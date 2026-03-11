@@ -45,6 +45,7 @@ For detailed guides, please refer to the comprehensive manuals located in the `D
 - 🚀 **[Deployment Manual](Documents/deployment%20manual.md):** Step-by-step instructions for installing and running the platform locally or on a cloud server like AWS EC2.
 - 📖 **[User Manual](Documents/user%20manual.md):** A complete guide on how to navigate the platform, upload documents, chat with the AI, and use the professional dashboards.
 - 🧠 **[Information Manual](Documents/information%20manual.md):** A deep dive into the platform's core architecture, including RAG logic, the LLM router, and the content analytics engine.
+- ☁️ **[AWS EC2 Launch Guide](Documents/AWS%20EC2%20Launch%20Guide.md):** Detailed, step-by-step AWS Console instructions for launching the optimized `t4g.large` instance and setting up security groups.
 
 ### Prerequisites
 
