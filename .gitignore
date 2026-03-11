@@ -1,0 +1,43 @@
+# Byte-compiled
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual env
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+
+# Data
+data/
+*.db
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+
+# Embeddings cache
+model_cache/
+
+# macOS / USB
+._*
+.DS_Store
+.Trashes
+.Spotlight-V100
+.fseventsd
+Icon?
+
+# Test Documents
+CFO/

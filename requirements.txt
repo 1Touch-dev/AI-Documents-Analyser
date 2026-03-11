@@ -1,0 +1,54 @@
+# ─── Core Backend ───
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+pydantic==2.10.4
+pydantic-settings==2.7.1
+httpx>=0.25.0,<0.28.0
+
+# ─── Database ───
+sqlalchemy==2.0.36
+alembic==1.14.1
+psycopg2-binary==2.9.10
+
+# ─── AI / LLM ───
+langchain==0.3.14
+langchain-community==0.3.14
+langchain-openai==0.3.0
+langchain-anthropic==0.3.3
+openai>=1.50.0
+anthropic>=0.40.0
+ollama==0.4.5
+
+# ─── Embeddings ───
+sentence-transformers==3.3.1
+
+# ─── Vector Stores ───
+chromadb==0.6.3
+qdrant-client==1.13.2
+
+# ─── Document Parsing ───
+PyMuPDF==1.25.3
+python-docx==1.1.2
+python-pptx==1.0.2
+openpyxl==3.1.5
+
+# ─── Cloud Storage ───
+boto3==1.36.2
+
+# ─── Visualization ───
+plotly==5.24.1
+altair==5.5.0
+pandas==2.2.3
+
+# ─── Frontend ───
+streamlit==1.41.1
+
+# ─── Auth & Security ───
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+slowapi==0.1.9
+
+# ─── Utilities ───
+python-dotenv==1.0.1
+aiofiles==24.1.0
