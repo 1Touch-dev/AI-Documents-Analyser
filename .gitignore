@@ -41,3 +41,7 @@ Icon?
 
 # Test Documents
 CFO/
+
+# AWS Keys
+*.pem
+ai-platform-key.pem
