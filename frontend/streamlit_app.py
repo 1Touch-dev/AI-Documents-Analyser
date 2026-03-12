@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import time
 from datetime import datetime, timedelta
+from urllib.parse import urlparse, urlunparse
 
 import httpx
 import numpy as np
@@ -21,8 +22,29 @@ import streamlit as st
 
 # ── Config ───────────────────────────────────────────────
 import os
-BACKEND_URL_ENV = os.getenv("BACKEND_API_URL", "http://localhost:8000/api")
-API_URL = BACKEND_URL_ENV
+BACKEND_URL_ENV = os.getenv("BACKEND_API_URL", "http://127.0.0.1:8000/api")
+
+
+def _normalize_api_url(url: str) -> str:
+    """
+    Force localhost URLs to IPv4 loopback to avoid ::1 connection-refused on macOS.
+    """
+    parsed = urlparse(url)
+    if parsed.hostname != "localhost":
+        return url.rstrip("/")
+    host = "127.0.0.1"
+    if parsed.port:
+        host = f"{host}:{parsed.port}"
+    netloc = host
+    if parsed.username:
+        auth = parsed.username
+        if parsed.password:
+            auth = f"{auth}:{parsed.password}"
+        netloc = f"{auth}@{netloc}"
+    return urlunparse(parsed._replace(netloc=netloc)).rstrip("/")
+
+
+API_URL = _normalize_api_url(BACKEND_URL_ENV)
 
 st.set_page_config(
     page_title="AI Knowledge Platform",

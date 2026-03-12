@@ -121,16 +121,31 @@ If you wish to run the app directly on your host machine for development:
 1. **Install Python 3.11+**
 2. **Setup Virtual Environment:**
    ```bash
+   cd "/Volumes/Seagate/AI Documents Analyser"
    python3 -m venv venv
    source venv/bin/activate
    pip install -r requirements.txt
    ```
-3. **Start PostgreSQL Locally** (e.g., via Homebrew or Docker run).
-4. **Start the Backend:**
+3. **Configure `.env` for local API URL (recommended on macOS):**
+   ```ini
+   BACKEND_API_URL=http://127.0.0.1:8000/api
+   ```
+4. **Start PostgreSQL Locally** (e.g., via Homebrew or Docker run).
+5. **Start the Backend:**
    ```bash
    uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
    ```
-5. **Start the Frontend (in a new terminal):**
+6. **Start the Frontend (in a new terminal):**
    ```bash
-   streamlit run frontend/streamlit_app.py
+   streamlit run frontend/streamlit_app.py --server.address 0.0.0.0 --server.port 8501
+   ```
+7. **Health Check:**
+   ```bash
+   curl -sS http://127.0.0.1:8000/api/health
+   curl -I http://127.0.0.1:8501
+   ```
+8. **Clean restart commands (if needed):**
+   ```bash
+   pkill -f "uvicorn backend.main:app" || true
+   pkill -f "streamlit run frontend/streamlit_app.py" || true
    ```

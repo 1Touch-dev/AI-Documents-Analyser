@@ -88,25 +88,50 @@ docker compose up --build -d
 
 ## Local Development (without Docker)
 
+### First-time setup
+
 ```bash
-# Create virtual environment
+cd "/Volumes/Seagate/AI Documents Analyser"
 python3 -m venv venv
 source venv/bin/activate
-
-# Install dependencies
 pip install -r requirements.txt
-
-# Copy environment config
 cp .env.example .env
+```
 
-# Start PostgreSQL (e.g. via brew or docker)
-docker run -d --name pg -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:16-alpine
+Set this in `.env` for reliable local connectivity on macOS:
 
-# Start backend
-uvicorn backend.main:app --reload --port 8000
+```ini
+BACKEND_API_URL=http://127.0.0.1:8000/api
+```
 
-# Start frontend (separate terminal)
-streamlit run frontend/streamlit_app.py
+### Start services (2 terminals)
+
+Terminal 1 (Backend):
+```bash
+cd "/Volumes/Seagate/AI Documents Analyser"
+source venv/bin/activate
+uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+Terminal 2 (Frontend):
+```bash
+cd "/Volumes/Seagate/AI Documents Analyser"
+source venv/bin/activate
+streamlit run frontend/streamlit_app.py --server.address 0.0.0.0 --server.port 8501
+```
+
+### Quick health checks
+
+```bash
+curl -sS http://127.0.0.1:8000/api/health
+curl -I http://127.0.0.1:8501
+```
+
+### Clean restart (if ports are stuck)
+
+```bash
+pkill -f "uvicorn backend.main:app" || true
+pkill -f "streamlit run frontend/streamlit_app.py" || true
 ```
 
 ---

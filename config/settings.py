@@ -5,6 +5,7 @@ Uses pydantic-settings for validation and type coercion.
 
 from __future__ import annotations
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -59,6 +60,19 @@ class Settings(BaseSettings):
 
     # ── Rate Limiting ────────────────────────────────────
     rate_limit: str = "60/minute"
+
+    @field_validator("debug", mode="before")
+    @classmethod
+    def _parse_debug(cls, value):
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            v = value.strip().lower()
+            if v in {"1", "true", "yes", "on", "dev", "debug"}:
+                return True
+            if v in {"0", "false", "no", "off", "prod", "production", "release"}:
+                return False
+        return value
 
 
 settings = Settings()

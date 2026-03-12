@@ -7,6 +7,7 @@ from __future__ import annotations
 import logging
 import uuid
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Any
 
 from config.settings import settings
@@ -56,6 +57,7 @@ class ChromaVectorStore(BaseVectorStore):
         import chromadb
         from chromadb.config import Settings as ChromaSettings
 
+        self._cleanup_macos_sidecars(chromadb)
         self._persist_dir = persist_dir or settings.chroma_persist_dir
         self._client = chromadb.PersistentClient(
             path=self._persist_dir,
@@ -66,6 +68,27 @@ class ChromaVectorStore(BaseVectorStore):
             metadata={"hnsw:space": "cosine"},
         )
         logger.info("ChromaDB collection '%s' ready (%d items)", self.COLLECTION_NAME, self._collection.count())
+
+    @staticmethod
+    def _cleanup_macos_sidecars(chromadb_module: Any) -> None:
+        """
+        Remove macOS AppleDouble files (e.g. ._00001-*.sql) that break Chroma migrations.
+        """
+        try:
+            chroma_root = Path(chromadb_module.__file__).resolve().parent
+            migrations_dir = chroma_root / "migrations"
+            if not migrations_dir.exists():
+                return
+
+            removed = 0
+            for sidecar in migrations_dir.rglob("._*"):
+                if sidecar.is_file():
+                    sidecar.unlink()
+                    removed += 1
+            if removed:
+                logger.warning("Removed %d macOS sidecar file(s) from Chroma migrations.", removed)
+        except Exception as exc:
+            logger.warning("Failed to clean Chroma migration sidecar files: %s", exc)
 
     def add_documents(
         self,

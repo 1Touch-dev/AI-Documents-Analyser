@@ -6,18 +6,52 @@ Welcome to the AI Knowledge Platform. This system empowers you to upload hundred
 
 ## 1. Starting and Stopping the Platform
 
-If the platform is running on your local machine, use these commands to control it. *(If deployed on a remote cloud server, your IT admin has likely configured it to run 24/7).*
+If the platform is running on your local machine, use one of the two methods below.
 
-**To Start the Application (Docker via Terminal):**
+### Option A: Docker
+
+**Start**
 ```bash
 cd "/Volumes/Seagate/AI Documents Analyser"
 docker compose up -d
 ```
-*The UI will be available at [http://localhost:8501](http://localhost:8501) within 30 seconds.*
 
-**To Stop the Application:**
+**Stop**
 ```bash
 docker compose down
+```
+
+### Option B: Native Python (No Docker)
+
+Before first run, set this in `.env`:
+```ini
+BACKEND_API_URL=http://127.0.0.1:8000/api
+```
+
+**Start Backend (Terminal 1)**
+```bash
+cd "/Volumes/Seagate/AI Documents Analyser"
+source venv/bin/activate
+uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+**Start Frontend (Terminal 2)**
+```bash
+cd "/Volumes/Seagate/AI Documents Analyser"
+source venv/bin/activate
+streamlit run frontend/streamlit_app.py --server.address 0.0.0.0 --server.port 8501
+```
+
+**Stop Native Processes**
+```bash
+pkill -f "uvicorn backend.main:app" || true
+pkill -f "streamlit run frontend/streamlit_app.py" || true
+```
+
+**Health Check**
+```bash
+curl -sS http://127.0.0.1:8000/api/health
+curl -I http://127.0.0.1:8501
 ```
 
 ---

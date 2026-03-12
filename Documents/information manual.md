@@ -46,3 +46,29 @@ The platform adheres to strict microservice boundaries to ensure scalability.
 - **FastAPI Backend:** Handles all heavy compute. Built asynchronously (`async def`), it allows multiple users to upload massive files simultaneously without blocking API requests for other users.
 - **Streamlit Frontend:** A pure, stateless UI layer. It holds no database connections and performs no complex math. It exclusively communicates via HTTP REST requests to the FastAPI backend. This means you could theoretically replace Streamlit with a React or Vue frontend in the future with zero changes to the backend engine.
 - **PostgreSQL Persistence:** All relational states—such as User tracking, Document metadata mapping, Conversation histories, and Prompt libraries—are stored resiliently in a traditional PostgreSQL relational database wrapper in SQLAlchemy ORM.
+
+---
+
+## 5. Local Run Quick Reference
+
+Use these commands when running without Docker:
+
+```bash
+cd "/Volumes/Seagate/AI Documents Analyser"
+source venv/bin/activate
+uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+In a second terminal:
+
+```bash
+cd "/Volumes/Seagate/AI Documents Analyser"
+source venv/bin/activate
+streamlit run frontend/streamlit_app.py --server.address 0.0.0.0 --server.port 8501
+```
+
+Recommended `.env` setting:
+
+```ini
+BACKEND_API_URL=http://127.0.0.1:8000/api
+```
