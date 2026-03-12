@@ -20,7 +20,9 @@ from plotly.subplots import make_subplots
 import streamlit as st
 
 # ── Config ───────────────────────────────────────────────
-API_URL = "http://localhost:8000/api"
+import os
+BACKEND_URL_ENV = os.getenv("BACKEND_API_URL", "http://localhost:8000/api")
+API_URL = BACKEND_URL_ENV
 
 st.set_page_config(
     page_title="AI Knowledge Platform",
@@ -29,105 +31,93 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── Custom CSS ───────────────────────────────────────────
+# ── Custom CSS (Theme-Aware) ─────────────────────────────
 st.markdown(
     """
     <style>
-    /* Global */
-    .stApp {
-        background: #f8f9fa;
-        color: #1e293b;
+    /* Theme-Aware Visibility Fixes */
+    :root {
+        --primary-brand: #4f46e5;
+        --success-brand: #10b981;
     }
+
+    /* Standardize background and text for visibility across ALL modes */
+    .main .block-container {
+        color: var(--text-color);
+        background-color: var(--background-color);
+    }
+
+    /* Sidebar Styling */
     [data-testid="stSidebar"] {
-        background: #ffffff; 
-        border-right: 1px solid #e2e8f0;
+        border-right: 1px solid rgba(128, 128, 128, 0.2);
     }
 
-    /* Override Streamlit default text colors where needed */
-    .stMarkdown, .stText { color: #1e293b; }
-    h1, h2, h3, h4, h5, h6 { color: #0f172a !important; font-weight: 600; }
+    /* Headers Contrast */
+    h1, h2, h3, h4, h5, h6 {
+        color: var(--text-color) !important;
+        font-weight: 600 !important;
+    }
 
-    /* Cards */
+    /* Metric Cards (Dynamic contrast) */
     .metric-card {
-        background: #ffffff; 
-        border: 1px solid #e2e8f0;
-        border-radius: 12px; padding: 20px; margin: 8px 0;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        background: rgba(128, 128, 128, 0.05);
+        border: 1px solid rgba(128, 128, 128, 0.2);
+        border-radius: 12px;
+        padding: 20px;
+        margin: 8px 0;
     }
-    .metric-card h3 {font-size: 14px; color: #64748b !important; margin: 0 0 4px 0; font-weight: 500;}
-    .metric-card p {font-size: 28px; font-weight: 700; color: #4f46e5 !important; margin: 0;}
-
-    /* Glassmorphism panels */
-    .glass-panel {
-        background: rgba(255, 255, 255, 0.7); 
-        border: 1px solid #e2e8f0;
-        border-radius: 16px; padding: 24px; margin: 12px 0;
-        backdrop-filter: blur(10px);
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    .metric-card h3 {
+        font-size: 14px;
+        color: var(--text-color) !important;
+        opacity: 0.8;
+        margin: 0 0 4px 0;
+    }
+    .metric-card p {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--primary-color) !important;
+        margin: 0;
     }
 
-    /* Chat bubbles */
+    /* Chat Bubbles (Contrast Fix) */
     .chat-user {
-        background: #e0e7ff; border: 1px solid #c7d2fe; color: #1e293b;
-        border-radius: 16px 16px 4px 16px; padding: 14px 18px; margin: 8px 0;
+        background: rgba(79, 70, 229, 0.1);
+        border: 1px solid rgba(79, 70, 229, 0.2);
+        color: var(--text-color);
+        border-radius: 16px 16px 4px 16px;
+        padding: 14px 18px;
+        margin: 8px 0;
     }
     .chat-assistant {
-        background: #ffffff; border: 1px solid #e2e8f0; color: #1e293b;
-        border-radius: 16px 16px 16px 4px; padding: 14px 18px; margin: 8px 0;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        background: rgba(128, 128, 128, 0.1);
+        border: 1px solid rgba(128, 128, 128, 0.2);
+        color: var(--text-color);
+        border-radius: 16px 16px 16px 4px;
+        padding: 14px 18px;
+        margin: 8px 0;
     }
 
-    /* Source badges */
-    .source-badge {
-        display: inline-block; background: #f1f5f9;
-        border: 1px solid #cbd5e1; border-radius: 8px;
-        padding: 4px 10px; margin: 2px 4px; font-size: 12px; color: #475569;
-    }
-
-    /* Status chips */
-    .status-ready {color: #16a34a; font-weight: 600;}
-    .status-processing {color: #d97706; font-weight: 600;}
-    .status-failed {color: #dc2626; font-weight: 600;}
-
-    /* Tab content padding */
-    .block-container {padding-top: 3rem; padding-bottom: 2rem;}
-    
-    /* Make tabs more visible */
-    [data-testid="stTabs"] { margin-top: 1rem; }
-
-    /* Button overrides */
+    /* Button Contrast */
     .stButton > button {
-        border: 1px solid #cbd5e1;
         border-radius: 8px;
-        background-color: #ffffff;
-        color: #4f46e5;
         font-weight: 500;
         transition: all 0.2s;
     }
-    .stButton > button:hover {
-        border-color: #4f46e5;
-        color: #ffffff;
-        background-color: #4f46e5;
-        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
-    }
 
-    /* Progress bars */
-    .batch-progress {
-        height: 6px; border-radius: 3px; background: #e2e8f0;
-        overflow: hidden; margin: 4px 0;
-    }
-    .batch-progress-fill {
-        height: 100%; border-radius: 3px;
-        background: linear-gradient(90deg, #4f46e5, #10b981);
-        transition: width 0.3s;
-    }
+    /* Status Tags */
+    .status-ready { color: #16a34a; font-weight: 600; }
+    .status-processing { color: #d97706; font-weight: 600; }
+    .status-failed { color: #dc2626; font-weight: 600; }
 
-    /* Word cloud tag */
-    .word-tag {
-        display: inline-block; padding: 4px 12px; margin: 3px;
-        border-radius: 20px; font-size: 13px; font-weight: 500;
-        background: #e0e7ff; border: 1px solid #c7d2fe;
-        color: #3730a3;
+    /* Diagnosis Badge */
+    .diag-badge {
+        font-size: 10px;
+        font-family: monospace;
+        opacity: 0.6;
+        padding: 2px 8px;
+        border-radius: 4px;
+        border: 1px solid rgba(128, 128, 128, 0.3);
+        margin-bottom: 20px;
     }
     </style>
     """,
@@ -174,7 +164,9 @@ def api_post(path: str, json_data: dict | None = None, files=None, data=None) ->
 
 def api_delete(path: str) -> dict | None:
     try:
+        st.write(f"DEBUG: Calling DELETE {API_URL}{path}") # Temporary test
         r = httpx.delete(f"{API_URL}{path}", headers=_headers(), timeout=30)
+        st.write(f"DEBUG: DELETE {API_URL}{path} -> Status: {r.status_code}") # Temporary test
         r.raise_for_status()
         return r.json()
     except Exception as e:
@@ -218,28 +210,6 @@ with st.sidebar:
     st.markdown("## 🧠 AI Knowledge Platform")
     st.markdown("---")
 
-    # ── Auth ─────────────────────────────────────────────
-    if not st.session_state.auth_token:
-        st.markdown("#### 🔐 Authentication")
-        auth_tab = st.radio("", ["Login", "Register"], horizontal=True, label_visibility="collapsed")
-        with st.form("auth_form"):
-            username = st.text_input("Username")
-            password = st.text_input("Password", type="password")
-            submitted = st.form_submit_button("Submit")
-            if submitted and username and password:
-                endpoint = "/auth/login" if auth_tab == "Login" else "/auth/register"
-                resp = api_post(endpoint, {"username": username, "password": password})
-                if resp and "access_token" in resp:
-                    st.session_state.auth_token = resp["access_token"]
-                    st.session_state.username = username
-                    st.rerun()
-    else:
-        st.success(f"Logged in as **{st.session_state.username}**")
-        if st.button("Logout"):
-            st.session_state.auth_token = ""
-            st.session_state.username = ""
-            st.rerun()
-
     st.markdown("---")
 
     with st.expander("⚙️ Provider API Keys", expanded=False):
@@ -250,67 +220,141 @@ with st.sidebar:
 
     st.markdown("---")
 
-    # ── Batch Upload ─────────────────────────────────────
+    # ── Batch Upload (Direct FastAPI Bypass) ─────────────
     st.markdown("#### 📄 Upload Documents")
-    uploaded_files = st.file_uploader(
-        "Choose files",
-        type=["pdf", "docx", "pptx", "xlsx", "csv", "txt", "json"],
-        accept_multiple_files=True,
-        help="Drag & drop up to 50+ files. Max 500 MB per file.",
-    )
+    
+    auth_token = st.session_state.auth_token
+    
+    html_code = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <style>
+      body {{ font-family: sans-serif; color: var(--text-color, #333); }}
+      .dropzone {{
+        border: 2px dashed #ccc;
+        border-radius: 8px;
+        padding: 20px;
+        text-align: center;
+        margin-bottom: 10px;
+        background: rgba(128, 128, 128, 0.05);
+        cursor: pointer;
+        transition: background 0.2s;
+      }}
+      .dropzone:hover {{ background: rgba(128, 128, 128, 0.1); }}
+      select, input, button {{
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 10px;
+        border-radius: 4px;
+        border: 1px solid #ccc;
+        box-sizing: border-box;
+      }}
+      button {{
+        background-color: #ff4b4b;
+        color: white;
+        font-weight: bold;
+        border: none;
+        cursor: pointer;
+      }}
+      button:hover {{ background-color: #ff3333; }}
+      button:disabled {{ background-color: #ffa0a0; cursor: not-allowed; }}
+      #status {{ font-size: 0.9em; margin-top: 5px; word-break: break-all; font-weight: bold; }}
+    </style>
+    </head>
+    <body>
+      <div class="dropzone" id="dropzone">
+        <p style="margin: 0; font-weight: bold;">📁 Drag & drop specific files here</p>
+        <p style="font-size: 0.75em; color: gray; margin-top: 5px;">Limit 1GB per file • PDF, DOCX, PPTX, XLSX, CSV, TXT, JSON</p>
+        <input type="file" id="fileInput" multiple style="display:none;" />
+      </div>
+      
+      <input type="text" id="categoryInput" value="general" placeholder="Category for batch" />
+      <button id="uploadBtn">⬆️ Upload All Directly</button>
+      <div id="status"></div>
 
-    upload_category = st.text_input("Category for batch", value="general", key="upload_cat")
+      <script>
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('fileInput');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const statusDiv = document.getElementById('status');
+        const categoryInput = document.getElementById('categoryInput');
+        
+        dropzone.addEventListener('click', () => fileInput.click());
+        dropzone.addEventListener('dragover', (e) => {{ e.preventDefault(); dropzone.style.background = 'rgba(128,128,128,0.2)'; }});
+        dropzone.addEventListener('dragleave', () => {{ dropzone.style.background = 'rgba(128,128,128,0.05)'; }});
+        dropzone.addEventListener('drop', (e) => {{
+          e.preventDefault();
+          dropzone.style.background = 'rgba(128,128,128,0.05)';
+          if (e.dataTransfer.files.length) {{
+            fileInput.files = e.dataTransfer.files;
+            statusDiv.innerText = `${{fileInput.files.length}} files selected ready to upload.`;
+            statusDiv.style.color = '#333';
+          }}
+        }});
+        
+        fileInput.addEventListener('change', () => {{
+          if(fileInput.files.length) {{
+             statusDiv.innerText = `${{fileInput.files.length}} files selected ready to upload.`;
+             statusDiv.style.color = '#333';
+          }}
+        }});
 
-    if uploaded_files:
-        total_size = sum(f.size for f in uploaded_files)
-        st.caption(f"📦 {len(uploaded_files)} files selected  •  {total_size / (1024*1024):.1f} MB total")
+        uploadBtn.addEventListener('click', async () => {{
+          if (!fileInput.files.length) {{
+            statusDiv.innerText = "⚠️ Please select files first.";
+            statusDiv.style.color = "orange";
+            return;
+          }}
+          
+          statusDiv.innerText = `⏳ Uploading ${{fileInput.files.length}} files directly to backend... Please wait.`;
+          statusDiv.style.color = "#0066cc";
+          uploadBtn.disabled = true;
+          
+          const formData = new FormData();
+          for (const file of fileInput.files) {{
+             formData.append("files", file);
+          }}
+          formData.append("category", categoryInput.value || "general");
 
-    if st.button("⬆️ Upload All", use_container_width=True) and uploaded_files:
-        with st.spinner(f"Uploading {len(uploaded_files)} files..."):
-            if len(uploaded_files) == 1:
-                f = uploaded_files[0]
-                files_payload = {"file": (f.name, f.getvalue(), f.type or "application/octet-stream")}
-                data = {"category": upload_category}
-                resp = api_post("/upload_document", files=files_payload, data=data)
-                if resp:
-                    st.success(f"✅ Uploaded! {resp.get('chunks', 0)} chunks")
-            else:
-                files_payload = [
-                    ("files", (f.name, f.getvalue(), f.type or "application/octet-stream"))
-                    for f in uploaded_files
-                ]
-                try:
-                    r = httpx.post(
-                        f"{API_URL}/upload_batch",
-                        files=files_payload,
-                        data={"category": upload_category},
-                        headers=_headers(),
-                        timeout=300,
-                    )
-                    r.raise_for_status()
-                    resp = r.json()
-                    st.session_state.batch_id = resp.get("batch_id")
-                    accepted = resp.get("accepted", 0)
-                    dupes = resp.get("duplicates", 0)
-                    rejected = resp.get("rejected", 0)
-                    st.success(f"✅ {accepted} processing  |  ⚠️ {dupes} duplicates  |  ❌ {rejected} rejected")
-                except Exception as e:
-                    st.error(f"Batch upload failed: {e}")
-
-    # ── Batch Progress ───────────────────────────────────
-    if st.session_state.batch_id:
-        status = api_get(f"/batch_status/{st.session_state.batch_id}", silent_codes=[404])
-        if status and status.get("error") and status.get("status_code") == 404:
-            # Batch likely cleared by server restart, clear session state silently
-            st.session_state.batch_id = None
-        elif status:
-            total = max(status.get("total", 1), 1)
-            ready = status.get("ready", 0)
-            pct = int(ready / total * 100) if total > 0 else 0
-            st.markdown(f"**Batch progress:** {ready}/{total} ready ({pct}%)")
-            st.progress(pct / 100)
-            if ready == total:
-                st.session_state.batch_id = None
+          try {{
+            // Bypass Streamlit dynamically by talking directly to port 8000
+            const hostname = window.location.hostname || 'localhost';
+            const backendUrl = `http://${{hostname}}:8000/api/upload_batch`;
+            
+            const response = await fetch(backendUrl, {{
+              method: "POST",
+              headers: {{
+                "Authorization": "Bearer {auth_token}"
+              }},
+              body: formData
+            }});
+            
+            if (!response.ok) {{
+              const err = await response.text();
+              throw new Error(`HTTP error ${{response.status}}: ${{err}}`);
+            }}
+            
+            const result = await response.json();
+            statusDiv.innerText = `✅ Success! ${{result.accepted}} processing | ⚠️ ${{result.duplicates}} duplicates | ❌ ${{result.rejected}} rejected. Check 'Documents' tab.`;
+            statusDiv.style.color = "green";
+            fileInput.value = ""; 
+          }} catch (error) {{
+            statusDiv.innerText = `❌ Upload failed: ${{error.message}}`;
+            statusDiv.style.color = "red";
+          }} finally {{
+            uploadBtn.disabled = false;
+          }}
+        }});
+      </script>
+    </body>
+    </html>
+    """
+    
+    import streamlit.components.v1 as components
+    components.html(html_code, height=360)
+    
+    st.session_state.batch_id = None
 
     st.markdown("---")
 
@@ -388,18 +432,20 @@ with tab_chat:
 
     # Display chat history
     for msg in st.session_state.chat_messages:
-        css_class = "chat-user" if msg["role"] == "user" else "chat-assistant"
-        prefix = "**You:**" if msg["role"] == "user" else "**AI:**"
-        st.markdown(f'<div class="{css_class}">{prefix} {msg["content"]}</div>', unsafe_allow_html=True)
-
-        # Show sources
-        if msg.get("sources"):
-            source_html = " ".join(
-                f'<span class="source-badge">📄 {s.get("title", s.get("doc_id", "?")[:8])} '
-                f'(score: {s.get("relevance_score", "?")})</span>'
-                for s in msg["sources"]
-            )
-            st.markdown(source_html, unsafe_allow_html=True)
+        role = "user" if msg["role"] == "user" else "assistant"
+        with st.chat_message(role):
+            st.markdown(msg["content"])
+            
+            # Show sources with indices matching [1], [2], etc.
+            if msg.get("sources"):
+                st.markdown("---")
+                cols = st.columns(len(msg["sources"]))
+                for i, s in enumerate(msg["sources"], 1):
+                    with cols[(i-1) % len(cols)]:
+                        st.markdown(
+                            f'<div class="source-badge">[{i}] 📄 {s.get("title", s.get("doc_id", "?")[:8])}</div>',
+                            unsafe_allow_html=True
+                        )
 
     # Input
     question = st.chat_input("Ask a question about your documents…")

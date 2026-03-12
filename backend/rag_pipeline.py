@@ -160,10 +160,13 @@ class RAGPipeline:
             )
         else:
             prompt = (
-                "You are a helpful AI assistant. Use the following library overview and context to answer "
-                "the user's question. If the user asks about the count or names of documents, refer to the "
-                "Library Overview. For content-specific answers, use the retrieve context chunks. "
-                "Cite sources using [1], [2], etc. for specific content.\n\n"
+                "You are a knowledgeable AI assistant. Use the following library overview and context to answer "
+                "the user's question. \n\n"
+                "Guidelines:\n"
+                "1. If the user asks about document counts or names, refer to the Library Overview.\n"
+                "2. For content-specific answers, use the Retrieve Context Chunks and cite them using [1], [2], etc.\n"
+                "3. Ensure every factual claim is grounded in the provided chunks.\n"
+                "4. If you cannot find the answer, be honest.\n\n"
                 f"{library_info}"
                 f"Retrieved Context Chunks:\n{context}\n\n"
                 f"Question: {question}\n\n"

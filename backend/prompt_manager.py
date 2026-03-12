@@ -24,8 +24,11 @@ DEFAULT_TEMPLATES = [
         "description": "Standard retrieval-augmented generation prompt.",
         "template": (
             "You are a helpful AI assistant. Use the following context to answer "
-            "the user's question. If the answer is not found in the context, say "
-            "so clearly.\n\n"
+            "the user's question. \n\n"
+            "Guidelines:\n"
+            "1. Cite sources using [1], [2], etc. for every claim made from the context.\n"
+            "2. If the answer is not found in the context, say so clearly.\n"
+            "3. Keep the answer professional and concise.\n\n"
             "Context:\n${context}\n\n"
             "Question: ${question}\n\n"
             "Answer:"
