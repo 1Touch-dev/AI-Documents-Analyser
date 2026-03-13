@@ -282,6 +282,33 @@ with st.sidebar:
       button:hover {{ background-color: #ff3333; }}
       button:disabled {{ background-color: #ffa0a0; cursor: not-allowed; }}
       #status {{ font-size: 0.9em; margin-top: 5px; word-break: break-all; font-weight: bold; }}
+      #progressBar {{
+        width: 100%;
+        height: 20px;
+        background-color: #f0f0f0;
+        border-radius: 10px;
+        overflow: hidden;
+        margin-top: 10px;
+        display: none;
+      }}
+      #progressFill {{
+        height: 100%;
+        background-color: #4CAF50;
+        width: 0%;
+        transition: width 0.3s;
+      }}
+      #debugLog {{
+        margin-top: 10px;
+        padding: 10px;
+        background: #f9f9f9;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 0.85em;
+        max-height: 200px;
+        overflow-y: auto;
+        font-family: monospace;
+        display: none;
+      }}
     </style>
     </head>
     <body>
@@ -290,10 +317,12 @@ with st.sidebar:
         <p style="font-size: 0.75em; color: gray; margin-top: 5px;">Limit 1GB per file • PDF, DOCX, PPTX, XLSX, CSV, TXT, JSON</p>
         <input type="file" id="fileInput" multiple style="display:none;" />
       </div>
-      
+
       <input type="text" id="categoryInput" value="general" placeholder="Category for batch" />
       <button id="uploadBtn">⬆️ Upload All Directly</button>
+      <div id="progressBar"><div id="progressFill"></div></div>
       <div id="status"></div>
+      <div id="debugLog"></div>
 
       <script>
         const dropzone = document.getElementById('dropzone');
@@ -301,7 +330,27 @@ with st.sidebar:
         const uploadBtn = document.getElementById('uploadBtn');
         const statusDiv = document.getElementById('status');
         const categoryInput = document.getElementById('categoryInput');
-        
+        const progressBar = document.getElementById('progressBar');
+        const progressFill = document.getElementById('progressFill');
+        const debugLog = document.getElementById('debugLog');
+
+        function log(message) {{
+          console.log('[BATCH UPLOAD]', message);
+          debugLog.style.display = 'block';
+          const timestamp = new Date().toLocaleTimeString();
+          debugLog.innerHTML += `[${{timestamp}}] ${{message}}<br>`;
+          debugLog.scrollTop = debugLog.scrollHeight;
+        }}
+
+        function updateProgress(percent, message) {{
+          progressBar.style.display = 'block';
+          progressFill.style.width = percent + '%';
+          if (message) {{
+            statusDiv.innerText = message;
+            log(message);
+          }}
+        }}
+
         dropzone.addEventListener('click', () => fileInput.click());
         dropzone.addEventListener('dragover', (e) => {{ e.preventDefault(); dropzone.style.background = 'rgba(128,128,128,0.2)'; }});
         dropzone.addEventListener('dragleave', () => {{ dropzone.style.background = 'rgba(128,128,128,0.05)'; }});
@@ -312,59 +361,194 @@ with st.sidebar:
             fileInput.files = e.dataTransfer.files;
             statusDiv.innerText = `${{fileInput.files.length}} files selected ready to upload.`;
             statusDiv.style.color = '#333';
+            log(`${{fileInput.files.length}} files dropped`);
           }}
         }});
-        
+
         fileInput.addEventListener('change', () => {{
           if(fileInput.files.length) {{
              statusDiv.innerText = `${{fileInput.files.length}} files selected ready to upload.`;
              statusDiv.style.color = '#333';
+             log(`${{fileInput.files.length}} files selected`);
           }}
         }});
 
         uploadBtn.addEventListener('click', async () => {{
+          // Clear previous logs and progress
+          debugLog.innerHTML = '';
+          debugLog.style.display = 'block';
+          progressBar.style.display = 'none';
+          progressFill.style.width = '0%';
+
+          log('=== UPLOAD STARTED ===');
+          log(`Current URL: ${{window.location.href}}`);
+          log(`Protocol: ${{window.location.protocol}}`);
+          log(`Hostname: ${{window.location.hostname}}`);
+          log(`Port: ${{window.location.port}}`);
+          log(`Origin: ${{window.location.origin}}`);
+
           if (!fileInput.files.length) {{
             statusDiv.innerText = "⚠️ Please select files first.";
             statusDiv.style.color = "orange";
+            log('ERROR: No files selected');
             return;
           }}
-          
-          statusDiv.innerText = `⏳ Uploading ${{fileInput.files.length}} files directly to backend... Please wait.`;
+
+          // Calculate total size
+          let totalSize = 0;
+          const fileList = [];
+          for (const file of fileInput.files) {{
+            totalSize += file.size;
+            fileList.push(`${{file.name}} (${{(file.size/1024/1024).toFixed(2)}} MB)`);
+          }}
+          log(`Files to upload: ${{fileInput.files.length}}`);
+          fileList.forEach(f => log(`  - ${{f}}`));
+          log(`Total size: ${{(totalSize/1024/1024).toFixed(2)}} MB`);
+
+          // Check against 1GB limit
+          if (totalSize > 1024 * 1024 * 1024) {{
+            const msg = `⚠️ Total size ${{(totalSize/1024/1024).toFixed(2)}} MB exceeds 1GB limit`;
+            statusDiv.innerText = msg;
+            statusDiv.style.color = "orange";
+            log(`ERROR: ${{msg}}`);
+            return;
+          }}
+
+          // Warn if over 500MB
+          if (totalSize > 500 * 1024 * 1024) {{
+            log(`⚠️ WARNING: Large upload size ${{(totalSize/1024/1024).toFixed(2)}} MB - this may take a while`);
+          }}
+
+          updateProgress(10, `⏳ Preparing ${{fileInput.files.length}} files...`);
           statusDiv.style.color = "#0066cc";
           uploadBtn.disabled = true;
-          
+
           const formData = new FormData();
           for (const file of fileInput.files) {{
              formData.append("files", file);
           }}
           formData.append("category", categoryInput.value || "general");
+          log(`Category: ${{categoryInput.value || "general"}}`);
+
+          updateProgress(20, '⏳ Building request...');
 
           try {{
-            // Use origin to construct full URL - will use current protocol and host
-            const backendUrl = `${{window.location.origin}}/api/upload_batch`;
-            
-            const response = await fetch(backendUrl, {{
-              method: "POST",
-              headers: {{
-                "Authorization": "Bearer {auth_token}"
-              }},
-              body: formData
+            // Use relative URL to avoid iframe origin issues
+            // This works both locally and on deployed server
+            const backendUrl = '/api/upload_batch';
+
+            log(`Using backend URL: ${{backendUrl}}`);
+            updateProgress(30, '⏳ Sending request...');
+
+            const xhr = new XMLHttpRequest();
+
+            // Track upload progress
+            xhr.upload.addEventListener('progress', (e) => {{
+              if (e.lengthComputable) {{
+                const percentComplete = Math.round((e.loaded / e.total) * 100);
+                const loadedMB = (e.loaded / 1024 / 1024).toFixed(2);
+                const totalMB = (e.total / 1024 / 1024).toFixed(2);
+                updateProgress(30 + (percentComplete * 0.6), `⏳ Uploading: ${{loadedMB}}/${{totalMB}} MB (${{percentComplete}}%)`);
+              }}
             }});
-            
-            if (!response.ok) {{
-              const err = await response.text();
-              throw new Error(`HTTP error ${{response.status}}: ${{err}}`);
-            }}
-            
-            const result = await response.json();
-            statusDiv.innerText = `✅ Success! ${{result.accepted}} processing | ⚠️ ${{result.duplicates}} duplicates | ❌ ${{result.rejected}} rejected. Check 'Documents' tab.`;
+
+            // Handle completion
+            const uploadPromise = new Promise((resolve, reject) => {{
+              xhr.addEventListener('load', () => {{
+                log(`✓ Upload completed - Response status: ${{xhr.status}}`);
+                log(`Response headers: ${{xhr.getAllResponseHeaders()}}`);
+                log(`Response text (first 500 chars): ${{xhr.responseText.substring(0, 500)}}`);
+
+                if (xhr.status >= 200 && xhr.status < 300) {{
+                  updateProgress(95, '✅ Processing response...');
+                  try {{
+                    const result = JSON.parse(xhr.responseText);
+                    log(`✓ Successfully parsed response`);
+                    log(`Result: ${{JSON.stringify(result)}}`);
+                    resolve(result);
+                  }} catch (parseError) {{
+                    log(`❌ ERROR parsing JSON: ${{parseError.message}}`);
+                    log(`Raw response: ${{xhr.responseText}}`);
+                    reject(new Error(`Failed to parse response: ${{parseError.message}}`));
+                  }}
+                }} else {{
+                  // Enhanced error handling with specific diagnostics
+                  let errorMsg = `HTTP ${{xhr.status}}`;
+                  let diagnostic = '';
+
+                  if (xhr.status === 413) {{
+                    errorMsg = 'Request Entity Too Large (413)';
+                    diagnostic = 'The file size exceeds the server upload limit. Nginx client_max_body_size may need to be increased.';
+                  }} else if (xhr.status === 403) {{
+                    errorMsg = 'Forbidden (403)';
+                    diagnostic = 'Access denied. This could be due to: nginx location block restrictions, CORS policy, or missing authentication. Check nginx configuration and backend logs.';
+                  }} else if (xhr.status === 404) {{
+                    errorMsg = 'Not Found (404)';
+                    diagnostic = 'The API endpoint /api/upload_batch was not found. Verify nginx proxy_pass configuration and backend is running.';
+                  }} else if (xhr.status === 500) {{
+                    errorMsg = 'Internal Server Error (500)';
+                    diagnostic = 'Backend processing failed. Check FastAPI backend logs for Python errors.';
+                  }} else if (xhr.status === 502) {{
+                    errorMsg = 'Bad Gateway (502)';
+                    diagnostic = 'Nginx cannot reach the backend. Check that FastAPI is running on port 8000.';
+                  }} else if (xhr.status === 504) {{
+                    errorMsg = 'Gateway Timeout (504)';
+                    diagnostic = 'Backend processing took too long. Increase proxy_read_timeout in nginx or optimize backend.';
+                  }}
+
+                  log(`❌ ERROR: ${{errorMsg}}`);
+                  log(`Diagnostic: ${{diagnostic}}`);
+                  log(`Response body: ${{xhr.responseText}}`);
+
+                  const fullError = diagnostic
+                    ? `${{errorMsg}}\\n\\nDiagnostic: ${{diagnostic}}\\n\\nServer response: ${{xhr.responseText.substring(0, 300)}}`
+                    : `${{errorMsg}}\\n\\nServer response: ${{xhr.responseText.substring(0, 300)}}`;
+
+                  reject(new Error(fullError));
+                }}
+              }});
+
+              xhr.addEventListener('error', (e) => {{
+                log(`❌ ERROR: Network error occurred`);
+                log(`Error details: ${{JSON.stringify(e)}}`);
+                reject(new Error('Network error. Possible causes: CORS restrictions, network connectivity issues, or firewall blocking the request.'));
+              }});
+
+              xhr.addEventListener('timeout', () => {{
+                log(`❌ ERROR: Request timeout after ${{xhr.timeout}}ms`);
+                reject(new Error(`Upload timeout after ${{xhr.timeout / 1000}}s. The files may be too large, network is slow, or backend processing is taking too long. Try uploading fewer/smaller files.`));
+              }});
+            }});
+
+            xhr.open('POST', backendUrl);
+            xhr.setRequestHeader('Authorization', 'Bearer {auth_token}');
+            xhr.timeout = 300000; // 5 minutes
+
+            log(`✓ XHR configured:`);
+            log(`  - Method: POST`);
+            log(`  - URL: ${{backendUrl}}`);
+            log(`  - Timeout: ${{xhr.timeout / 1000}}s`);
+            log(`  - Authorization: Bearer token set`);
+            log(`  - Files in FormData: ${{fileInput.files.length}}`);
+            log(`📤 Sending request now...`);
+
+            xhr.send(formData);
+
+            const result = await uploadPromise;
+            updateProgress(100, `✅ Success! ${{result.accepted}} accepted | ⚠️ ${{result.duplicates}} duplicates | ❌ ${{result.rejected}} rejected`);
             statusDiv.style.color = "green";
-            fileInput.value = ""; 
+            log(`Upload complete: ${{result.accepted}} accepted, ${{result.duplicates}} duplicates, ${{result.rejected}} rejected`);
+            fileInput.value = "";
+
           }} catch (error) {{
             statusDiv.innerText = `❌ Upload failed: ${{error.message}}`;
             statusDiv.style.color = "red";
+            progressBar.style.display = 'none';
+            log(`FATAL ERROR: ${{error.message}}`);
+            log(`Error stack: ${{error.stack}}`);
           }} finally {{
             uploadBtn.disabled = false;
+            log('=== UPLOAD FINISHED ===');
           }}
         }});
       </script>
