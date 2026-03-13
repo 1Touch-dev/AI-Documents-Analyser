@@ -340,9 +340,8 @@ with st.sidebar:
           formData.append("category", categoryInput.value || "general");
 
           try {{
-            // Bypass Streamlit dynamically by talking directly to port 8000
-            const hostname = window.location.hostname || 'localhost';
-            const backendUrl = `http://${{hostname}}:8000/api/upload_batch`;
+            // Use origin to construct full URL - will use current protocol and host
+            const backendUrl = `${{window.location.origin}}/api/upload_batch`;
             
             const response = await fetch(backendUrl, {{
               method: "POST",
