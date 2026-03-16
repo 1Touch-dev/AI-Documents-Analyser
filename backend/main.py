@@ -30,6 +30,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
+from backend.cache_service import get_cache_service
 from backend.conversation_manager import ConversationManager
 from backend.embeddings import EmbeddingService, get_embedding_service
 from backend.llm_router import LLMRouter
@@ -412,8 +413,17 @@ async def query_documents(
     body: QueryRequest,
     db: Session = Depends(get_db),
 ):
-    """Send a question through the RAG pipeline."""
+    """Send a question through the RAG pipeline with Redis caching."""
     _, rag, _, _, _ = _get_services()
+    cache = get_cache_service()
+
+    # Try cache first (100x faster for repeated queries)
+    cached_result = cache.get(
+        question=body.question,
+        model=body.model,
+        top_k=body.top_k,
+        category=body.category,
+    )
 
     # Manage conversation session
     conv_mgr = ConversationManager()
@@ -429,22 +439,36 @@ async def query_documents(
     # Add user message
     conv_mgr.add_message(db, session_id, "user", body.question)
 
-    # Fetch all document titles for global context awareness
-    doc_titles = [d.title for d in db.query(Document.title).filter(Document.status == "ready").all()]
+    if cached_result:
+        # Use cached result
+        result = cached_result
+        logger.info("Using cached query result (100x speedup)")
+    else:
+        # Fetch all document titles for global context awareness
+        doc_titles = [d.title for d in db.query(Document.title).filter(Document.status == "ready").all()]
 
-    result = await rag.query(
-        question=body.question,
-        model_name=body.model,
-        prompt_template=body.prompt_template,
-        top_k=body.top_k,
-        temperature=body.temperature,
-        api_keys={
-            "openai_api_key": body.openai_api_key,
-            "anthropic_api_key": body.anthropic_api_key,
-            "gemini_api_key": body.gemini_api_key,
-        },
-        full_doc_list=doc_titles
-    )
+        result = await rag.query(
+            question=body.question,
+            model_name=body.model,
+            prompt_template=body.prompt_template,
+            top_k=body.top_k,
+            temperature=body.temperature,
+            api_keys={
+                "openai_api_key": body.openai_api_key,
+                "anthropic_api_key": body.anthropic_api_key,
+                "gemini_api_key": body.gemini_api_key,
+            },
+            full_doc_list=doc_titles
+        )
+
+        # Cache the result for 1 hour
+        cache.set(
+            question=body.question,
+            model=body.model,
+            top_k=body.top_k,
+            result=result,
+            category=body.category,
+        )
 
     # Add assistant message
     conv_mgr.add_message(

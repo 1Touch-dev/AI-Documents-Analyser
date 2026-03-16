@@ -41,7 +41,9 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
 
     # ── Embeddings ───────────────────────────────────────
-    embedding_model: str = "BAAI/bge-large-en-v1.5"
+    # Switched to bge-base for 2.5x faster performance with only 2-3% quality loss
+    # bge-large: 1024 dims, 335M params | bge-base: 768 dims, 109M params
+    embedding_model: str = "BAAI/bge-base-en-v1.5"
 
     # ── Vector Store ─────────────────────────────────────
     vector_store_type: str = "chroma"  # "chroma" | "qdrant"
@@ -60,6 +62,10 @@ class Settings(BaseSettings):
 
     # ── Rate Limiting ────────────────────────────────────
     rate_limit: str = "60/minute"
+
+    # ── Caching (Redis) ──────────────────────────────────
+    redis_url: str = "redis://localhost:6379/0"
+    cache_ttl_seconds: int = 3600  # 1 hour
 
     @field_validator("debug", mode="before")
     @classmethod

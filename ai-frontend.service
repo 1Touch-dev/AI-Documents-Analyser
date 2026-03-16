@@ -1,0 +1,19 @@
+[Unit]
+Description=AI Knowledge Platform Frontend (Streamlit)
+After=network.target ai-backend.service
+Wants=ai-backend.service
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/AI-Documents-Analyser
+Environment="PATH=/home/ubuntu/AI-Documents-Analyser/.venv/bin"
+ExecStart=/home/ubuntu/AI-Documents-Analyser/.venv/bin/streamlit run frontend/streamlit_app.py --server.address 0.0.0.0 --server.port 8501 --server.headless true
+Restart=always
+RestartSec=10
+StandardOutput=append:/home/ubuntu/AI-Documents-Analyser/frontend.log
+StandardError=append:/home/ubuntu/AI-Documents-Analyser/frontend.log
+
+[Install]
+WantedBy=multi-user.target
