@@ -17,6 +17,9 @@ from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
+MAX_INGEST_CHARS = 300_000
+MAX_INGEST_CHUNKS = 600
+
 
 class RAGPipeline:
     """End-to-end retrieval-augmented generation pipeline."""
@@ -69,10 +72,28 @@ class RAGPipeline:
         """
         Chunk → embed → store.  Returns the number of chunks created.
         """
+        if len(text) > MAX_INGEST_CHARS:
+            logger.warning(
+                "Document %s text too large (%d chars). Truncating to %d chars.",
+                doc_id,
+                len(text),
+                MAX_INGEST_CHARS,
+            )
+            text = text[:MAX_INGEST_CHARS]
+
         chunks = self.chunk_text(text)
         if not chunks:
             logger.warning("No chunks produced for doc %s", doc_id)
             return 0
+
+        if len(chunks) > MAX_INGEST_CHUNKS:
+            logger.warning(
+                "Document %s produced too many chunks (%d). Capping to %d.",
+                doc_id,
+                len(chunks),
+                MAX_INGEST_CHUNKS,
+            )
+            chunks = chunks[:MAX_INGEST_CHUNKS]
 
         embeddings = self.embedder.embed_texts(chunks)
 

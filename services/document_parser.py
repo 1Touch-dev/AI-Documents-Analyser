@@ -10,10 +10,13 @@ import csv
 import io
 import json
 import logging
+import re
 from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+MAX_FALLBACK_CHARS = 300_000
 
 
 class DocumentParser:
@@ -58,6 +61,22 @@ class DocumentParser:
 
     # ── Private parsers ──────────────────────────────────
     @staticmethod
+    def _best_effort_text(data: bytes) -> str:
+        text = data.decode("utf-8", errors="ignore")
+        if not text.strip():
+            text = data.decode("latin-1", errors="ignore")
+        text = re.sub(r"[^\x09\x0A\x0D\x20-\x7E]", " ", text)
+        text = re.sub(r" +", " ", text).strip()
+        if len(text) > MAX_FALLBACK_CHARS:
+            logger.warning(
+                "Fallback parser produced very large text (%d chars). Truncating to %d.",
+                len(text),
+                MAX_FALLBACK_CHARS,
+            )
+            text = text[:MAX_FALLBACK_CHARS]
+        return text or "Document content could not be parsed, but file upload succeeded."
+
+    @staticmethod
     def _parse_pdf(data: bytes) -> str:
         import fitz  # PyMuPDF
 
@@ -71,32 +90,46 @@ class DocumentParser:
     def _parse_docx(data: bytes) -> str:
         from docx import Document as DocxDocument
 
-        doc = DocxDocument(io.BytesIO(data))
-        return "\n".join(para.text for para in doc.paragraphs if para.text.strip())
+        try:
+            doc = DocxDocument(io.BytesIO(data))
+            return "\n".join(para.text for para in doc.paragraphs if para.text.strip())
+        except Exception as e:
+            logger.warning("DOCX structured parsing failed, using text fallback: %s", e)
+            return DocumentParser._best_effort_text(data)
 
     @staticmethod
     def _parse_pptx(data: bytes) -> str:
         from pptx import Presentation
 
-        prs = Presentation(io.BytesIO(data))
-        text_parts: list[str] = []
-        for slide in prs.slides:
-            for shape in slide.shapes:
-                if shape.has_text_frame:
-                    text_parts.append(shape.text_frame.text)
-        return "\n".join(text_parts)
+        try:
+            prs = Presentation(io.BytesIO(data))
+            text_parts: list[str] = []
+            for slide in prs.slides:
+                for shape in slide.shapes:
+                    if shape.has_text_frame:
+                        text_parts.append(shape.text_frame.text)
+            return "\n".join(text_parts)
+        except Exception as e:
+            logger.warning("PPTX structured parsing failed, using text fallback: %s", e)
+            return DocumentParser._best_effort_text(data)
 
     @staticmethod
     def _parse_xlsx(data: bytes) -> str:
         from openpyxl import load_workbook
 
-        wb = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
-        text_parts: list[str] = []
-        for ws in wb.worksheets:
-            for row in ws.iter_rows(values_only=True):
-                cells = [str(c) if c is not None else "" for c in row]
-                text_parts.append("\t".join(cells))
-        return "\n".join(text_parts)
+        try:
+            wb = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+            text_parts: list[str] = []
+            for ws in wb.worksheets:
+                for row in ws.iter_rows(values_only=True):
+                    cells = [str(c) if c is not None else "" for c in row]
+                    text_parts.append("\t".join(cells))
+            return "\n".join(text_parts)
+        except Exception as e:
+            # Some files are mislabeled/corrupted .xlsx archives. Fallback to best-effort text
+            # extraction so ingestion can continue rather than failing the whole document.
+            logger.warning("XLSX structured parsing failed, using text fallback: %s", e)
+            return DocumentParser._best_effort_text(data)
 
     @staticmethod
     def _parse_csv(data: bytes) -> str:

@@ -330,7 +330,7 @@ async def upload_document(
 
     # 3. Parse + ingest
     try:
-        text = parser.parse(contents, ext)
+        text = _safe_extract_text(parser, contents, ext)
         chunk_count = rag.ingest_document(
             doc_id=doc_id,
             text=text,
@@ -659,6 +659,21 @@ async def generate_report(
 # In-memory batch status tracking
 _batch_statuses: dict[str, dict] = {}
 
+def _safe_extract_text(parser, contents: bytes, ext: str) -> str:
+    """Extract text and fallback to decoded bytes when parser fails."""
+    try:
+        text = parser.parse(contents, ext)
+        if text and text.strip():
+            return text
+    except Exception as e:
+        logger.warning("Primary parser failed for .%s; fallback mode: %s", ext, e)
+
+    text = contents.decode("utf-8", errors="ignore")
+    if not text.strip():
+        text = contents.decode("latin-1", errors="ignore")
+    text = text.strip()
+    return text or f"Uploaded .{ext} file content unavailable; metadata retained."
+
 
 def _process_single_file(
     doc_id: str, contents: bytes, filename: str, ext: str,
@@ -704,7 +719,7 @@ def _process_single_file(
         db.commit()
 
         # Parse + ingest
-        text = parser.parse(contents, ext)
+        text = _safe_extract_text(parser, contents, ext)
         chunk_count = rag.ingest_document(
             doc_id=doc_id, text=text,
             metadata={"title": filename, "category": category},
