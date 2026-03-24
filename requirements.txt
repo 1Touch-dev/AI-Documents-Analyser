@@ -47,7 +47,8 @@ streamlit==1.41.1
 # ─── Auth & Security ───
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
-bcrypt>=4.0.1
+# Keep bcrypt pinned to a passlib-compatible release for stable auth hashing.
+bcrypt==4.0.1
 slowapi==0.1.9
 
 # ─── Caching ───

@@ -237,9 +237,15 @@ async def register(body: UserCreate, db: Session = Depends(get_db)):
     existing = db.query(User).filter(User.username == body.username).first()
     if existing:
         raise HTTPException(status_code=400, detail="Username already taken.")
+    try:
+        hashed_password = pwd_context.hash(body.password)
+    except Exception as e:
+        logger.exception("Password hashing failed during registration for username=%s", body.username)
+        raise HTTPException(status_code=500, detail="Password hashing backend unavailable.") from e
+
     user = User(
         username=body.username,
-        hashed_password=pwd_context.hash(body.password),
+        hashed_password=hashed_password,
     )
     db.add(user)
     db.commit()
@@ -250,7 +256,16 @@ async def register(body: UserCreate, db: Session = Depends(get_db)):
 @app.post("/api/auth/login", response_model=TokenResponse, tags=["Auth"])
 async def login(body: UserLogin, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == body.username).first()
-    if not user or not pwd_context.verify(body.password, user.hashed_password):
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials.")
+
+    try:
+        password_ok = pwd_context.verify(body.password, user.hashed_password)
+    except Exception as e:
+        logger.exception("Password verification failed for username=%s", body.username)
+        raise HTTPException(status_code=500, detail="Password verification backend unavailable.") from e
+
+    if not password_ok:
         raise HTTPException(status_code=401, detail="Invalid credentials.")
     token = _create_token({"sub": user.username})
     return TokenResponse(access_token=token)
