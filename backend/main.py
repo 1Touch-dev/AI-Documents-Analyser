@@ -3,6 +3,8 @@ FastAPI application – all API endpoints for the AI Knowledge Platform.
 """
 
 import logging
+import re
+import time
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
@@ -62,6 +64,28 @@ _rag_pipeline: Optional[RAGPipeline] = None
 _s3: Optional[S3StorageService] = None
 _parser: Optional[DocumentParser] = None
 _report_gen: Optional[ReportGenerator] = None
+
+
+def _log_upload_stage(
+    stage: str,
+    doc_id: str,
+    filename: str,
+    *,
+    ext: str | None = None,
+    size_bytes: int | None = None,
+    elapsed_ms: int | None = None,
+    extra: str | None = None,
+) -> None:
+    parts = [f"stage={stage}", f"doc_id={doc_id}", f"file={filename}"]
+    if ext:
+        parts.append(f"ext={ext}")
+    if size_bytes is not None:
+        parts.append(f"size={size_bytes}")
+    if elapsed_ms is not None:
+        parts.append(f"elapsed_ms={elapsed_ms}")
+    if extra:
+        parts.append(extra)
+    logger.info("[UPLOAD] %s", " | ".join(parts))
 
 
 def _get_services():
@@ -288,6 +312,7 @@ async def upload_document(
     user: Optional[User] = Depends(get_current_user),
 ):
     """Upload a document → S3 → parse → chunk → embed → vector store."""
+    started_at = time.perf_counter()
     # Validate extension
     ext = file.filename.rsplit(".", 1)[-1].lower() if file.filename else ""
     if ext not in ALLOWED_EXTENSIONS:
@@ -301,14 +326,23 @@ async def upload_document(
     doc_id = str(uuid.uuid4())
     doc_title = title or file.filename or "Untitled"
     s3_key = f"documents/{doc_id}/{file.filename}"
+    _log_upload_stage("received", doc_id, doc_title, ext=ext, size_bytes=len(contents))
 
     _, rag, s3, parser, _ = _get_services()
 
     # 1. Store file (S3 if configured, otherwise local fallback)
     try:
+        store_started = time.perf_counter()
         if settings.aws_access_key_id and settings.aws_access_key_id != "your-access-key":
             s3.upload_bytes(contents, s3_key, content_type=file.content_type or "application/octet-stream")
-            logger.info("Stored in S3: %s", s3_key)
+            _log_upload_stage(
+                "stored_s3",
+                doc_id,
+                doc_title,
+                ext=ext,
+                elapsed_ms=int((time.perf_counter() - store_started) * 1000),
+                extra=f"path={s3_key}",
+            )
         else:
             # Local fallback
             import os
@@ -318,9 +352,16 @@ async def upload_document(
             with open(local_path, "wb") as f:
                 f.write(contents)
             s3_key = local_path
-            logger.info("Stored locally (no S3 keys): %s", local_path)
+            _log_upload_stage(
+                "stored_local",
+                doc_id,
+                doc_title,
+                ext=ext,
+                elapsed_ms=int((time.perf_counter() - store_started) * 1000),
+                extra=f"path={local_path}",
+            )
     except Exception as e:
-        logger.warning("Storage failed, saving locally: %s", e)
+        logger.warning("[UPLOAD] stage=store_failed | doc_id=%s | file=%s | reason=%s", doc_id, doc_title, e)
         import os
         local_dir = os.path.join("data", "uploads", doc_id)
         os.makedirs(local_dir, exist_ok=True)
@@ -328,6 +369,7 @@ async def upload_document(
         with open(local_path, "wb") as f:
             f.write(contents)
         s3_key = local_path
+        _log_upload_stage("stored_local_fallback", doc_id, doc_title, ext=ext, extra=f"path={local_path}")
 
     # 2. Save document record
     doc = Document(
@@ -342,24 +384,51 @@ async def upload_document(
     )
     db.add(doc)
     db.commit()
+    _log_upload_stage("db_record_created", doc_id, doc_title, ext=ext, extra="status=processing")
 
     # 3. Parse + ingest
     try:
+        parse_started = time.perf_counter()
         text = _safe_extract_text(parser, contents, ext)
+        _log_upload_stage(
+            "parsed",
+            doc_id,
+            doc_title,
+            ext=ext,
+            elapsed_ms=int((time.perf_counter() - parse_started) * 1000),
+            extra=f"chars={len(text)}",
+        )
+        ingest_started = time.perf_counter()
         chunk_count = rag.ingest_document(
             doc_id=doc_id,
             text=text,
             metadata={"title": doc_title, "category": category},
         )
+        _log_upload_stage(
+            "ingested",
+            doc_id,
+            doc_title,
+            ext=ext,
+            elapsed_ms=int((time.perf_counter() - ingest_started) * 1000),
+            extra=f"chunks={chunk_count}",
+        )
         doc.chunk_count = chunk_count
         doc.status = "ready"
     except Exception as e:
-        logger.error("Ingestion failed for %s: %s", doc_id, e)
+        logger.exception("[UPLOAD] stage=failed | doc_id=%s | file=%s | reason=%s", doc_id, doc_title, e)
         doc.status = "failed"
         db.commit()
         raise HTTPException(500, f"Document processing failed: {e}")
 
     db.commit()
+    _log_upload_stage(
+        "completed",
+        doc_id,
+        doc_title,
+        ext=ext,
+        elapsed_ms=int((time.perf_counter() - started_at) * 1000),
+        extra=f"status={doc.status}|chunks={doc.chunk_count}",
+    )
 
     return {
         "document_id": doc_id,
@@ -673,20 +742,34 @@ async def generate_report(
 
 # In-memory batch status tracking
 _batch_statuses: dict[str, dict] = {}
+MAX_SAFE_EXTRACT_CHARS = 180_000
+
+
+def _normalize_extracted_text(text: str, max_chars: int = MAX_SAFE_EXTRACT_CHARS) -> str:
+    text = re.sub(r"[^\x09\x0A\x0D\x20-\x7E]", " ", text)
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    text = text.strip()
+    if len(text) > max_chars:
+        logger.warning("Extracted text too large (%d chars). Truncating to %d.", len(text), max_chars)
+        text = text[:max_chars]
+    return text
 
 def _safe_extract_text(parser, contents: bytes, ext: str) -> str:
     """Extract text and fallback to decoded bytes when parser fails."""
     try:
         text = parser.parse(contents, ext)
         if text and text.strip():
-            return text
+            logger.info("[UPLOAD] parser=primary | ext=%s | chars=%d", ext, len(text))
+            return _normalize_extracted_text(text)
     except Exception as e:
         logger.warning("Primary parser failed for .%s; fallback mode: %s", ext, e)
 
     text = contents.decode("utf-8", errors="ignore")
     if not text.strip():
         text = contents.decode("latin-1", errors="ignore")
-    text = text.strip()
+    text = _normalize_extracted_text(text)
+    logger.info("[UPLOAD] parser=fallback | ext=%s | chars=%d", ext, len(text))
     return text or f"Uploaded .{ext} file content unavailable; metadata retained."
 
 
@@ -695,21 +778,39 @@ def _process_single_file(
     category: str, s3_key: str, batch_id: str, file_hash: str,
 ):
     """Process a single file in a background thread."""
+    started_at = time.perf_counter()
     from db.database import SessionLocal
     db = SessionLocal()
     try:
         _, rag, s3, parser, _ = _get_services()
+        _log_upload_stage("batch_started", doc_id, filename, ext=ext, size_bytes=len(contents), extra=f"batch_id={batch_id}")
 
         # Store file
         try:
+            store_started = time.perf_counter()
             if settings.aws_access_key_id and settings.aws_access_key_id != "your-access-key":
                 s3.upload_bytes(contents, s3_key, content_type="application/octet-stream")
+                _log_upload_stage(
+                    "batch_stored_s3",
+                    doc_id,
+                    filename,
+                    ext=ext,
+                    elapsed_ms=int((time.perf_counter() - store_started) * 1000),
+                    extra=f"path={s3_key}",
+                )
             else:
                 import os
                 local_dir = os.path.join("data", "uploads", doc_id)
                 os.makedirs(local_dir, exist_ok=True)
                 with open(os.path.join(local_dir, filename), "wb") as f:
                     f.write(contents)
+                _log_upload_stage(
+                    "batch_stored_local",
+                    doc_id,
+                    filename,
+                    ext=ext,
+                    elapsed_ms=int((time.perf_counter() - store_started) * 1000),
+                )
         except Exception as e:
             logger.warning("Storage fallback for %s: %s", doc_id, e)
             import os
@@ -717,6 +818,7 @@ def _process_single_file(
             os.makedirs(local_dir, exist_ok=True)
             with open(os.path.join(local_dir, filename), "wb") as f:
                 f.write(contents)
+            _log_upload_stage("batch_stored_local_fallback", doc_id, filename, ext=ext)
 
         # Save document record
         doc = Document(
@@ -732,12 +834,31 @@ def _process_single_file(
         )
         db.add(doc)
         db.commit()
+        _log_upload_stage("batch_db_record_created", doc_id, filename, ext=ext, extra="status=processing")
 
         # Parse + ingest
+        parse_started = time.perf_counter()
         text = _safe_extract_text(parser, contents, ext)
+        _log_upload_stage(
+            "batch_parsed",
+            doc_id,
+            filename,
+            ext=ext,
+            elapsed_ms=int((time.perf_counter() - parse_started) * 1000),
+            extra=f"chars={len(text)}",
+        )
+        ingest_started = time.perf_counter()
         chunk_count = rag.ingest_document(
             doc_id=doc_id, text=text,
             metadata={"title": filename, "category": category},
+        )
+        _log_upload_stage(
+            "batch_ingested",
+            doc_id,
+            filename,
+            ext=ext,
+            elapsed_ms=int((time.perf_counter() - ingest_started) * 1000),
+            extra=f"chunks={chunk_count}",
         )
         doc.chunk_count = chunk_count
         doc.status = "ready"
@@ -745,10 +866,17 @@ def _process_single_file(
 
         _batch_statuses[batch_id]["files"][doc_id]["status"] = "ready"
         _batch_statuses[batch_id]["files"][doc_id]["chunks"] = chunk_count
-        logger.info("Batch file processed: %s (%d chunks)", filename, chunk_count)
+        _log_upload_stage(
+            "batch_completed",
+            doc_id,
+            filename,
+            ext=ext,
+            elapsed_ms=int((time.perf_counter() - started_at) * 1000),
+            extra=f"chunks={chunk_count}|batch_id={batch_id}",
+        )
 
     except Exception as e:
-        logger.error("Batch file failed %s: %s", doc_id, e)
+        logger.exception("[UPLOAD] stage=batch_failed | doc_id=%s | file=%s | reason=%s", doc_id, filename, e)
         _batch_statuses[batch_id]["files"][doc_id]["status"] = "failed"
         _batch_statuses[batch_id]["files"][doc_id]["error"] = str(e)
         try:

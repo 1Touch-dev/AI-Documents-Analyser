@@ -17,8 +17,8 @@ from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
-MAX_INGEST_CHARS = 300_000
-MAX_INGEST_CHUNKS = 600
+MAX_INGEST_CHARS = 180_000
+MAX_INGEST_CHUNKS = 320
 
 
 class RAGPipeline:
