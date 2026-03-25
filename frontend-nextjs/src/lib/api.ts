@@ -1,4 +1,4 @@
-import { API_PROXY_BASE_URL } from "@/lib/config";
+import { API_PROXY_BASE_URL, BACKEND_API_BASE_URL } from "@/lib/config";
 
 export type AuthResponse = {
   access_token: string;
@@ -173,14 +173,26 @@ export function uploadBatch(files: File[], category: string, token?: string) {
   const form = new FormData();
   files.forEach((file) => form.append("files", file));
   form.append("category", category || "general");
-  return request<UploadBatchResponse>(
-    "/upload_batch",
-    {
-      method: "POST",
-      body: form,
-    },
-    token
-  );
+
+  return fetch(`${BACKEND_API_BASE_URL}/upload_batch`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    body: form,
+  }).then(async (response) => {
+    if (!response.ok) {
+      let message = `Request failed (${response.status})`;
+      try {
+        const body = (await response.json()) as { detail?: string };
+        if (body.detail) {
+          message = body.detail;
+        }
+      } catch {
+        // keep generic message if response is not JSON
+      }
+      throw new Error(message);
+    }
+    return (await response.json()) as UploadBatchResponse;
+  });
 }
 
 export function getBatchStatus(batchId: string, token?: string) {
