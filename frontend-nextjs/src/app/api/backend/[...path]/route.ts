@@ -15,23 +15,33 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   const { path } = await context.params;
   const targetUrl = buildTargetUrl(path, request);
 
+  // IMPORTANT: Don't use `request.text()` for multipart uploads.
+  // That forces a full buffered UTF-8 decode and can corrupt multipart boundaries.
+  // We pass the raw request body through to the backend instead.
   const requestBody =
-    request.method === "GET" || request.method === "HEAD"
-      ? undefined
-      : await request.text();
+    request.method === "GET" || request.method === "HEAD" ? undefined : request.body;
 
   const headers = new Headers(request.headers);
   headers.delete("host");
   headers.delete("connection");
-  headers.delete("content-length");
 
   let backendResponse: Response;
   try {
-    backendResponse = await fetch(targetUrl, {
+    const fetchOptions: any = {
       method: request.method,
       headers,
       body: requestBody,
       cache: "no-store",
+    };
+
+    // When using a streamed body in Node's fetch/undici, `duplex` is required.
+    // Only set it when we actually have a body.
+    if (requestBody) {
+      fetchOptions.duplex = "half";
+    }
+
+    backendResponse = await fetch(targetUrl, {
+      ...fetchOptions,
     });
   } catch (error) {
     return NextResponse.json(
