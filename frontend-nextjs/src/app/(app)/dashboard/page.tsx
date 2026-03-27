@@ -418,23 +418,7 @@ export default function DashboardPage() {
         </article>
       </div>
 
-      <article className="rounded-xl border border-white/15 bg-white/5 p-5 shadow-lg shadow-indigo-950/25 backdrop-blur-md">
-        <h3 className="mb-3 text-sm font-medium text-slate-300">Model List</h3>
-        <div className="flex flex-wrap gap-2">
-          {models.map((model) => (
-            <motion.span
-              key={model}
-              initial={{ opacity: 0, scale: 0.92 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.25 }}
-              className="rounded-full border border-cyan-300/30 bg-cyan-500/10 px-3 py-1 text-xs text-cyan-100"
-            >
-              {model}
-            </motion.span>
-          ))}
-          {!models.length ? <span className="text-sm text-slate-300">No models loaded yet.</span> : null}
-        </div>
-      </article>
+      
 
       <div className="grid gap-4 md:grid-cols-3">
         <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-slate-300">
