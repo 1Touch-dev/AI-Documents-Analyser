@@ -17,9 +17,9 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      router.replace("/dashboard");
-    }
+    if (!isAuthenticated) return;
+    router.replace("/dashboard");
+    router.refresh();
   }, [isAuthenticated, router]);
 
   async function onSubmit(event: FormEvent) {
@@ -28,7 +28,6 @@ export default function RegisterPage() {
     setIsSubmitting(true);
     try {
       await registerUser(username, password);
-      router.push("/dashboard");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Registration failed.");
     } finally {

@@ -24,9 +24,9 @@ export default function LoginPage() {
   }, []);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      router.replace(nextPath);
-    }
+    if (!isAuthenticated) return;
+    router.replace(nextPath);
+    router.refresh();
   }, [isAuthenticated, nextPath, router]);
 
   async function onSubmit(event: FormEvent) {
@@ -35,7 +35,6 @@ export default function LoginPage() {
     setIsSubmitting(true);
     try {
       await loginUser(username, password);
-      router.push(nextPath);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Login failed.");
     } finally {
