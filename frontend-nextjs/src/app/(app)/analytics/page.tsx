@@ -751,7 +751,6 @@ export default function AnalyticsPage() {
             ))}
           </select>
         </div>
-        </div>
         <div className="max-h-80 overflow-auto rounded-lg border border-white/10">
           <table className="w-full text-left text-xs">
             <thead className="bg-white/10 text-slate-200">
@@ -833,10 +832,10 @@ export default function AnalyticsPage() {
                   </td>
                   <td className="px-3 py-2">{fin.fiscal_year || "-"}</td>
                   <td className="px-3 py-2">{fin.currency}</td>
-                  <td className="px-3 py-2 text-emerald-300">{fin.revenue?.total?.toLocaleString() ?? "-"}</td>
-                  <td className="px-3 py-2 text-red-300">{fin.expenses?.total?.toLocaleString() ?? "-"}</td>
+                  <td className="px-3 py-2 text-emerald-300">{fin.revenue?.total != null ? fin.revenue.total.toLocaleString() : "-"}</td>
+                  <td className="px-3 py-2 text-red-300">{fin.expenses?.total != null ? fin.expenses.total.toLocaleString() : "-"}</td>
                   <td className="px-3 py-2 font-semibold">
-                    {fin.net_result ? fin.net_result.toLocaleString() : "-"}
+                    {fin.net_result != null ? fin.net_result.toLocaleString() : "-"}
                   </td>
                   <td className="px-3 py-2">
                     <span 
