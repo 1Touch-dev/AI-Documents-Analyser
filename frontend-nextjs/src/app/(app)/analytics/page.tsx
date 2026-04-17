@@ -28,8 +28,12 @@ import {
   getAnalyticsContentInsights,
   getAnalyticsOverview,
   getAnalyticsStorage,
+  getAnalyticsFinancials,
+  downloadAnalyticsExport,
+  extractFinancials,
   listDocuments,
   type DocumentItem,
+  type FinancialReport,
 } from "@/lib/api";
 import { useAuth } from "@/contexts/auth-context";
 
@@ -131,6 +135,10 @@ export default function AnalyticsPage() {
   const [explorerStatus, setExplorerStatus] = useState("all");
   const [error, setError] = useState<string | null>(null);
 
+  // Phase 3 & 4 Financials state
+  const [financials, setFinancials] = useState<FinancialReport[]>([]);
+  const [isExtracting, setIsExtracting] = useState<Record<string, boolean>>({});
+
   useEffect(() => {
     let mounted = true;
     Promise.all([
@@ -139,13 +147,14 @@ export default function AnalyticsPage() {
       getAnalyticsContentInsights(token ?? undefined),
       getAnalyticsStorage(token ?? undefined),
       listDocuments(token ?? undefined, 500),
+      getAnalyticsFinancials(token ?? undefined),
     ])
-      .then(([, ct, insights, , docs]) => {
+      .then(([, ct, insights, , docs, fins]) => {
         if (!mounted) return;
         setContent(ct);
         setContentInsights(insights);
         setDocuments(docs.documents);
-
+        setFinancials(fins.reports);
       })
       .catch((e) => mounted && setError(e instanceof Error ? e.message : "Failed to load analytics."));
     return () => {
@@ -293,6 +302,20 @@ export default function AnalyticsPage() {
       return matchesCategory && matchesType && matchesStatus && matchesSearch;
     });
   }, [explorerCategory, explorerSearch, explorerStatus, explorerType, filteredDocuments]);
+
+  async function handleExtractFinancials(docId: string) {
+    if (!token) return;
+    setIsExtracting((prev) => ({ ...prev, [docId]: true }));
+    try {
+      await extractFinancials({ doc_id: docId, overwrite: true }, token);
+      const res = await getAnalyticsFinancials(token);
+      setFinancials(res.reports);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Extraction failed");
+    } finally {
+      setIsExtracting((prev) => ({ ...prev, [docId]: false }));
+    }
+  }
 
   return (
     <section className="space-y-5">
@@ -728,6 +751,7 @@ export default function AnalyticsPage() {
             ))}
           </select>
         </div>
+        </div>
         <div className="max-h-80 overflow-auto rounded-lg border border-white/10">
           <table className="w-full text-left text-xs">
             <thead className="bg-white/10 text-slate-200">
@@ -762,6 +786,110 @@ export default function AnalyticsPage() {
           </table>
         </div>
       </article>
+
+      <article className="rounded-xl border border-white/15 bg-white/5 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-3">
+          <div>
+            <p className="text-sm font-semibold text-white">LLM Structured Financial Extraction (Gemma 4 E2B)</p>
+            <p className="mt-1 text-xs text-slate-300">
+              Extracted Revenue and Expense figures. Available for automated Tableau flat-export.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => downloadAnalyticsExport("csv", token ?? undefined)}
+              className="rounded-lg bg-emerald-500/20 border border-emerald-400/40 px-3 py-1.5 text-xs font-semibold text-emerald-100 hover:bg-emerald-500/30"
+            >
+              Export CSV for Tableau
+            </button>
+            <button
+              onClick={() => downloadAnalyticsExport("json", token ?? undefined)}
+              className="rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-white/20"
+            >
+              Export JSON
+            </button>
+          </div>
+        </div>
+        
+        <div className="max-h-80 overflow-auto rounded-lg border border-white/10">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-white/10 text-slate-200">
+              <tr>
+                <th className="px-3 py-2">Document Title</th>
+                <th className="px-3 py-2">FY</th>
+                <th className="px-3 py-2">Curr</th>
+                <th className="px-3 py-2">Total Revenue</th>
+                <th className="px-3 py-2">Total Expense</th>
+                <th className="px-3 py-2">Net Result</th>
+                <th className="px-3 py-2">Confidence</th>
+                <th className="px-3 py-2">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {financials.map((fin) => (
+                <tr key={fin.id} className="border-t border-white/10 text-slate-100">
+                  <td className="px-3 py-2 max-w-[200px] truncate" title={fin.doc_title || ""}>
+                    {fin.doc_title || "Unknown"}
+                  </td>
+                  <td className="px-3 py-2">{fin.fiscal_year || "-"}</td>
+                  <td className="px-3 py-2">{fin.currency}</td>
+                  <td className="px-3 py-2 text-emerald-300">{fin.revenue?.total?.toLocaleString() ?? "-"}</td>
+                  <td className="px-3 py-2 text-red-300">{fin.expenses?.total?.toLocaleString() ?? "-"}</td>
+                  <td className="px-3 py-2 font-semibold">
+                    {fin.net_result ? fin.net_result.toLocaleString() : "-"}
+                  </td>
+                  <td className="px-3 py-2">
+                    <span 
+                      className={`px-1.5 py-0.5 rounded text-[10px] uppercase font-bold ${
+                        fin.confidence === "high" ? "bg-emerald-500/20 text-emerald-200" :
+                        fin.confidence === "medium" ? "bg-amber-500/20 text-amber-200" :
+                        "bg-red-500/20 text-red-200"
+                      }`}
+                    >
+                      {fin.confidence}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2">
+                    <button
+                      onClick={() => handleExtractFinancials(fin.doc_id)}
+                      disabled={isExtracting[fin.doc_id]}
+                      className="rounded border border-indigo-400/40 bg-indigo-500/20 px-2 py-1 text-[10px] text-indigo-100 hover:bg-indigo-500/40 disabled:opacity-50"
+                    >
+                      {isExtracting[fin.doc_id] ? "Running..." : "Re-extract"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              
+              {/* Show docs that could be extracted but aren't yet */}
+              {explorerDocuments.filter(d => d.status === "ready" && !financials.some(f => f.doc_id === d.id)).slice(0, 10).map((doc) => (
+                <tr key={doc.id} className="border-t border-white/10 text-slate-400">
+                  <td className="px-3 py-2 max-w-[200px] truncate" title={doc.title}>{doc.title}</td>
+                  <td className="px-3 py-2 text-center" colSpan={6}>Not extracted yet</td>
+                  <td className="px-3 py-2">
+                    <button
+                      onClick={() => handleExtractFinancials(doc.id)}
+                      disabled={isExtracting[doc.id]}
+                      className="rounded border border-cyan-400/40 bg-cyan-500/20 px-2 py-1 text-[10px] text-cyan-100 hover:bg-cyan-500/40 disabled:opacity-50"
+                    >
+                      {isExtracting[doc.id] ? "Running..." : "Run Gemma"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              
+              {!financials.length && !explorerDocuments.length && (
+                <tr>
+                  <td className="px-3 py-3 text-slate-300" colSpan={8}>
+                    No financial data available.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </article>
+
     </section>
   );
 }

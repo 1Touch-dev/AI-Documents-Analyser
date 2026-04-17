@@ -55,6 +55,29 @@ export type ReportResponse = {
   output_format?: string;
 };
 
+export type FinancialReport = {
+  id: string;
+  doc_id: string;
+  doc_title: string | null;
+  currency: string;
+  fiscal_year: string | null;
+  revenue: Record<string, number | null>;
+  expenses: Record<string, number | null>;
+  net_result: number | null;
+  confidence: string;
+  notes: string | null;
+  model_used: string | null;
+  extracted_at: string | null;
+};
+
+export type DocumentStatusResponse = {
+  total_in_db: number;
+  total_indexed: number;
+  total_not_indexed: number;
+  indexed: any[];
+  not_indexed: any[];
+};
+
 export type UploadBatchResponse = {
   batch_id: string;
   total_submitted: number;
@@ -265,6 +288,9 @@ export function queryDocuments(
     openai_api_key?: string | null;
     anthropic_api_key?: string | null;
     gemini_api_key?: string | null;
+    translate?: boolean;
+    target_language?: string | null;
+    target_currency?: string | null;
   },
   token?: string
 ) {
@@ -353,5 +379,32 @@ export function generateReport(
     },
     token
   );
+}
+
+// ── Phase 3 & 4 ───────────────────────────────────────────────────────────
+
+export function getDocumentStatus(token?: string) {
+  return request<DocumentStatusResponse>("/documents/status", { method: "GET" }, token);
+}
+
+export function extractFinancials(payload: { doc_id: string; overwrite?: boolean }, token?: string) {
+  return request<{ status: string; report: FinancialReport }>(
+    "/analytics/extract_financials",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    token
+  );
+}
+
+export function getAnalyticsFinancials(token?: string) {
+  return request<{ reports: FinancialReport[] }>("/analytics/financials", { method: "GET" }, token);
+}
+
+export function downloadAnalyticsExport(format: "csv" | "json" = "csv", token?: string) {
+  // A direct download URL for the browser
+  const tk = token ? `?token=${encodeURIComponent(token)}&format=${format}` : `?format=${format}`;
+  window.open(`${BACKEND_API_BASE_URL}/analytics/export${tk}`, "_blank");
 }
 

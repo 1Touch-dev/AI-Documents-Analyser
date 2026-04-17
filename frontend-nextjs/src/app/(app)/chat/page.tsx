@@ -57,6 +57,10 @@ export default function ChatPage() {
   const [controlTab, setControlTab] = useState<"upload" | "query" | "keys">("query");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
+  // Phase 1 + 2 state
+  const [translate, setTranslate] = useState(false);
+  const [targetCurrency, setTargetCurrency] = useState<string>("");
+
   useEffect(() => {
     getModels(token ?? undefined)
       .then((res) => setModels(["auto", ...res.models.filter((m) => m !== "auto")]))
@@ -176,6 +180,9 @@ export default function ChatPage() {
           anthropic_api_key: anthropicApiKey || null,
           gemini_api_key: geminiApiKey || null,
           session_id: sessionId || undefined,
+          translate,
+          target_language: translate ? "English" : null,
+          target_currency: targetCurrency || null,
         },
         token ?? undefined
       );
@@ -431,6 +438,36 @@ export default function ChatPage() {
                             {prompt.name}
                           </option>
                         ))}
+                      </select>
+                    </label>
+
+                    <hr className="my-2 border-white/10" />
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="translateToggle"
+                        checked={translate}
+                        onChange={(e) => setTranslate(e.target.checked)}
+                        className="h-4 w-4 rounded border-gray-300 bg-transparent"
+                      />
+                      <label htmlFor="translateToggle" className="text-sm text-slate-300">
+                        Translate to English (Gemma 4 E2B)
+                      </label>
+                    </div>
+
+                    <label className="block text-xs text-slate-300 mt-3">
+                      Currency Conversion (Target)
+                      <select
+                        value={targetCurrency}
+                        onChange={(e) => setTargetCurrency(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-white/20 bg-slate-950/60 px-3 py-2 text-sm text-white"
+                      >
+                        <option value="">None (KeepOriginal)</option>
+                        <option value="USD">USD ($)</option>
+                        <option value="BRL">BRL (R$)</option>
+                        <option value="EUR">EUR (€)</option>
+                        <option value="GBP">GBP (£)</option>
                       </select>
                     </label>
                   </div>
