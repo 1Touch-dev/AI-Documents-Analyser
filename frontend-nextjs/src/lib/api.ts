@@ -45,6 +45,13 @@ export type QueryResponse = {
   sources: Array<{ title?: string; doc_id?: string; excerpt?: string }>;
   model_used: string;
   session_id: string;
+  explanation?: {
+    model: string;
+    top_k: number;
+    translated: boolean;
+    currency_converted: boolean;
+    chunks_analyzed: number;
+  };
 };
 
 export type ReportResponse = {
@@ -270,6 +277,13 @@ export function getConversation(sessionId: string, token?: string) {
       role: "user" | "assistant";
       content: string;
       sources?: Array<{ title?: string; excerpt?: string }>;
+      explanation?: {
+        model: string;
+        top_k: number;
+        translated: boolean;
+        currency_converted: boolean;
+        chunks_analyzed: number;
+      };
       timestamp?: string;
     }>;
     timestamp: string | null;
