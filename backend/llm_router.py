@@ -2,12 +2,15 @@
 LLM Router – routes queries to the appropriate language model.
 
 Supports:
-  • Ollama (Llama 3, Mistral, Mixtral, Gemma)
-  • OpenAI (GPT-4 / GPT-3.5)
+  • Ollama (Gemma 4 E2B / E4B — primary local; Llama 3, Mistral, Mixtral)
+  • OpenAI (GPT-4o, o3-mini)
   • Anthropic (Claude)
+  • Google Gemini
 
-Includes an 'auto' routing mode that sends simple queries to local
-models and complex reasoning to more powerful external models.
+Routing strategy:
+  • Simple / translation / summarization → gemma4:e2b (fast, local)
+  • Complex reasoning / financial analysis → cloud API models
+  • Graceful fallback: gemma4:e2b → gemma2:2b → llama3.2
 """
 
 from __future__ import annotations
@@ -35,42 +38,57 @@ class ModelProvider(str, Enum):
 
 # Model → provider mapping
 MODEL_REGISTRY: dict[str, dict[str, Any]] = {
-    # ── Ollama (local) ────────────────────────────────
-    "llama3.2": {"provider": ModelProvider.OLLAMA, "model_id": "llama3.2"},
+    # ── Gemma 4 (local — primary) ─────────────────────
+    # ollama pull gemma4:e2b  (~7.2 GB — preferred on 16+ GB instances)
+    # ollama pull gemma2:2b   (~1.7 GB — lightweight RAM-safe fallback)
+    "gemma4:e2b":  {"provider": ModelProvider.OLLAMA, "model_id": "gemma4:e2b"},
+    "gemma4:e4b":  {"provider": ModelProvider.OLLAMA, "model_id": "gemma4:e4b"},
+    "gemma2:2b":   {"provider": ModelProvider.OLLAMA, "model_id": "gemma2:2b"},
+    "gemma2":      {"provider": ModelProvider.OLLAMA, "model_id": "gemma2"},
+    "gemma":       {"provider": ModelProvider.OLLAMA, "model_id": "gemma"},
+    # ── Ollama (other local) ──────────────────────────
+    "llama3.2":  {"provider": ModelProvider.OLLAMA, "model_id": "llama3.2"},
     "tinyllama": {"provider": ModelProvider.OLLAMA, "model_id": "tinyllama"},
-    "llama3": {"provider": ModelProvider.OLLAMA, "model_id": "llama3"},
-    "llama3.1": {"provider": ModelProvider.OLLAMA, "model_id": "llama3.1"},
-    "mistral": {"provider": ModelProvider.OLLAMA, "model_id": "mistral"},
-    "mixtral": {"provider": ModelProvider.OLLAMA, "model_id": "mixtral"},
-    "gemma": {"provider": ModelProvider.OLLAMA, "model_id": "gemma"},
-    "gemma2": {"provider": ModelProvider.OLLAMA, "model_id": "gemma2"},
+    "llama3":    {"provider": ModelProvider.OLLAMA, "model_id": "llama3"},
+    "llama3.1":  {"provider": ModelProvider.OLLAMA, "model_id": "llama3.1"},
+    "mistral":   {"provider": ModelProvider.OLLAMA, "model_id": "mistral"},
+    "mixtral":   {"provider": ModelProvider.OLLAMA, "model_id": "mixtral"},
     # ── OpenAI ────────────────────────────────────────
     "gpt-5.4": {"provider": ModelProvider.OPENAI, "model_id": "gpt-5.4"},
-    "o3-mini": {"provider": ModelProvider.OPENAI, "model_id": "o3-mini"},
-    "gpt-4o": {"provider": ModelProvider.OPENAI, "model_id": "gpt-4o"},
+    "o3-mini":  {"provider": ModelProvider.OPENAI, "model_id": "o3-mini"},
+    "gpt-4o":  {"provider": ModelProvider.OPENAI, "model_id": "gpt-4o"},
     # ── Anthropic ─────────────────────────────────────
-    "claude-4.6-opus": {"provider": ModelProvider.ANTHROPIC, "model_id": "claude-4.6-opus-20260205"},
+    "claude-4.6-opus":   {"provider": ModelProvider.ANTHROPIC, "model_id": "claude-4.6-opus-20260205"},
     "claude-4.6-sonnet": {"provider": ModelProvider.ANTHROPIC, "model_id": "claude-4.6-sonnet-20260217"},
     "claude-3.5-sonnet": {"provider": ModelProvider.ANTHROPIC, "model_id": "claude-3-5-sonnet-20241022"},
     # ── Gemini ────────────────────────────────────────
-    "gemini-3.1-pro": {"provider": ModelProvider.GEMINI, "model_id": "gemini-3.1-pro-preview"},
-    "gemini-3-flash": {"provider": ModelProvider.GEMINI, "model_id": "gemini-3-flash"},
+    "gemini-3.1-pro":   {"provider": ModelProvider.GEMINI, "model_id": "gemini-3.1-pro-preview"},
+    "gemini-3-flash":   {"provider": ModelProvider.GEMINI, "model_id": "gemini-3-flash"},
     "gemini-3.1-flash": {"provider": ModelProvider.GEMINI, "model_id": "gemini-3.1-flash-lite-preview"},
 }
 
-# ── Auto-routing heuristic ────────────────────────────────
+# ── Auto-routing heuristics ───────────────────────────────
+# Simple tasks → Gemma (fast local); complex tasks → cloud API
+_SIMPLE_KEYWORDS = {
+    "translate", "summarize", "summary", "what is", "define", "list",
+    "who is", "when did", "how many", "convert", "explain briefly",
+}
 _COMPLEX_KEYWORDS = {
     "analyze", "compare", "evaluate", "synthesize", "strategy",
     "recommend", "design", "architecture", "complex", "detailed",
     "comprehensive", "multi-step", "reasoning", "explain why",
+    "financial analysis", "revenue", "forecast", "budget", "roi",
 }
 
 
 def _is_complex_query(query: str) -> bool:
-    """Simple heuristic: complex if query is long or contains keywords."""
+    """Returns True if the query warrants a cloud API model."""
     q = query.lower()
     if len(query) > 300:
         return True
+    # Explicit simple keywords keep the query local even if long-ish
+    if any(kw in q for kw in _SIMPLE_KEYWORDS):
+        return False
     return any(kw in q for kw in _COMPLEX_KEYWORDS)
 
 
@@ -91,23 +109,76 @@ class LLMRouter:
         """Return all registered model names."""
         return sorted(MODEL_REGISTRY.keys())
 
-    def resolve_model(self, model_name: str, query: str = "", api_keys: dict[str, str | None] | None = None) -> str:
-        """Resolve 'auto' or validate a model name."""
-        if model_name == "auto":
-            if _is_complex_query(query):
-                keys = api_keys or {}
-                if keys.get("openai_api_key") or settings.openai_api_key:
-                    return "gpt-5.4"
-                if keys.get("gemini_api_key"):
-                    return "gemini-3.1-pro"
-                if keys.get("anthropic_api_key") or settings.anthropic_api_key:
-                    return "claude-4.6-sonnet"
-            return "llama3.2"
+    def resolve_model(
+        self,
+        model_name: str,
+        query: str = "",
+        api_keys: dict[str, str | None] | None = None,
+        force_local: bool = False,
+    ) -> str:
+        """
+        Resolve 'auto' to a concrete model name.
+
+        Auto-routing logic:
+          1. Simple / translation / summarization -> primary local model (Gemma 4 E2B)
+          2. Complex reasoning / financial analysis -> best available cloud model
+          3. force_local=True -> always use primary local model (used by translation service)
+        """
+        if model_name == "auto" or force_local:
+            if force_local or not _is_complex_query(query):
+                # Route to Gemma 4 E2B; caller should catch errors if model not pulled
+                return settings.primary_local_model
+            # Complex query – prefer cloud APIs if keys are provided
+            keys = api_keys or {}
+            if keys.get("openai_api_key") or settings.openai_api_key:
+                return "gpt-5.4"
+            if keys.get("gemini_api_key"):
+                return "gemini-3.1-pro"
+            if keys.get("anthropic_api_key") or settings.anthropic_api_key:
+                return "claude-4.6-sonnet"
+            # No cloud keys – fall back to local anyway
+            return settings.primary_local_model
         if model_name not in MODEL_REGISTRY:
             raise ValueError(
                 f"Unknown model '{model_name}'. Available: {self.list_models()}"
             )
         return model_name
+
+    async def generate_with_fallback(
+        self,
+        preferred_model: str,
+        messages: list[dict[str, str]],
+        temperature: float = 0.7,
+        max_tokens: int = 2048,
+        api_keys: dict[str, str | None] | None = None,
+    ) -> tuple[str, str]:
+        """
+        Try preferred_model; fall back to fallback_local_model then llama3.2 on Ollama errors.
+        Returns (answer_text, model_actually_used).
+        """
+        fallback_chain = [
+            preferred_model,
+            settings.fallback_local_model,
+            "llama3.2",
+        ]
+        # Deduplicate while preserving order
+        seen: set[str] = set()
+        chain = [m for m in fallback_chain if not (m in seen or seen.add(m))]  # type: ignore[func-returns-value]
+
+        last_err: Exception | None = None
+        for model in chain:
+            if model not in MODEL_REGISTRY:
+                continue
+            try:
+                answer = await self.generate(model, messages, temperature, max_tokens, api_keys)
+                return answer, model
+            except Exception as exc:
+                logger.warning("Model %s failed (%s), trying next fallback.", model, exc)
+                last_err = exc
+
+        raise RuntimeError(
+            f"All models in fallback chain failed. Last error: {last_err}"
+        )
 
     async def generate(
         self,

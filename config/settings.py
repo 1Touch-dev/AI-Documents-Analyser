@@ -36,6 +36,21 @@ class Settings(BaseSettings):
     # ── Ollama ───────────────────────────────────────────
     ollama_base_url: str = "http://localhost:11434"
 
+    # ── Local Model Strategy ─────────────────────────────
+    # gemma4:e2b requires ~7.2 GB RAM. Use gemma2:2b (~3 GB) on smaller instances.
+    # Set PRIMARY_LOCAL_MODEL in .env to override.
+    primary_local_model: str = "gemma4:e2b"
+    fallback_local_model: str = "gemma2:2b"
+
+    # ── Translation ──────────────────────────────────────
+    # Default target language for translation toggle.
+    translate_target_language: str = "English"
+
+    # ── Currency ─────────────────────────────────────────
+    # Supported: USD, BRL, EUR, GBP. Uses Frankfurter.app (no API key needed).
+    default_currency: str = "USD"
+    currency_cache_ttl: int = 3600  # 1 hour
+
     # ── External LLM Keys (Optional) ────────────────────
     openai_api_key: str = ""
     anthropic_api_key: str = ""
@@ -66,6 +81,10 @@ class Settings(BaseSettings):
     # ── Caching (Redis) ──────────────────────────────────
     redis_url: str = "redis://localhost:6379/0"
     cache_ttl_seconds: int = 3600  # 1 hour
+
+    # ── Financial Analytics ──────────────────────────────
+    # Model used for LLM-driven financial extraction (prefer local for speed).
+    financial_extraction_model: str = "gemma4:e2b"
 
     @field_validator("debug", mode="before")
     @classmethod

@@ -128,6 +128,8 @@ class RAGPipeline:
         filter_metadata: dict[str, Any] | None = None,
         api_keys: dict[str, str | None] | None = None,
         full_doc_list: list[str] | None = None,
+        translate: bool = False,
+        target_language: str | None = None,
     ) -> dict[str, Any]:
         """
         Full RAG query: embed → search → prompt → LLM → answer.
@@ -154,8 +156,23 @@ class RAGPipeline:
         # 4. Build context from retrieved chunks
         context_parts: list[str] = []
         sources: list[dict[str, Any]] = []
-        for i, result in enumerate(search_results, 1):
-            context_parts.append(f"[{i}] {result['document']}")
+        chunk_texts = [r["document"] for r in search_results]
+
+        # 4a. Optionally translate chunks to target language
+        if translate:
+            from services.translation_service import TranslationService
+            translation_svc = TranslationService(self.llm)
+            chunk_texts = await translation_svc.translate_chunks(
+                chunk_texts, target_language=target_language
+            )
+            logger.info(
+                "RAG query: translated %d chunks to '%s'",
+                len(chunk_texts),
+                target_language or "English",
+            )
+
+        for i, (result, text) in enumerate(zip(search_results, chunk_texts), 1):
+            context_parts.append(f"[{i}] {text}")
             sources.append(
                 {
                     "chunk_id": result["id"],
@@ -163,7 +180,7 @@ class RAGPipeline:
                     "chunk_index": result["metadata"].get("chunk_index", 0),
                     "title": result["metadata"].get("title", ""),
                     "relevance_score": round(1 - result.get("distance", 0), 4),
-                    "excerpt": result["document"][:200],
+                    "excerpt": text[:200],
                 }
             )
 

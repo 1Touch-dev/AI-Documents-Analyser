@@ -183,6 +183,12 @@ class QueryRequest(BaseModel):
     openai_api_key: str | None = None
     anthropic_api_key: str | None = None
     gemini_api_key: str | None = None
+    # ── Phase 1: Translation toggle ──────────────────────
+    translate: bool = False
+    target_language: str | None = None   # e.g. "English", "Spanish"
+    # ── Phase 2: Currency conversion ─────────────────────
+    target_currency: str | None = None   # e.g. "USD", "BRL", "EUR"
+
 
 class QueryResponse(BaseModel):
     answer: str
@@ -523,8 +529,8 @@ async def query_documents(
     # Add user message
     conv_mgr.add_message(db, session_id, "user", body.question)
 
-    if cached_result:
-        # Use cached result
+    if cached_result and not body.translate:
+        # Use cached result (skip cache when translation is active — context may differ)
         result = cached_result
         logger.info("Using cached query result (100x speedup)")
     else:
@@ -542,17 +548,31 @@ async def query_documents(
                 "anthropic_api_key": body.anthropic_api_key,
                 "gemini_api_key": body.gemini_api_key,
             },
-            full_doc_list=doc_titles
+            full_doc_list=doc_titles,
+            translate=body.translate,
+            target_language=body.target_language,
         )
 
-        # Cache the result for 1 hour
-        cache.set(
-            question=body.question,
-            model=body.model,
-            top_k=body.top_k,
-            result=result,
-            category=body.category,
-        )
+        # Cache (only when translation is off — translated results are non-generic)
+        if not body.translate:
+            cache.set(
+                question=body.question,
+                model=body.model,
+                top_k=body.top_k,
+                result=result,
+                category=body.category,
+            )
+
+    # Post-process currency conversion if requested
+    if body.target_currency:
+        try:
+            from services.currency_service import CurrencyService
+            currency_svc = CurrencyService()
+            result["answer"] = await currency_svc.convert_in_text(
+                result["answer"], body.target_currency
+            )
+        except Exception as e:
+            logger.warning("Currency conversion failed (%s). Returning unconverted answer.", e)
 
     # Add assistant message
     conv_mgr.add_message(
