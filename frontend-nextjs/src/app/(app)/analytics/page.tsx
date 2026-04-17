@@ -817,8 +817,6 @@ export default function AnalyticsPage() {
             </button>
           </div>
         </div>
-        
-        </div>
       </article>
 
       {/* Business Intelligence: Insights Dashboard */}
@@ -871,7 +869,6 @@ export default function AnalyticsPage() {
           )}
         </article>
       )}
-      </article>
 
     </section>
   );
