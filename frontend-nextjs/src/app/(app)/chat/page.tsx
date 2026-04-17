@@ -18,6 +18,18 @@ import {
 import { useAuth } from "@/contexts/auth-context";
 import { useAppPreferences } from "@/contexts/app-preferences-context";
 
+
+const MODEL_DISPLAY_NAMES: Record<string, string> = {
+  "gpt-4o": "GPT-4o",
+  "gpt-4o-mini": "GPT-4o Mini",
+  "o3-mini": "o3-mini",
+  "claude-4.6-opus": "Claude 4.6 Opus",
+  "claude-4.6-sonnet": "Claude 4.6 Sonnet",
+  "claude-3.5-sonnet": "Claude 3.5 Sonnet",
+  "gemini-2.5-pro": "Gemini 2.5 Pro",
+  "gemini-2.0-flash": "Gemini 2.0 Flash",
+};
+
 export default function ChatPage() {
   const { token } = useAuth();
   const {
@@ -53,7 +65,7 @@ export default function ChatPage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [models, setModels] = useState<string[]>(["auto"]);
+  const [models, setModels] = useState<string[]>(["gpt-4o"]);
   const [prompts, setPrompts] = useState<PromptItem[]>([]);
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [uploadSummary, setUploadSummary] = useState<UploadBatchResponse | null>(null);
@@ -70,8 +82,8 @@ export default function ChatPage() {
 
   useEffect(() => {
     getModels(token ?? undefined)
-      .then((res) => setModels(["auto", ...res.models.filter((m) => m !== "auto")]))
-      .catch(() => setModels(["auto"]));
+      .then((res) => setModels(["gpt-4o", ...res.models.filter((m) => m !== "gpt-4o")]))
+      .catch(() => setModels(["gpt-4o"]));
 
     listPrompts(token ?? undefined)
       .then((res) => setPrompts(res.prompts))
@@ -180,7 +192,7 @@ export default function ChatPage() {
       const result = await queryDocuments(
         {
           question: currentQuestion,
-          model: selectedModel || "auto",
+          model: selectedModel || "gpt-4o",
           category: selectedCategory || null,
           prompt_template: selectedPromptTemplate || undefined,
           openai_api_key: openaiApiKey || null,
@@ -297,7 +309,7 @@ export default function ChatPage() {
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/15 bg-white/5 p-3">
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-slate-300">
-                Model: {selectedModel || "auto"}
+                Model: {MODEL_DISPLAY_NAMES[selectedModel] || selectedModel || "GPT-4o"}
               </span>
               <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-slate-300">
                 Category: {selectedCategory || "general"}
@@ -422,7 +434,7 @@ export default function ChatPage() {
                       >
                         {models.map((model) => (
                           <option key={model} value={model}>
-                            {model}
+                            {MODEL_DISPLAY_NAMES[model] || model}
                           </option>
                         ))}
                       </select>

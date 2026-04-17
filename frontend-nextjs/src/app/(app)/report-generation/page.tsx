@@ -28,7 +28,7 @@ export default function ReportGenerationPage() {
           query: query.trim(),
           report_type: reportType,
           output_format: outputFormat,
-          model: selectedModel || "auto",
+          model: selectedModel || "gpt-4o",
           openai_api_key: openaiApiKey || null,
           anthropic_api_key: anthropicApiKey || null,
           gemini_api_key: geminiApiKey || null,

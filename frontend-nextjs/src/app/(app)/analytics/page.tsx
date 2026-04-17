@@ -148,24 +148,24 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     let mounted = true;
-    Promise.all([
+    Promise.allSettled([
       getAnalyticsOverview(token ?? undefined),
       getAnalyticsContent(token ?? undefined),
       getAnalyticsContentInsights(token ?? undefined),
       getAnalyticsStorage(token ?? undefined),
       listDocuments(token ?? undefined, 500),
       getAnalyticsFinancials(token ?? undefined),
-      fetch("/api/backend/analytics/insights", { headers: { "Authorization": `Bearer ${token}` } }).then(r => r.json())
-    ])
-      .then(([, ct, insights, , docs, fins, bInsights]) => {
+      fetch("/api/backend/analytics/insights", { headers: { "Authorization": `Bearer ${token}` } })
+        .then((r) => { if (!r.ok) return null; return r.json().catch(() => null); })
+        .catch(() => null),
+    ]).then(([, ctRes, insightsRes, , docsRes, finsRes, bInsightsRes]) => {
         if (!mounted) return;
-        setContent(ct);
-        setContentInsights(insights);
-        setDocuments(docs.documents);
-        setFinancials(fins.reports);
-        setBusinessInsights(bInsights);
-      })
-      .catch((e) => mounted && setError(e instanceof Error ? e.message : "Failed to load analytics."));
+        if (ctRes.status === "fulfilled" && ctRes.value) setContent(ctRes.value);
+        if (insightsRes.status === "fulfilled" && insightsRes.value) setContentInsights(insightsRes.value);
+        if (docsRes.status === "fulfilled" && docsRes.value) setDocuments(docsRes.value.documents);
+        if (finsRes.status === "fulfilled" && finsRes.value) setFinancials(finsRes.value.reports);
+        if (bInsightsRes.status === "fulfilled" && bInsightsRes.value) setBusinessInsights(bInsightsRes.value);
+      });
     return () => {
       mounted = false;
     };
@@ -798,7 +798,7 @@ export default function AnalyticsPage() {
       <article className="rounded-xl border border-white/15 bg-white/5 p-4">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-3">
           <div>
-            <p className="text-sm font-semibold text-white">LLM Structured Financial Extraction (Gemma 4 E2B)</p>
+            <p className="text-sm font-semibold text-white">LLM Structured Financial Extraction (GPT-4o)</p>
             <p className="mt-1 text-xs text-slate-300">
               Extracted Revenue and Expense figures. Available for automated Tableau flat-export.
             </p>

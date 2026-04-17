@@ -33,14 +33,9 @@ class Settings(BaseSettings):
     aws_region: str = "us-east-1"
     s3_bucket_name: str = "ai-knowledge-platform-docs"
 
-    # ── Ollama ───────────────────────────────────────────
-    ollama_base_url: str = "http://localhost:11434"
-
-    # ── Local Model Strategy ─────────────────────────────
-    # gemma4:e2b requires ~7.2 GB RAM. Use gemma2:2b (~3 GB) on smaller instances.
-    # Set PRIMARY_LOCAL_MODEL in .env to override.
-    primary_local_model: str = "gemma4:e2b"
-    fallback_local_model: str = "gemma2:2b"
+    # ── Default API Model ────────────────────────────────
+    # Used when model="auto". Resolved in priority: openai → anthropic → gemini.
+    default_model: str = "gpt-4o"
 
     # ── Translation ──────────────────────────────────────
     # Default target language for translation toggle.
@@ -92,7 +87,7 @@ class Settings(BaseSettings):
     
     # ── Financial Analytics ──────────────────────────────
     # Model used for LLM-driven financial extraction (prefer local for speed).
-    financial_extraction_model: str = "gemma4:e2b"
+    financial_extraction_model: str = "gpt-4o"
 
     @field_validator("debug", mode="before")
     @classmethod

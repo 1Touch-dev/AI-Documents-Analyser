@@ -27,7 +27,7 @@ const AppPreferencesContext = createContext<AppPreferencesContextValue | null>(n
 function loadInitial(): AppPreferences {
   if (typeof window === "undefined") {
     return {
-      selectedModel: "auto",
+      selectedModel: "gpt-4o",
       selectedCategory: "general",
       selectedPromptTemplate: "",
       openaiApiKey: "",
@@ -41,7 +41,7 @@ function loadInitial(): AppPreferences {
     if (!raw) throw new Error("no local data");
     const parsed = JSON.parse(raw) as Partial<AppPreferences>;
     return {
-      selectedModel: parsed.selectedModel || "auto",
+      selectedModel: parsed.selectedModel || "gpt-4o",
       selectedCategory: parsed.selectedCategory || "general",
       selectedPromptTemplate: parsed.selectedPromptTemplate || "",
       openaiApiKey: parsed.openaiApiKey || "",
@@ -50,7 +50,7 @@ function loadInitial(): AppPreferences {
     };
   } catch {
     return {
-      selectedModel: "auto",
+      selectedModel: "gpt-4o",
       selectedCategory: "general",
       selectedPromptTemplate: "",
       openaiApiKey: "",
