@@ -1051,3 +1051,167 @@ async def list_available_models():
 async def health_check():
     return {"status": "healthy", "app": settings.app_name}
 
+
+# ══════════════════════════════════════════════════════════
+#  Phase 3: Financial Analytics endpoints
+# ══════════════════════════════════════════════════════════
+
+class FinancialExtractRequest(BaseModel):
+    doc_id: str
+    overwrite: bool = False
+
+
+@app.post("/api/analytics/extract_financials", tags=["Financial Analytics"])
+async def extract_financials(
+    body: FinancialExtractRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Trigger LLM-driven financial extraction for a document.
+    Pulls document chunks from the vector store and runs Gemma extraction.
+    """
+    from backend.analytics_service import FinancialAnalyticsService
+    from db.models import Document as DocModel
+
+    llm, rag, _, _, _ = _get_services()
+
+    # Fetch document metadata
+    doc = db.query(DocModel).filter(DocModel.id == body.doc_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    if doc.status != "ready":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Document is not ready for extraction (status: {doc.status}).",
+        )
+
+    # Retrieve all chunks for this document from the vector store
+    embedder = get_embedding_service()
+    vector_store = get_vector_store(dimension=embedder.dimension)
+    try:
+        raw_chunks = vector_store.get_documents_by_doc_id(body.doc_id)
+        doc_text = "\n\n".join(c.get("document", "") for c in raw_chunks)
+    except Exception as e:
+        logger.warning("Could not retrieve chunks for doc %s: %s", body.doc_id, e)
+        doc_text = ""
+
+    if not doc_text.strip():
+        raise HTTPException(
+            status_code=422,
+            detail="No indexed content found for this document. Ensure it has been processed.",
+        )
+
+    svc = FinancialAnalyticsService(llm)
+    report = await svc.extract_financials(
+        doc_id=str(doc.id),
+        doc_text=doc_text,
+        db=db,
+        doc_title=doc.title,
+        overwrite=body.overwrite,
+    )
+    return {"status": "success", "report": report}
+
+
+@app.get("/api/analytics/financials", tags=["Financial Analytics"])
+async def get_financials(db: Session = Depends(get_db)):
+    """List all stored financial reports."""
+    from backend.analytics_service import FinancialAnalyticsService
+    llm, *_ = _get_services()
+    svc = FinancialAnalyticsService(llm)
+    return {"reports": svc.get_all_reports(db)}
+
+
+# ══════════════════════════════════════════════════════════
+#  Phase 3: Document Status — S3 vs ChromaDB index
+# ══════════════════════════════════════════════════════════
+
+@app.get("/api/documents/status", tags=["Documents"])
+async def document_status(db: Session = Depends(get_db)):
+    """
+    Compare documents stored in S3 vs indexed in ChromaDB.
+    Returns:
+      - indexed: doc IDs that are in both S3 (DB) and ChromaDB
+      - not_indexed: doc IDs in DB but missing from ChromaDB
+      - s3_only: doc IDs with no chunks (failed ingestion)
+    """
+    from db.models import Document as DocModel
+
+    embedder = get_embedding_service()
+    vector_store = get_vector_store(dimension=embedder.dimension)
+
+    # All documents from PostgreSQL
+    db_docs = db.query(DocModel).filter(DocModel.status == "ready").all()
+    db_doc_map = {str(d.id): d for d in db_docs}
+
+    # All indexed doc_ids from ChromaDB
+    try:
+        indexed_ids: set[str] = vector_store.get_indexed_doc_ids()
+    except Exception as e:
+        logger.warning("Could not retrieve indexed doc IDs from vector store: %s", e)
+        indexed_ids = set()
+
+    indexed = []
+    not_indexed = []
+
+    for doc_id, doc in db_doc_map.items():
+        entry = {
+            "doc_id": doc_id,
+            "title": doc.title,
+            "category": doc.category,
+            "file_type": doc.file_type,
+            "chunk_count": doc.chunk_count,
+            "uploaded_at": doc.timestamp.isoformat() if doc.timestamp else None,
+        }
+        if doc_id in indexed_ids:
+            indexed.append(entry)
+        else:
+            not_indexed.append(entry)
+
+    return {
+        "total_in_db": len(db_doc_map),
+        "total_indexed": len(indexed),
+        "total_not_indexed": len(not_indexed),
+        "indexed": indexed,
+        "not_indexed": not_indexed,
+    }
+
+
+# ══════════════════════════════════════════════════════════
+#  Phase 4: Tableau / CSV export
+# ══════════════════════════════════════════════════════════
+
+@app.get("/api/analytics/export", tags=["Financial Analytics"])
+async def export_analytics(
+    format: str = "json",  # "json" | "csv"
+    db: Session = Depends(get_db),
+):
+    """
+    Export all financial analytics data in JSON or CSV format
+    (Tableau-compatible flat row structure).
+    """
+    import csv
+    import io
+
+    from fastapi.responses import PlainTextResponse, JSONResponse as FJSONResponse
+    from backend.analytics_service import FinancialAnalyticsService
+
+    llm, *_ = _get_services()
+    svc = FinancialAnalyticsService(llm)
+    rows = svc.get_export_data(db)
+
+    if format.lower() == "csv":
+        if not rows:
+            return PlainTextResponse("No data available.", media_type="text/csv")
+        output = io.StringIO()
+        writer = csv.DictWriter(output, fieldnames=list(rows[0].keys()))
+        writer.writeheader()
+        writer.writerows(rows)
+        return PlainTextResponse(
+            content=output.getvalue(),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=financial_analytics.csv"},
+        )
+
+    # Default: JSON
+    return FJSONResponse(content={"count": len(rows), "data": rows})
+

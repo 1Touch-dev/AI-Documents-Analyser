@@ -11,6 +11,7 @@ from sqlalchemy import (
     Column,
     DateTime,
     Enum,
+    Float,
     Integer,
     String,
     Text,
@@ -104,3 +105,36 @@ class User(Base):
 
     def __repr__(self) -> str:
         return f"<User {self.username!r}>"
+
+
+# ──────────────────────────────────────────────────────────
+# Financial Report (LLM-extracted structured financial data)
+# ──────────────────────────────────────────────────────────
+class FinancialReport(Base):
+    __tablename__ = "financial_reports"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    doc_id = Column(String(64), nullable=False, index=True)
+    doc_title = Column(String(512), nullable=True)
+    # Revenue breakdown: {"F&B": 500000, "Sponsorship": 1200000, ...}
+    revenue = Column(JSON, default=dict)
+    # Expense breakdown: {"Player Salary": 3000000, ...}
+    expenses = Column(JSON, default=dict)
+    # ISO 4217 currency code detected in the document
+    currency = Column(String(8), default="USD", nullable=False)
+    # Optional fiscal year string (e.g. "2023-24")
+    fiscal_year = Column(String(16), nullable=True)
+    # Computed net result (revenue_total - expenses_total)
+    net_result = Column(Float, nullable=True)
+    # LLM confidence: "high" | "medium" | "low"
+    confidence = Column(String(16), default="low")
+    # Human-readable extraction notes from LLM
+    notes = Column(String(1024), nullable=True)
+    # Which model performed the extraction
+    model_used = Column(String(64), nullable=True)
+    extracted_at = Column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+
+    def __repr__(self) -> str:
+        return f"<FinancialReport doc_id={self.doc_id!r} currency={self.currency!r}>"

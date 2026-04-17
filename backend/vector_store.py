@@ -44,6 +44,12 @@ class BaseVectorStore(ABC):
     @abstractmethod
     def count(self) -> int: ...
 
+    @abstractmethod
+    def get_indexed_doc_ids(self) -> set[str]: ...
+
+    @abstractmethod
+    def get_documents_by_doc_id(self, doc_id: str) -> list[dict[str, Any]]: ...
+
 
 # ──────────────────────────────────────────────────────────
 # ChromaDB
@@ -162,6 +168,38 @@ class ChromaVectorStore(BaseVectorStore):
         except Exception:
             return []
 
+    def get_indexed_doc_ids(self) -> set[str]:
+        """Return a set of all unique doc_ids currently indexed."""
+        try:
+            # We can use get with an empty include to just get metadatas, or IDs and parse
+            results = self._collection.get(include=["metadatas"])
+            if not results or not results["metadatas"]:
+                return set()
+            return {m.get("doc_id") for m in results["metadatas"] if m and m.get("doc_id")}
+        except Exception as e:
+            logger.warning("ChromaVectorStore.get_indexed_doc_ids failed: %s", e)
+            return set()
+
+    def get_documents_by_doc_id(self, doc_id: str) -> list[dict[str, Any]]:
+        """Retrieve all text chunks for a specific document ID."""
+        try:
+            results = self._collection.get(
+                where={"doc_id": doc_id},
+                include=["documents", "metadatas"]
+            )
+            output = []
+            for i in range(len(results["ids"])):
+                output.append({
+                    "id": results["ids"][i],
+                    "document": results["documents"][i] if results["documents"] else "",
+                    "metadata": results["metadatas"][i] if results["metadatas"] else {},
+                })
+            # Ensure they are sorted by chunk index
+            output.sort(key=lambda x: x["metadata"].get("chunk_index", 0))
+            return output
+        except Exception as e:
+            logger.warning("ChromaVectorStore.get_documents_by_doc_id failed: %s", e)
+            return []
 
 # ──────────────────────────────────────────────────────────
 # Qdrant
@@ -262,6 +300,46 @@ class QdrantVectorStore(BaseVectorStore):
         info = self._client.get_collection(self.COLLECTION_NAME)
         return info.points_count
 
+    def get_indexed_doc_ids(self) -> set[str]:
+        from qdrant_client.models import Filter
+        try:
+            # Qdrant requires scrolling for all data; for now we'll do a limited scroll
+            results, _ = self._client.scroll(
+                collection_name=self.COLLECTION_NAME,
+                limit=10000,
+                with_payload=True,
+                with_vectors=False,
+            )
+            return {hit.payload.get("doc_id") for hit in results if hit.payload and hit.payload.get("doc_id")}
+        except Exception as e:
+            logger.warning("QdrantVectorStore.get_indexed_doc_ids failed: %s", e)
+            return set()
+
+    def get_documents_by_doc_id(self, doc_id: str) -> list[dict[str, Any]]:
+        from qdrant_client.models import Filter, FieldCondition, MatchValue
+        try:
+            results, _ = self._client.scroll(
+                collection_name=self.COLLECTION_NAME,
+                scroll_filter=Filter(
+                    must=[FieldCondition(key="doc_id", match=MatchValue(value=doc_id))]
+                ),
+                limit=10000,
+                with_payload=True,
+                with_vectors=False,
+            )
+            output = []
+            for hit in results:
+                payload = hit.payload or {}
+                output.append({
+                    "id": str(hit.id),
+                    "document": payload.get("text", ""),
+                    "metadata": {k: v for k, v in payload.items() if k != "text"},
+                })
+            output.sort(key=lambda x: x["metadata"].get("chunk_index", 0))
+            return output
+        except Exception as e:
+            logger.warning("QdrantVectorStore.get_documents_by_doc_id failed: %s", e)
+            return []
 
 # ──────────────────────────────────────────────────────────
 # Factory
