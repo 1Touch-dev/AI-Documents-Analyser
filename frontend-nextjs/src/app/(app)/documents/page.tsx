@@ -68,8 +68,14 @@ export default function DocumentsPage() {
 
   useEffect(() => {
     refreshDocuments();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+    // Poll for any 'processing' documents
+    const pollInterval = setInterval(() => {
+      if (documents.some(d => normalizeStatus(d.status) === "processing")) {
+        refreshDocuments();
+      }
+    }, 5000);
+    return () => clearInterval(pollInterval);
+  }, [token, documents.length]);
 
   useEffect(() => {
     if (!uploadSummary?.batch_id || !token) return;
@@ -277,7 +283,7 @@ export default function DocumentsPage() {
                         normalizedStatus === "ready"
                           ? "bg-emerald-500/20 text-emerald-200"
                           : normalizedStatus === "processing"
-                          ? "bg-amber-500/20 text-amber-200"
+                          ? "bg-amber-500/20 text-amber-200 animate-pulse"
                           : "bg-red-500/20 text-red-200";
                       return (
                         <>

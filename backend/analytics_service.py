@@ -28,34 +28,15 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy.orm import Session
 
 from config.settings import settings
-from db.models import FinancialReport
+from db.models import FinancialReport, FinancialMetric, AnalyticsJob
+from utils.schema_validator import validate_financial_json, REVENUE_CATEGORIES, EXPENSE_CATEGORIES
 
 if TYPE_CHECKING:
     from backend.llm_router import LLMRouter
 
 logger = logging.getLogger(__name__)
 
-# ── Revenue categories (as defined in the spec) ───────────────────────────────
-REVENUE_CATEGORIES = [
-    "F&B",
-    "Sponsorship",
-    "Tickets",
-    "Retail",
-    "Player Sales",
-    "Other Revenue",
-]
-
-# ── Expense categories ────────────────────────────────────────────────────────
-EXPENSE_CATEGORIES = [
-    "Player Salary",
-    "Coach Salary",
-    "Travel",
-    "Stadium",
-    "Back Office",
-    "Marketing",
-    "Retail",
-    "Misc",
-]
+# Revenue and Expense categories are imported from utils.schema_validator
 
 # ── Extraction prompt ─────────────────────────────────────────────────────────
 _EXTRACTION_PROMPT = """You are a financial data extraction specialist. Analyze the following document text and extract structured financial data.
@@ -123,6 +104,7 @@ class FinancialAnalyticsService:
         db: Session,
         doc_title: str = "",
         overwrite: bool = False,
+        job_id: str | None = None,
     ) -> dict[str, Any]:
         """
         Run LLM-based financial extraction for a document and persist to DB.
@@ -174,13 +156,26 @@ class FinancialAnalyticsService:
         model_used = settings.financial_extraction_model
 
         try:
-            answer, model_used = await self._llm.generate_with_fallback(
-                preferred_model=settings.financial_extraction_model,
-                messages=messages,
-                temperature=0.0,   # Zero temp for deterministic structured output
-                max_tokens=1024,
+            import asyncio
+            # Timeout control (30s) per task requirement
+            answer, model_used = await asyncio.wait_for(
+                self._llm.generate_with_fallback(
+                    preferred_model=settings.financial_extraction_model,
+                    messages=messages,
+                    temperature=0.0,
+                    max_tokens=1024,
+                ),
+                timeout=30.0
             )
             raw_json = self._parse_json_response(answer)
+        except asyncio.TimeoutError:
+            logger.error("Financial extraction timed out for doc %s", doc_id)
+            if job_id:
+                db.query(AnalyticsJob).filter(AnalyticsJob.id == job_id).update({
+                    "error_message": "LLM extraction timed out (30s)"
+                })
+                db.commit()
+            raw_json = self._empty_report()
         except Exception as e:
             logger.error(
                 "Financial extraction failed for doc %s (%s): %s", doc_id, doc_title, e
@@ -217,7 +212,41 @@ class FinancialAnalyticsService:
             db.add(report)
             db.commit()
             db.refresh(report)
-            return self._report_to_dict(report)
+
+        # Sync to FinancialMetric table for granular analytical queries
+        self._sync_metrics(doc_id, raw_json, db)
+
+        return self._report_to_dict(report)
+
+    def _sync_metrics(self, doc_id: str, raw_json: dict, db: Session):
+        """Flat save categories to financial_metrics for efficient dashboard queries."""
+        # First clear old metrics if they exist for this doc
+        db.query(FinancialMetric).filter(FinancialMetric.doc_id == doc_id).delete()
+        
+        currency = raw_json.get("currency", "USD")
+        fy = raw_json.get("fiscal_year")
+        
+        # Revenue
+        revs = raw_json.get("revenue", {})
+        for cat, val in revs.items():
+            if val is not None and cat != "total":
+                m = FinancialMetric(
+                    doc_id=doc_id, category=cat, value=float(val), 
+                    type="revenue", currency=currency, fiscal_year=fy
+                )
+                db.add(m)
+        
+        # Expenses
+        exps = raw_json.get("expenses", {})
+        for cat, val in exps.items():
+            if val is not None and cat != "total":
+                m = FinancialMetric(
+                    doc_id=doc_id, category=cat, value=float(val), 
+                    type="expense", currency=currency, fiscal_year=fy
+                )
+                db.add(m)
+        
+        db.commit()
 
     def _parse_json_response(self, raw: str) -> dict[str, Any]:
         """
@@ -227,25 +256,20 @@ class FinancialAnalyticsService:
         cleaned = re.sub(r"```(?:json)?", "", raw).replace("```", "").strip()
         # Find the first {...} block
         match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+        raw_dict = {}
         if match:
             try:
-                return json.loads(match.group(0))
+                raw_dict = json.loads(match.group(0))
             except json.JSONDecodeError as e:
                 logger.warning("JSON parse failed: %s\nRaw: %s", e, raw[:500])
-        return self._empty_report()
+        
+        # Robust validation with fallback to 0.0
+        return validate_financial_json(raw_dict)
 
     @staticmethod
     def _empty_report() -> dict[str, Any]:
         """Return a zero-filled financial report structure."""
-        return {
-            "currency": "USD",
-            "fiscal_year": None,
-            "revenue": {c: None for c in REVENUE_CATEGORIES} | {"total": None},
-            "expenses": {c: None for c in EXPENSE_CATEGORIES} | {"total": None},
-            "net_result": None,
-            "confidence": "low",
-            "notes": "Extraction failed or no financial data found.",
-        }
+        return validate_financial_json({})
 
     @staticmethod
     def _report_to_dict(report: FinancialReport) -> dict[str, Any]:

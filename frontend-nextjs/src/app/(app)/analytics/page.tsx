@@ -138,6 +138,12 @@ export default function AnalyticsPage() {
   // Phase 3 & 4 Financials state
   const [financials, setFinancials] = useState<FinancialReport[]>([]);
   const [isExtracting, setIsExtracting] = useState<Record<string, boolean>>({});
+  const [businessInsights, setBusinessInsights] = useState<{
+    top_revenue_stream: string;
+    biggest_expense: string;
+    profit_trend: Array<{ fy: number; type: string; value: number }>;
+    total_processed: number;
+  } | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -148,13 +154,15 @@ export default function AnalyticsPage() {
       getAnalyticsStorage(token ?? undefined),
       listDocuments(token ?? undefined, 500),
       getAnalyticsFinancials(token ?? undefined),
+      fetch("/api/analytics/insights", { headers: { "Authorization": `Bearer ${token}` } }).then(r => r.json())
     ])
-      .then(([, ct, insights, , docs, fins]) => {
+      .then(([, ct, insights, , docs, fins, bInsights]) => {
         if (!mounted) return;
         setContent(ct);
         setContentInsights(insights);
         setDocuments(docs.documents);
         setFinancials(fins.reports);
+        setBusinessInsights(bInsights);
       })
       .catch((e) => mounted && setError(e instanceof Error ? e.message : "Failed to load analytics."));
     return () => {
@@ -810,83 +818,59 @@ export default function AnalyticsPage() {
           </div>
         </div>
         
-        <div className="max-h-80 overflow-auto rounded-lg border border-white/10">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-white/10 text-slate-200">
-              <tr>
-                <th className="px-3 py-2">Document Title</th>
-                <th className="px-3 py-2">FY</th>
-                <th className="px-3 py-2">Curr</th>
-                <th className="px-3 py-2">Total Revenue</th>
-                <th className="px-3 py-2">Total Expense</th>
-                <th className="px-3 py-2">Net Result</th>
-                <th className="px-3 py-2">Confidence</th>
-                <th className="px-3 py-2">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {financials.map((fin) => (
-                <tr key={fin.id} className="border-t border-white/10 text-slate-100">
-                  <td className="px-3 py-2 max-w-[200px] truncate" title={fin.doc_title || ""}>
-                    {fin.doc_title || "Unknown"}
-                  </td>
-                  <td className="px-3 py-2">{fin.fiscal_year || "-"}</td>
-                  <td className="px-3 py-2">{fin.currency}</td>
-                  <td className="px-3 py-2 text-emerald-300">{fin.revenue?.total != null ? fin.revenue.total.toLocaleString() : "-"}</td>
-                  <td className="px-3 py-2 text-red-300">{fin.expenses?.total != null ? fin.expenses.total.toLocaleString() : "-"}</td>
-                  <td className="px-3 py-2 font-semibold">
-                    {fin.net_result != null ? fin.net_result.toLocaleString() : "-"}
-                  </td>
-                  <td className="px-3 py-2">
-                    <span 
-                      className={`px-1.5 py-0.5 rounded text-[10px] uppercase font-bold ${
-                        fin.confidence === "high" ? "bg-emerald-500/20 text-emerald-200" :
-                        fin.confidence === "medium" ? "bg-amber-500/20 text-amber-200" :
-                        "bg-red-500/20 text-red-200"
-                      }`}
-                    >
-                      {fin.confidence}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2">
-                    <button
-                      onClick={() => handleExtractFinancials(fin.doc_id)}
-                      disabled={isExtracting[fin.doc_id]}
-                      className="rounded border border-indigo-400/40 bg-indigo-500/20 px-2 py-1 text-[10px] text-indigo-100 hover:bg-indigo-500/40 disabled:opacity-50"
-                    >
-                      {isExtracting[fin.doc_id] ? "Running..." : "Re-extract"}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              
-              {/* Show docs that could be extracted but aren't yet */}
-              {explorerDocuments.filter(d => d.status === "ready" && !financials.some(f => f.doc_id === d.id)).slice(0, 10).map((doc) => (
-                <tr key={doc.id} className="border-t border-white/10 text-slate-400">
-                  <td className="px-3 py-2 max-w-[200px] truncate" title={doc.title}>{doc.title}</td>
-                  <td className="px-3 py-2 text-center" colSpan={6}>Not extracted yet</td>
-                  <td className="px-3 py-2">
-                    <button
-                      onClick={() => handleExtractFinancials(doc.id)}
-                      disabled={isExtracting[doc.id]}
-                      className="rounded border border-cyan-400/40 bg-cyan-500/20 px-2 py-1 text-[10px] text-cyan-100 hover:bg-cyan-500/40 disabled:opacity-50"
-                    >
-                      {isExtracting[doc.id] ? "Running..." : "Run Gemma"}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              
-              {!financials.length && !explorerDocuments.length && (
-                <tr>
-                  <td className="px-3 py-3 text-slate-300" colSpan={8}>
-                    No financial data available.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
         </div>
+      </article>
+
+      {/* Business Intelligence: Insights Dashboard */}
+      {businessInsights && (
+        <article className="rounded-2xl border border-indigo-500/20 bg-indigo-500/5 p-6 backdrop-blur-xl">
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h3 className="text-xl font-bold text-white">Business Value Insights</h3>
+              <p className="text-sm text-indigo-300">High-level financial drivers and profitability trends.</p>
+            </div>
+            <BarChart className="h-6 w-6 text-indigo-400" />
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+            <div className="rounded-xl border border-white/10 bg-slate-900/50 p-4">
+              <p className="text-xs uppercase tracking-widest text-slate-400">Top Revenue Stream</p>
+              <p className="mt-2 text-2xl font-bold text-emerald-400">{businessInsights.top_revenue_stream}</p>
+              <p className="mt-1 text-[11px] text-slate-500">Highest contribution by category</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-slate-900/50 p-4">
+              <p className="text-xs uppercase tracking-widest text-slate-400">Biggest Expense</p>
+              <p className="mt-2 text-2xl font-bold text-rose-400">{businessInsights.biggest_expense}</p>
+              <p className="mt-1 text-[11px] text-slate-500">Largest overhead cost</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-slate-900/50 p-4">
+              <p className="text-xs uppercase tracking-widest text-slate-400">Doc Penetration</p>
+              <p className="mt-2 text-2xl font-bold text-cyan-400">{businessInsights.total_processed}</p>
+              <p className="mt-1 text-[11px] text-slate-500">Financials extracted successfully</p>
+            </div>
+          </div>
+
+          {businessInsights.profit_trend?.length > 0 && (
+            <div className="mt-8">
+              <h4 className="mb-4 text-sm font-semibold text-slate-300">Multi-Year Financial Trend</h4>
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={businessInsights.profit_trend}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                    <XAxis dataKey="fy" stroke="#64748b" />
+                    <YAxis stroke="#64748b" />
+                    <RechartsTooltip 
+                      contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155' }}
+                      itemStyle={{ color: '#e2e8f0' }}
+                    />
+                    <Bar dataKey="value" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+        </article>
+      )}
       </article>
 
     </section>

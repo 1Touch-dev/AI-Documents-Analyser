@@ -41,6 +41,13 @@ export default function ChatPage() {
       role: "user" | "assistant";
       content: string;
       sources?: Array<{ title?: string; excerpt?: string }>;
+      explanation?: {
+        model: string;
+        top_k: number;
+        translated: boolean;
+        currency_converted: boolean;
+        chunks_analyzed: number;
+      };
     }>
   >([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -189,7 +196,12 @@ export default function ChatPage() {
       setSessionId(result.session_id || null);
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: result.answer, sources: result.sources ?? [] },
+        { 
+          role: "assistant", 
+          content: result.answer, 
+          sources: result.sources ?? [],
+          explanation: result.explanation
+        },
       ]);
       await refreshHistory();
     } catch (e) {
@@ -214,6 +226,7 @@ export default function ChatPage() {
           role: m.role,
           content: m.content,
           sources: m.sources || [],
+          explanation: (m as any).explanation,
         }))
       );
     } catch (e) {
@@ -525,6 +538,20 @@ export default function ChatPage() {
                       {msg.role === "user" ? "You" : "Assistant"}
                     </p>
                     <p className="whitespace-pre-wrap text-sm text-slate-100">{msg.content}</p>
+                    {!!msg.explanation && (
+                      <div className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3 italic">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-300">
+                          How this was generated
+                        </p>
+                        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-400">
+                          <span>Model: <span className="text-slate-200">{msg.explanation.model}</span></span>
+                          <span>Context: <span className="text-slate-200">{msg.explanation.chunks_analyzed} chunks</span></span>
+                          {msg.explanation.translated && <span className="text-cyan-400">Translated ✓</span>}
+                          {msg.explanation.currency_converted && <span className="text-emerald-400">Currency Converted ✓</span>}
+                        </div>
+                      </div>
+                    )}
+                    
                     {!!msg.sources?.length && (
                       <div className="mt-3 space-y-2">
                         <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">

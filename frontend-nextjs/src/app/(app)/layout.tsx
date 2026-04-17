@@ -7,6 +7,7 @@ import { motion } from "motion/react";
 import Avatar from "react-avatar";
 import {
   BarChart3,
+  Cpu,
   FileOutput,
   FileSpreadsheet,
   FileText,
@@ -29,6 +30,7 @@ const NAV_ITEMS = [
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/report-generation", label: "Report Generation", icon: FileOutput },
   { href: "/export-data", label: "Export Data", icon: FileSpreadsheet },
+  { href: "/system", label: "System", icon: Cpu },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
