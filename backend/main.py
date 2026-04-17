@@ -1113,7 +1113,7 @@ async def extract_financials(
 ):
     """
     Trigger LLM-driven financial extraction for a document.
-    Pulls document chunks from the vector store and runs Gemma extraction.
+    Pulls document chunks from the vector store and runs LLM-based extraction.
     """
     from backend.analytics_service import FinancialAnalyticsService
     from db.models import Document as DocModel

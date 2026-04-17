@@ -2,8 +2,8 @@
 Financial Analytics Service – LLM-driven structured extraction of revenue
 and expense data from document text.
 
-Unlike the pattern-based AnalyticsEngine, this service uses a local LLM
-(Gemma 4 E2B) to understand context and return structured JSON financial data.
+Unlike the pattern-based AnalyticsEngine, this service uses an API LLM
+(GPT-4o) to understand context and return structured JSON financial data.
 
 Categories
 ----------

@@ -87,7 +87,7 @@ async def run_financial_extraction(
             job.finished_at = datetime.now(timezone.utc)
             job.execution_time = duration
             job.progress = 100
-            # Track Usage (Mock token counts for now as Gemma local doesn't expose them cleanly yet)
+            # Track Usage (mock token counts - API models report usage differently)
             token_data = {"prompt": len(doc_text)//4, "completion": 500}
             job.token_usage = token_data
             job.model_used = settings.financial_extraction_model
