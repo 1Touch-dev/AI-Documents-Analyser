@@ -36,6 +36,7 @@ import {
   type FinancialReport,
 } from "@/lib/api";
 import { useAuth } from "@/contexts/auth-context";
+import { TrendingUp } from "lucide-react";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
@@ -827,7 +828,7 @@ export default function AnalyticsPage() {
               <h3 className="text-xl font-bold text-white">Business Value Insights</h3>
               <p className="text-sm text-indigo-300">High-level financial drivers and profitability trends.</p>
             </div>
-            <BarChart className="h-6 w-6 text-indigo-400" />
+            <TrendingUp className="h-6 w-6 text-indigo-400" />
           </div>
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3">

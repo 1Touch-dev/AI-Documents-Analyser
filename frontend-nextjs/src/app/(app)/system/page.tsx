@@ -10,7 +10,7 @@ import {
   DollarSign, 
   CheckCircle2, 
   XCircle, 
-  BarChart, 
+  Activity as BarChartIcon, 
   ShieldCheck,
   Zap,
   RefreshCcw
@@ -133,7 +133,7 @@ export default function SystemPage() {
         <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-6 backdrop-blur-xl lg:col-span-2">
           <div className="mb-6 flex items-center justify-between">
             <h3 className="text-lg font-semibold text-white">Cost & Model Insights</h3>
-            <BarChart className="h-5 w-5 text-indigo-400" />
+            <BarChartIcon className="h-5 w-5 text-indigo-400" />
           </div>
           <div className="space-y-6">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
