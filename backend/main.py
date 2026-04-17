@@ -2,6 +2,7 @@
 FastAPI application – all API endpoints for the AI Knowledge Platform.
 """
 
+import json
 import logging
 import re
 import time
@@ -30,6 +31,7 @@ from pydantic import BaseModel, Field
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from backend.cache_service import get_cache_service
@@ -1194,6 +1196,7 @@ async def get_extraction_status(job_id: str, db: Session = Depends(get_db)):
 async def get_system_metrics():
     """Retrieve system-wide job telemetry, cost metrics, and model breakdowns."""
     from db.models import LLMUsage
+    from db.database import SessionLocal
     db = SessionLocal()
     try:
         metrics = metrics_service.get_system_metrics()
@@ -1261,7 +1264,7 @@ async def get_system_health(db: Session = Depends(get_db)):
     
     # 1. Check DB
     try:
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
         health["components"]["database"] = "ok"
     except Exception as e:
         health["status"] = "degraded"

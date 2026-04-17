@@ -42,8 +42,8 @@ export default function SystemPage() {
   const fetchData = async () => {
     try {
       const [mRes, fRes] = await Promise.all([
-        fetch("/api/system/metrics"),
-        fetch("/api/system/failed_jobs")
+        fetch("/api/backend/system/metrics"),
+        fetch("/api/backend/system/failed_jobs")
       ]);
       if (mRes.ok) setMetrics(await mRes.json());
       if (fRes.ok) setFailedJobs(await fRes.json());

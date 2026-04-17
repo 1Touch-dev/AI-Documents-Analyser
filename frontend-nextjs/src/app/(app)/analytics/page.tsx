@@ -155,7 +155,7 @@ export default function AnalyticsPage() {
       getAnalyticsStorage(token ?? undefined),
       listDocuments(token ?? undefined, 500),
       getAnalyticsFinancials(token ?? undefined),
-      fetch("/api/analytics/insights", { headers: { "Authorization": `Bearer ${token}` } }).then(r => r.json())
+      fetch("/api/backend/analytics/insights", { headers: { "Authorization": `Bearer ${token}` } }).then(r => r.json())
     ])
       .then(([, ct, insights, , docs, fins, bInsights]) => {
         if (!mounted) return;
