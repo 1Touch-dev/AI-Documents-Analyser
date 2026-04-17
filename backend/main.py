@@ -48,8 +48,25 @@ from backend.metrics_service import metrics_service
 from services.document_parser import DocumentParser
 from services.s3_storage import S3StorageService
 
-# ── Logging ──────────────────────────────────────────────
-logging.basicConfig(level=settings.log_level.upper())
+# ── Logging (Structured JSON for production) ──────────────────────────────
+class JSONFormatter(logging.Formatter):
+    def format(self, record):
+        log_entry = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "level": record.levelname,
+            "message": record.getMessage(),
+            "module": record.module,
+            "job_id": getattr(record, "job_id", None),
+            "doc_id": getattr(record, "doc_id", None),
+        }
+        if record.exc_info:
+            log_entry["exception"] = self.formatException(record.exc_info)
+        return json.dumps(log_entry)
+
+handler = logging.StreamHandler()
+handler.setFormatter(JSONFormatter())
+logging.root.handlers = [handler]
+logging.root.setLevel(settings.log_level.upper())
 logger = logging.getLogger(__name__)
 
 # ── Rate limiter ─────────────────────────────────────────
@@ -194,9 +211,23 @@ class QueryRequest(BaseModel):
 
 class QueryResponse(BaseModel):
     answer: str
-    sources: list[dict[str, Any]]
+    sources: list[dict]
     model_used: str
     session_id: str
+    explanation: Optional[dict] = None
+
+class FailedJobResponse(BaseModel):
+    id: str
+    document_id: str
+    error: str
+    model: Optional[str]
+    timestamp: str
+
+class AnalyticsInsightsResponse(BaseModel):
+    top_revenue_stream: str
+    biggest_expense: str
+    profit_trend: list[dict]
+    total_processed: int
 
 class PromptCreate(BaseModel):
     name: str
@@ -581,11 +612,21 @@ async def query_documents(
         db, session_id, "assistant", result["answer"], sources=result["sources"]
     )
 
+    # Explanation Layer (RAG details)
+    explanation = {
+        "model": result.get("model_used"),
+        "top_k": body.top_k,
+        "translated": body.translate,
+        "currency_converted": True if body.target_currency else False,
+        "chunks_analyzed": len(result.get("sources", [])),
+    }
+
     return QueryResponse(
         answer=result["answer"],
         sources=result["sources"],
         model_used=result["model_used"],
         session_id=str(session_id),
+        explanation=explanation
     )
 
 
@@ -1151,8 +1192,66 @@ async def get_extraction_status(job_id: str, db: Session = Depends(get_db)):
 
 @app.get("/api/system/metrics", tags=["System"])
 async def get_system_metrics():
-    """Retrieve system-wide job telemetry and cost metrics."""
-    return metrics_service.get_system_metrics()
+    """Retrieve system-wide job telemetry, cost metrics, and model breakdowns."""
+    from db.models import LLMUsage
+    db = SessionLocal()
+    try:
+        metrics = metrics_service.get_system_metrics()
+        # Add Cost Breakdown
+        usages = db.query(LLMUsage).all()
+        total_cost = sum(u.estimated_cost for u in usages)
+        model_breakdown = {}
+        for u in usages:
+            model_breakdown[u.model_name] = model_breakdown.get(u.model_name, 0) + u.estimated_cost
+        
+        metrics["total_api_spend"] = round(total_cost, 4)
+        metrics["cost_by_model"] = {k: round(v, 4) for k, v in model_breakdown.items()}
+        return metrics
+    finally:
+        db.close()
+
+
+@app.get("/api/system/failed_jobs", tags=["System"])
+async def get_failed_jobs(db: Session = Depends(get_db)):
+    """Retrieve details of the last 10 failed jobs for debugging."""
+    jobs = db.query(AnalyticsJob).filter(AnalyticsJob.status == "failed")\
+             .order_by(AnalyticsJob.finished_at.desc()).limit(10).all()
+    return [
+        {
+            "id": str(j.id),
+            "document_id": j.document_id,
+            "error": j.error_message,
+            "model": j.model_used,
+            "timestamp": j.finished_at.isoformat() if j.finished_at else j.updated_at.isoformat()
+        } for j in jobs
+    ]
+
+
+@app.get("/api/analytics/insights", tags=["Financial Analytics"])
+async def get_financial_insights(db: Session = Depends(get_db)):
+    """Business Intelligence: Analyze financial trends across all processed documents."""
+    from db.models import FinancialMetric
+    from sqlalchemy import func
+    
+    # Simple insights logic
+    top_rev = db.query(FinancialMetric.category, func.sum(FinancialMetric.value))\
+                .filter(FinancialMetric.type == "revenue")\
+                .group_by(FinancialMetric.category).order_by(func.sum(FinancialMetric.value).desc()).first()
+                
+    top_exp = db.query(FinancialMetric.category, func.sum(FinancialMetric.value))\
+                .filter(FinancialMetric.type == "expense")\
+                .group_by(FinancialMetric.category).order_by(func.sum(FinancialMetric.value).desc()).first()
+
+    # Trend (by fiscal year)
+    trend = db.query(FinancialMetric.fiscal_year, FinancialMetric.type, func.sum(FinancialMetric.value))\
+              .group_by(FinancialMetric.fiscal_year, FinancialMetric.type).all()
+    
+    return {
+        "top_revenue_stream": top_rev[0] if top_rev else "N/A",
+        "biggest_expense": top_exp[0] if top_exp else "N/A",
+        "profit_trend": [{"fy": t[0], "type": t[1], "value": t[2]} for t in trend if t[0]],
+        "total_processed": db.query(func.count(func.distinct(FinancialMetric.doc_id))).scalar()
+    }
 
 
 @app.get("/api/system/health", tags=["System"])
