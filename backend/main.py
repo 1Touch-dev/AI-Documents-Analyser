@@ -42,7 +42,9 @@ from backend.report_generator import ReportGenerator
 from backend.vector_store import get_vector_store
 from config.settings import settings
 from db.database import get_db, init_db
-from db.models import Document, User
+from db.models import Document, User, AnalyticsJob
+from backend.job_executor import job_executor
+from backend.metrics_service import metrics_service
 from services.document_parser import DocumentParser
 from services.s3_storage import S3StorageService
 
@@ -1101,15 +1103,82 @@ async def extract_financials(
             detail="No indexed content found for this document. Ensure it has been processed.",
         )
 
-    svc = FinancialAnalyticsService(llm)
-    report = await svc.extract_financials(
-        doc_id=str(doc.id),
-        doc_text=doc_text,
-        db=db,
-        doc_title=doc.title,
-        overwrite=body.overwrite,
+    # 1. Create Job Entry
+    new_job = AnalyticsJob(document_id=str(doc.id))
+    db.add(new_job)
+    db.commit()
+    db.refresh(new_job)
+
+    # 2. Dispatch via JobExecutor
+    from backend.tasks import run_financial_extraction
+    job_id = job_executor.dispatch(
+        func=run_financial_extraction,
+        args=(str(new_job.id), str(doc.id), doc_text, doc.title, llm),
+        kwargs={"overwrite": body.overwrite},
+        background_tasks=background_tasks,
+        job_id=str(new_job.id)
     )
-    return {"status": "success", "report": report}
+
+    return {
+        "job_id": job_id,
+        "status": "queued",
+        "message": "Financial extraction job has been queued via JobExecutor."
+    }
+
+
+@app.get("/api/analytics/status/{job_id}", tags=["Financial Analytics"])
+async def get_extraction_status(job_id: str, db: Session = Depends(get_db)):
+    """Check the status of a specific extraction job."""
+    job = db.query(AnalyticsJob).filter(AnalyticsJob.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found.")
+    
+    return {
+        "job_id": str(job.id),
+        "status": job.status,
+        "progress": job.progress,
+        "retry_count": job.retry_count,
+        "execution_time_sec": job.execution_time,
+        "error": job.error_message,
+        "started_at": job.started_at.isoformat() if job.started_at else None,
+        "finished_at": job.finished_at.isoformat() if job.finished_at else None
+    }
+
+
+# ══════════════════════════════════════════════════════════
+#  System: Metrics & Health
+# ══════════════════════════════════════════════════════════
+
+@app.get("/api/system/metrics", tags=["System"])
+async def get_system_metrics():
+    """Retrieve system-wide job telemetry and cost metrics."""
+    return metrics_service.get_system_metrics()
+
+
+@app.get("/api/system/health", tags=["System"])
+async def get_system_health(db: Session = Depends(get_db)):
+    """Check connectivity to downstream dependencies (DB, Redis)."""
+    health = {"status": "healthy", "components": {}}
+    
+    # 1. Check DB
+    try:
+        db.execute("SELECT 1")
+        health["components"]["database"] = "ok"
+    except Exception as e:
+        health["status"] = "degraded"
+        health["components"]["database"] = f"error: {str(e)}"
+        
+    # 2. Check Redis
+    try:
+        import redis
+        client = redis.from_url(settings.redis_url)
+        client.ping()
+        health["components"]["redis"] = "ok"
+    except Exception as e:
+        health["status"] = "degraded"
+        health["components"]["redis"] = f"error: {str(e)}"
+        
+    return health
 
 
 @app.get("/api/analytics/financials", tags=["Financial Analytics"])

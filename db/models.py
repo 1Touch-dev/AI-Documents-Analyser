@@ -138,3 +138,68 @@ class FinancialReport(Base):
 
     def __repr__(self) -> str:
         return f"<FinancialReport doc_id={self.doc_id!r} currency={self.currency!r}>"
+
+
+# ──────────────────────────────────────────────────────────
+# Analytics Job (Enhanced Monitoring System)
+# ──────────────────────────────────────────────────────────
+class AnalyticsJob(Base):
+    __tablename__ = "analytics_jobs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    document_id = Column(String(64), nullable=False, index=True)
+    status = Column(
+        Enum("pending", "processing", "completed", "failed", name="job_status"),
+        default="pending",
+        nullable=False
+    )
+    progress = Column(Integer, default=0)
+    error_message = Column(Text, nullable=True)
+    retry_count = Column(Integer, default=0)
+    
+    # Monitoring Fields
+    model_used = Column(String(64), nullable=True)
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    finished_at = Column(DateTime(timezone=True), nullable=True)
+    execution_time = Column(Float, nullable=True)  # in seconds
+    token_usage = Column(JSON, nullable=True)     # {"prompt": 100, "completion": 50}
+    cost_estimate = Column(Float, nullable=True)
+    
+    created_at = Column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False
+    )
+
+    def __repr__(self) -> str:
+        return f"<AnalyticsJob {self.id} status={self.status}>"
+
+
+# ──────────────────────────────────────────────────────────
+# Financial Metric (Granular Data Layer)
+# ──────────────────────────────────────────────────────────
+class FinancialMetric(Base):
+    __tablename__ = "financial_metrics"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    doc_id = Column(String(64), nullable=False, index=True)
+    category = Column(String(128), nullable=False, index=True)
+    value = Column(Float, nullable=False)
+    type = Column(Enum("revenue", "expense", name="metric_type"), nullable=False)
+    currency = Column(String(8), default="USD", nullable=False)
+    fiscal_year = Column(String(16), nullable=True)
+    timestamp = Column(DateTime(timezone=True), default=_utcnow, nullable=False)
+
+
+# ──────────────────────────────────────────────────────────
+# LLM Usage (Cost Tracking)
+# ──────────────────────────────────────────────────────────
+class LLMUsage(Base):
+    __tablename__ = "llm_usage"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    job_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+    model_name = Column(String(64), nullable=False)
+    prompt_tokens = Column(Integer, default=0)
+    completion_tokens = Column(Integer, default=0)
+    estimated_cost = Column(Float, default=0.0)
+    timestamp = Column(DateTime(timezone=True), default=_utcnow, nullable=False)

@@ -82,6 +82,14 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     cache_ttl_seconds: int = 3600  # 1 hour
 
+    # ── Celery / Task Queue ──────────────────────────────
+    use_celery: bool = False
+    celery_broker_url: str = "redis://localhost:6379/1"
+    celery_result_backend: str = "redis://localhost:6379/2"
+
+    # ── Monitoring & Metrics ─────────────────────────────
+    metrics_enabled: bool = True
+    
     # ── Financial Analytics ──────────────────────────────
     # Model used for LLM-driven financial extraction (prefer local for speed).
     financial_extraction_model: str = "gemma4:e2b"
