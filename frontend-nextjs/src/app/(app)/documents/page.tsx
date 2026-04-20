@@ -75,22 +75,64 @@ export default function DocumentsPage() {
     let pollCount = 0;
     let sameProcessingCount = 0;
     let lastProcessing = -1;
-    const MAX_POLLS = 300;        // ~4 minutes at 800ms interval
-    const MAX_STAGNANT_POLLS = 30; // stop if processing count never changes for 24s
+    const MAX_POLLS = 300;
+    const MAX_STAGNANT_POLLS = 30;
+    // Refresh the doc list every 5 polls so top-level metrics stay in sync
+    const DOC_REFRESH_EVERY = 5;
 
     const poll = async () => {
       try {
         const status = await getBatchStatus(uploadSummary.batch_id, token ?? undefined);
         if (cancelled) return;
-        setBatchStatus(status);
 
-        const completed = status.processing === 0 || status.ready + status.failed >= status.total;
+        // Cross-reference: if a file is "processing" in the batch dict but
+        // already "ready" in the live document list, override its display status
+        // so both panels stay in sync.
+        setDocuments((currentDocs) => {
+          const readyIds = new Set(
+            currentDocs.filter((d) => normalizeStatus(d.status) === "ready").map((d) => d.id)
+          );
+          if (readyIds.size === 0) return currentDocs;
+
+          let anyFixed = false;
+          const fixedFiles = { ...status.files };
+          for (const [docId, fileInfo] of Object.entries(fixedFiles)) {
+            if (fileInfo.status === "processing" && readyIds.has(docId)) {
+              fixedFiles[docId] = { ...fileInfo, status: "ready" };
+              anyFixed = true;
+            }
+          }
+          if (anyFixed) {
+            const fixedReady = Object.values(fixedFiles).filter((f) => f.status === "ready").length;
+            const fixedProcessing = Object.values(fixedFiles).filter((f) => f.status === "processing").length;
+            setBatchStatus({ ...status, files: fixedFiles, ready: fixedReady, processing: fixedProcessing });
+          } else {
+            setBatchStatus(status);
+          }
+          return currentDocs; // docs state unchanged, we just read it
+        });
+
+        // Re-read batchStatus after potential fix — use raw status for completion check
+        const effectiveProcessing = Object.values(status.files).filter(
+          (f) => f.status === "processing"
+        ).length;
+
+        const completed =
+          effectiveProcessing === 0 ||
+          status.ready + status.failed >= status.total;
+
         if (completed) {
           await refreshDocuments();
           return;
         }
 
         pollCount += 1;
+
+        // Periodically refresh docs so metrics & table stay current
+        if (pollCount % DOC_REFRESH_EVERY === 0) {
+          await refreshDocuments();
+        }
+
         if (status.processing === lastProcessing) {
           sameProcessingCount += 1;
         } else {

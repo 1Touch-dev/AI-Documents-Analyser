@@ -76,6 +76,9 @@ _report_gen: Optional[ReportGenerator] = None
 _UPLOAD_WORKERS = max(4, (os.cpu_count() or 2) * 2)
 _upload_executor = ThreadPoolExecutor(max_workers=_UPLOAD_WORKERS, thread_name_prefix="upload")
 
+# Lock protecting writes to _batch_statuses from concurrent upload threads
+_batch_status_lock = threading.Lock()
+
 
 def _log_upload_stage(
     stage: str,
@@ -1063,8 +1066,9 @@ def _process_single_file(
         doc.status = "ready"
         db.commit()
 
-        _batch_statuses[batch_id]["files"][doc_id]["status"] = "ready"
-        _batch_statuses[batch_id]["files"][doc_id]["chunks"] = chunk_count
+        with _batch_status_lock:
+            _batch_statuses[batch_id]["files"][doc_id]["status"] = "ready"
+            _batch_statuses[batch_id]["files"][doc_id]["chunks"] = chunk_count
         _log_upload_stage(
             "batch_completed",
             doc_id,
@@ -1076,8 +1080,9 @@ def _process_single_file(
 
     except Exception as e:
         logger.exception("[UPLOAD] stage=batch_failed | doc_id=%s | file=%s | reason=%s", doc_id, filename, e)
-        _batch_statuses[batch_id]["files"][doc_id]["status"] = "failed"
-        _batch_statuses[batch_id]["files"][doc_id]["error"] = str(e)
+        with _batch_status_lock:
+            _batch_statuses[batch_id]["files"][doc_id]["status"] = "failed"
+            _batch_statuses[batch_id]["files"][doc_id]["error"] = str(e)
         try:
             doc_obj = db.query(Document).filter(Document.id == uuid.UUID(doc_id)).first()
             if doc_obj:
