@@ -29,7 +29,7 @@ class EmbeddingService:
     def dimension(self) -> int:
         return self._dimension
 
-    def embed_texts(self, texts: list[str], batch_size: int = 32) -> list[list[float]]:
+    def embed_texts(self, texts: list[str], batch_size: int = 64) -> list[list[float]]:
         """
         Embed a list of texts.
 

@@ -75,8 +75,8 @@ export default function DocumentsPage() {
     let pollCount = 0;
     let sameProcessingCount = 0;
     let lastProcessing = -1;
-    const MAX_POLLS = 120; // ~3 minutes at 1.5s interval
-    const MAX_STAGNANT_POLLS = 20; // stop if processing count never changes
+    const MAX_POLLS = 300;        // ~4 minutes at 800ms interval
+    const MAX_STAGNANT_POLLS = 30; // stop if processing count never changes for 24s
 
     const poll = async () => {
       try {
@@ -104,13 +104,12 @@ export default function DocumentsPage() {
         }
 
         if (status.processing > 0) {
-          timer = window.setTimeout(poll, 1500);
+          timer = window.setTimeout(poll, 800);
         }
       } catch {
-        // Polling can fail transiently while backend catches up.
         pollCount += 1;
         if (pollCount < MAX_POLLS) {
-          timer = window.setTimeout(poll, 2000);
+          timer = window.setTimeout(poll, 1500);
         }
       }
     };
@@ -199,7 +198,7 @@ export default function DocumentsPage() {
       <div className="rounded-xl border border-white/15 bg-white/5 p-5">
         <h3 className="text-sm font-semibold text-white">Batch Upload</h3>
         <p className="mt-1 text-xs text-slate-300">
-          Upload multiple files (`PDF`, `DOCX`, `PPTX`, `XLSX`, `CSV`, `TXT`, `JSON`) and track processing.
+          Upload multiple files (PDF, DOCX, PPTX, XLSX, CSV, TXT, JSON) — files are indexed in parallel.
         </p>
         <div className="mt-3 grid gap-3 md:grid-cols-[1fr_180px_140px]">
           <input
@@ -219,23 +218,83 @@ export default function DocumentsPage() {
             disabled={isUploading}
             className="rounded-lg bg-gradient-to-r from-indigo-500 to-cyan-500 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
           >
-            {isUploading ? "Uploading..." : "Upload"}
+            {isUploading ? "Uploading…" : "Upload"}
           </button>
         </div>
-        {!!selectedFiles.length && (
-          <p className="mt-2 text-xs text-slate-300">{selectedFiles.length} file(s) selected.</p>
+
+        {!!selectedFiles.length && !uploadSummary && (
+          <p className="mt-2 text-xs text-slate-300">{selectedFiles.length} file(s) selected — ready to upload.</p>
         )}
+
+        {/* Live batch progress panel */}
         {uploadSummary && (
-          <p className="mt-2 text-xs text-cyan-100">
-            Batch submitted: accepted {uploadSummary.accepted}, duplicates {uploadSummary.duplicates},
-            rejected {uploadSummary.rejected}
-          </p>
-        )}
-        {batchStatus && (
-          <p className="mt-1 text-xs text-slate-300">
-            Processing status: ready {batchStatus.ready} / processing {batchStatus.processing} / failed{" "}
-            {batchStatus.failed}
-          </p>
+          <div className="mt-4 space-y-3">
+            {/* Overall progress bar */}
+            {batchStatus && batchStatus.total > 0 && (
+              <div>
+                <div className="mb-1 flex items-center justify-between text-xs text-slate-300">
+                  <span>
+                    {batchStatus.processing > 0
+                      ? `Processing ${batchStatus.processing} file${batchStatus.processing > 1 ? "s" : ""} in parallel…`
+                      : `Complete — ${batchStatus.ready} ready${batchStatus.failed > 0 ? `, ${batchStatus.failed} failed` : ""}`}
+                  </span>
+                  <span className="text-slate-400">
+                    {batchStatus.ready + batchStatus.failed}/{batchStatus.total}
+                  </span>
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      batchStatus.processing > 0
+                        ? "bg-gradient-to-r from-indigo-400 to-cyan-400"
+                        : batchStatus.failed > 0
+                        ? "bg-gradient-to-r from-amber-400 to-red-400"
+                        : "bg-gradient-to-r from-emerald-400 to-cyan-400"
+                    }`}
+                    style={{
+                      width: `${Math.round(((batchStatus.ready + batchStatus.failed) / batchStatus.total) * 100)}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Per-file status rows */}
+            {batchStatus && Object.values(batchStatus.files).length > 0 && (
+              <div className="max-h-48 space-y-1.5 overflow-y-auto">
+                {Object.values(batchStatus.files).map((f) => (
+                  <div
+                    key={f.filename}
+                    className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs"
+                  >
+                    <span className="truncate max-w-[60%] text-slate-200">{f.filename}</span>
+                    <span
+                      className={`ml-2 shrink-0 rounded-full px-2 py-0.5 font-medium ${
+                        f.status === "ready"
+                          ? "bg-emerald-500/20 text-emerald-200"
+                          : f.status === "processing"
+                          ? "bg-amber-500/20 text-amber-200"
+                          : "bg-red-500/20 text-red-200"
+                      }`}
+                    >
+                      {f.status === "ready"
+                        ? `✓ ready${f.chunks ? ` · ${f.chunks} chunks` : ""}`
+                        : f.status === "processing"
+                        ? "⟳ indexing…"
+                        : `✗ ${f.error || "failed"}`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Summary line */}
+            <p className="text-xs text-slate-400">
+              Submitted: accepted {uploadSummary.accepted}
+              {uploadSummary.duplicates > 0 ? ` · duplicates ${uploadSummary.duplicates}` : ""}
+              {uploadSummary.rejected > 0 ? ` · rejected ${uploadSummary.rejected}` : ""}
+            </p>
+          </div>
         )}
       </div>
 

@@ -291,10 +291,10 @@ export default function ChatPage() {
           lastProcessing = status.processing;
         }
         if (pollCount >= MAX_POLLS || sameProcessingCount >= MAX_STAGNANT_POLLS) return;
-        if (status.processing > 0) timer = window.setTimeout(poll, 1500);
+        if (status.processing > 0) timer = window.setTimeout(poll, 800);
       } catch {
         pollCount += 1;
-        if (pollCount < MAX_POLLS) timer = window.setTimeout(poll, 2000);
+        if (pollCount < MAX_POLLS) timer = window.setTimeout(poll, 1500);
       }
     };
 
