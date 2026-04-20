@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { motion } from "motion/react";
 import { OglBackground } from "@/components/ogl-background";
 
 const features = [
@@ -46,11 +45,7 @@ export default function Home() {
 
         <section className="flex flex-1 items-center py-12">
           <div className="grid w-full items-center gap-8 lg:grid-cols-2">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, ease: "easeOut" }}
-            >
+            <div>
               <p className="mb-3 inline-block rounded-full border border-indigo-300/35 bg-indigo-500/20 px-3 py-1 text-xs font-medium text-indigo-100">
                 Production-Ready Document Intelligence
               </p>
@@ -76,14 +71,9 @@ export default function Home() {
                   Open Dashboard
                 </Link>
               </div>
-            </motion.div>
+            </div>
 
-            <motion.div
-              initial={{ opacity: 0, scale: 0.97 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.65, delay: 0.08 }}
-              className="rounded-2xl border border-white/20 bg-white/8 p-6 backdrop-blur-xl"
-            >
+            <div className="rounded-2xl border border-white/20 bg-white/8 p-6 backdrop-blur-xl">
               <h2 className="text-lg font-medium text-white">Why teams choose this platform</h2>
               <div className="mt-4 space-y-3">
                 {features.map((feature) => (
@@ -96,7 +86,7 @@ export default function Home() {
                   </article>
                 ))}
               </div>
-            </motion.div>
+            </div>
           </div>
         </section>
       </div>

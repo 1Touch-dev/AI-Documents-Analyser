@@ -1,114 +1,196 @@
 # AI Knowledge Platform — User Manual
 
-Welcome to the AI Knowledge Platform. This system empowers you to upload hundreds of large documents (PDFs, PPTXs, CSVs, etc.), extract meaning from them automatically, and query them using state-of-the-art AI.
+Welcome to the AI Knowledge Platform. This system empowers you to upload hundreds of large documents (PDFs, PPTXs, CSVs, etc.), extract meaning from them automatically, and query them using state-of-the-art AI powered by **OpenAI GPT**.
 
 ---
 
-## 1. Starting and Stopping the Platform
+## 1. Accessing the Platform
 
-If the platform is running on your local machine, use one of the two methods below.
+| Environment | URL |
+|---|---|
+| Production (EC2) | `http://54.175.54.77:3001` |
+| Local development | `http://localhost:3001` |
+| Backend API Docs | `http://54.175.54.77:8010/docs` |
 
-### Option A: Docker
+### Default Credentials
+Log in with the credentials provided by your administrator. To register a new account, use the **Register** page at `/register`.
 
-**Start**
+---
+
+## 2. Starting and Stopping (Self-Hosted)
+
+### Docker
 ```bash
-cd "/Volumes/Seagate/AI Documents Analyser"
-docker compose up -d
+cd /home/ubuntu/AI-Documents-Analyser
+docker compose up -d      # start
+docker compose down       # stop
 ```
 
-**Stop**
+### Native Python (Development)
 ```bash
-docker compose down
+# Terminal 1 — Backend
+source .venv/bin/activate
+uvicorn backend.main:app --host 0.0.0.0 --port 8010
+
+# Terminal 2 — Frontend
+cd frontend-nextjs
+npm run start -- --hostname 0.0.0.0 --port 3001
 ```
 
-### Option B: Native Python (No Docker)
-
-Before first run, set this in `.env`:
-```ini
-BACKEND_API_URL=http://127.0.0.1:8000/api
-```
-
-**Start Backend (Terminal 1)**
-```bash
-cd "/Volumes/Seagate/AI Documents Analyser"
-source venv/bin/activate
-uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-**Start Frontend (Terminal 2)**
-```bash
-cd "/Volumes/Seagate/AI Documents Analyser"
-source venv/bin/activate
-streamlit run frontend/streamlit_app.py --server.address 0.0.0.0 --server.port 8501
-```
-
-**Stop Native Processes**
+Stop native processes:
 ```bash
 pkill -f "uvicorn backend.main:app" || true
-pkill -f "streamlit run frontend/streamlit_app.py" || true
-```
-
-**Health Check**
-```bash
-curl -sS http://127.0.0.1:8000/api/health
-curl -I http://127.0.0.1:8501
+pkill -f "next.*3001" || true
 ```
 
 ---
 
-## 2. Authentication & Model Selection
+## 3. Chat Settings — Model, Currency & Translation
 
-### Logging In
-1. The first time you use the system, click the **Register** radio button on the left sidebar. Enter a Username and Password.
-2. Click **Submit**. Your session will be securely saved.
+All chat settings are accessed via the **Chat Settings** button (gear icon) in the Chat page. Settings persist across the browser session via `localStorage`.
 
-### Injecting API Keys (Optional)
-By default, the system uses a fully private, internal AI model (`Llama 3.2 3B`) running on your machine. This guarantees 100% data privacy.
+### Model Selection
+The platform routes all requests through **OpenAI GPT models**. Available options:
 
-However, if you wish to use incredibly powerful Cloud AI models:
-1. Expand the **⚙️ Provider API Keys** menu in the sidebar.
-2. Paste your OpenAI, Anthropic, or Gemini API keys.
-3. Your keys are **never** saved to the database. They temporarily live in your local browser session and are cleared when you exit.
+| Model | Best For |
+|---|---|
+| `auto` *(default)* | Automatically picks gpt-4o or gpt-4.1 based on query complexity |
+| `gpt-4o` | Fast responses, cost-efficient, everyday queries |
+| `gpt-4.1` | Deep reasoning, complex analysis, long documents |
+| `gpt-4.1-mini` | Fastest response time, simple lookups |
 
----
+> **No local model is required.** All AI runs through the OpenAI cloud API. Ensure `OPENAI_API_KEY` is set in the server environment, or paste your key in the **OpenAI API** tab of Chat Settings.
 
-## 3. Uploading Documents
+### Translate to English
+Toggle **Translate to English** in Chat Settings → Query Controls. When enabled, the AI translates its answer into English after generation. Useful when documents are in Portuguese but you need English output. Citations (`[1]`, `[2]`) and numeric values are preserved throughout translation.
 
-The system supports massive files (up to **500 MB** per file) and batch processing. Supported formats: `PDF, DOCX, PPTX, XLSX, CSV, TXT, JSON`.
+### Currency Conversion — 45+ Currencies
+Select a target currency in Chat Settings → Query Controls. The system automatically detects all currency amounts in the AI response and converts them using **live exchange rates** sourced from the fawazahmed0 open-source API (updated hourly, no API key required).
 
-1. Go to the **Documents** tab, or use the uploader in the left sidebar.
-2. Drag and drop multiple files.
-3. While files upload, you can type a **Custom Category** (e.g., `Financials Q3`, `Legal Docs`).
-4. Hit Upload.
+**Auto-Detection:** On page load the platform scans your indexed documents and auto-detects the dominant currency (e.g., BRL for Brazilian documents). The first dropdown option shows `Default (Brazilian Real — BRL, auto-detected)` and is pre-selected automatically.
 
-**Important Note on Processing:** Large documents (like a 300-page PDF) take time to process. The system reads the document, splits it into hundreds of chunks, and mathematically translates the text into "vector embeddings." You can track the real-time progress of this in the sidebar. Once complete, the file status will change to `ready`.
+**Supported output currencies (45+):**
 
----
+| Region | Currencies |
+|---|---|
+| Americas | BRL, USD, CAD, MXN, ARS, CLP, COP, PEN |
+| Europe | EUR, GBP, CHF, NOK, SEK, DKK, PLN, CZK, HUF, RON, TRY, RUB, UAH |
+| Asia-Pacific | JPY, CNY, INR, KRW, SGD, HKD, TWD, THB, IDR, MYR, PHP, VND, AUD, NZD |
+| Middle East / Africa | AED, SAR, QAR, ILS, EGP, ZAR, NGN, KES |
+| South Asia | PKR, BDT |
 
-## 4. Chatting With Your Documents (RAG)
+**Detected input patterns in AI responses:**
+- `R$ 1.500,00` — Brazilian Real with multipliers (mil, M, MM)
+- `$100`, `€200`, `£50`, `₹1000`, `¥500`, `A$200`, `C$150` — symbol prefix
+- `"100 USD"`, `"200 EUR"`, `"50 GBP"` — ISO code suffix
 
-The core feature of this platform is the **Retrieval-Augmented Generation (RAG)** engine.
+If the live rate API is unreachable, the system falls back to open.er-api.com then to a static USD cross-rate table — the answer is always returned, never blocked.
 
-1. Navigate to the **💬 Chat** tab.
-2. Select an **LLM Provider** from the dropdown (`GPT-5.4`, `Claude 4.6`, `Gemini 3.1 Pro`, or `Local Llama`). *Note: Cloud models require you to have pasted an API key in the sidebar.*
-3. Ask a question. For example: *"What were the Q3 operational risks mentioned across our board presentations?"*
-
-**How it works:** The system instantly searches through *every* uploaded document, finds the 5-10 most highly relevant paragraphs, and feeds them to the AI to construct an accurate, citation-backed answer. The AI is fully aware of your entire document library ("Global Context").
-
----
-
-## 5. Dashboards and Visualizations
-
-Navigate to the **📊 Dashboards** tab to view professional, content-driven intelligence about your documents. The dashboard does more than just show file sizes; it reads your documents and extracts deep insights.
-
-*   **Topic Intelligence:** Extracts automatic "Bigram Themes" (e.g., `ticket médio`, `risco operacional`) showing the fundamental topics of your corporate library.
-*   **Financial Data:** Automatically scans documents for `R$`, `$`, `%`, and `mil/milhões` to highlight crucial financial variables floating in the text.
-*   **Per-Document Insights:** Expand any document panel to see a clean preview, its dominant themes, and the exact currencies detected within it.
-*   **Filters:** Use the interactive filters at the top to slice your dashboards by Category, File Type, or specific Users.
+### OpenAI API Key
+If the server does not have a global `OPENAI_API_KEY` configured, paste your personal key in Chat Settings → OpenAI API. The key is used only for your session and is never stored in the database.
 
 ---
 
-## 6. managing Prompts & Conversations
+## 4. Uploading Documents
 
-*   **Save Reusable Prompts:** Frequently write the same complex prompt? Go to the **Prompts** tab. Create templates like *"Act as a CFO and summarize the key CAPEX takeaways from this document."* You can load these instantly in the Chat view.
-*   **Persistent Threads:** Every chat interaction is automatically saved. Navigate to the **Conversations** tab to resume a discussion from yesterday right where you left off.
+Supported formats: `PDF, DOCX, PPTX, XLSX, CSV, TXT, JSON` — up to **500 MB per file**.
+
+**From the Documents page:**
+1. Click **Choose files** and select one or more files.
+2. Optionally set a **Category** (e.g., `Financials Q3`, `Legal Docs`).
+3. Click **Upload**. Progress is shown in real time.
+
+**From the Chat page:**
+1. Open Chat Settings → Upload Documents tab.
+2. Select files and click **Upload to Knowledge Base**.
+
+**Processing stages:**
+- `processing` — file is being parsed, chunked, and embedded into the vector store
+- `ready` — document is fully indexed and searchable
+- `failed` — processing failed (check file format and size)
+
+Large documents (300+ pages) may take 30–60 seconds to reach `ready` status.
+
+---
+
+## 5. Chatting With Your Documents (RAG)
+
+1. Go to the **Chat** page.
+2. Type a question and press **Enter** to send (Shift+Enter inserts a new line).
+3. The system retrieves the most relevant passages from your documents and generates a cited answer with full markdown formatting.
+
+**Example queries:**
+- *"What were the Q3 operational risks mentioned across our board presentations?"*
+- *"Summarize the key CAPEX figures from the 2025 budget documents."*
+- *"Compare revenue across the last three fiscal years."*
+
+Each answer includes **Sources** — the document name and excerpt the AI used. Source citations `[1]`, `[2]` in the answer body correspond to source cards below.
+
+### Copy Response
+Every assistant message has a **Copy** button (clipboard icon) in the top-right corner of the message bubble. Click it to copy the full plain-text response to your clipboard. The button briefly shows a green "Copied" confirmation.
+
+### Conversation History
+Every chat session is automatically saved. The left sidebar lists all past conversations. Click any entry to resume it. A **trash icon** appears on hover next to each conversation — click it to permanently delete that conversation. Start a fresh session with **+ New Chat**.
+
+---
+
+## 6. Analytics Dashboard
+
+Navigate to the **Analytics** page for intelligence extracted from your document library.
+
+### Overview KPIs
+- Total documents, chunks, estimated words, reading time, storage used
+
+### Financial Dashboard
+Click **Extract Financial Data** to trigger GPT-based financial extraction across all indexed documents. The result shows:
+- **Revenue categories:** F&B, Sponsorship, Tickets, Retail, Player Sales
+- **Expense categories:** Player Salary, Coach Salary, Travel, Stadium, Retail, F&B, Back Office, Misc
+- **Totals:** Revenue Total, Expense Total, Net Total
+
+A bar chart and summary cards are rendered automatically. You can select different GPT models for the extraction using the model selector.
+
+### Content Intelligence
+- **Topic Tags** — the most frequent bigram themes extracted from document text
+- **Monetary Values** — all currency figures detected across the corpus
+- **Organizations, Dates, Contacts** — named-entity extraction
+
+### Data Explorer
+A searchable, filterable table of all documents with category, type, status, uploader, and chunk count.
+
+---
+
+## 7. Documents Page — Index Status
+
+Click **Check Document Status** to compare the document registry against the vector store. The result shows:
+- **Indexed** — documents fully searchable in the vector store
+- **Not Indexed** — documents uploaded but not yet searchable (may need re-upload)
+
+---
+
+## 8. Prompt Templates
+
+Frequently use the same complex prompt? Go to the **Prompts** section.
+
+1. Create a template, e.g.: *"Act as a CFO and summarize the key CAPEX takeaways."*
+2. Give it a name and optional category.
+3. In Chat Settings → Query Controls, select it from the **Prompt Template** dropdown.
+
+---
+
+## 9. Report Generation
+
+Use the **Report Generation** page to create structured reports:
+1. Enter a topic and a query.
+2. Choose report type (`general`, `financial`, etc.) and output format (`markdown`, `json`, `table`).
+3. Click Generate. The system retrieves relevant context from documents and GPT synthesizes a full report.
+
+---
+
+## 10. Conversations
+
+All conversations are listed in the **Chat** sidebar and the Conversations page. Each conversation tracks:
+- All messages (user + assistant) with full markdown rendering
+- Source citations per assistant message
+- Category and timestamp
+
+Delete any conversation using the trash icon that appears on hover in the sidebar, or from the Conversations page.

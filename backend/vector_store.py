@@ -44,6 +44,9 @@ class BaseVectorStore(ABC):
     @abstractmethod
     def count(self) -> int: ...
 
+    @abstractmethod
+    def get_all_documents(self, limit: int = 200) -> list[dict[str, Any]]: ...
+
 
 # ──────────────────────────────────────────────────────────
 # ChromaDB
@@ -261,6 +264,28 @@ class QdrantVectorStore(BaseVectorStore):
     def count(self) -> int:
         info = self._client.get_collection(self.COLLECTION_NAME)
         return info.points_count
+
+    def get_all_documents(self, limit: int = 200) -> list[dict[str, Any]]:
+        try:
+            records, _ = self._client.scroll(
+                collection_name=self.COLLECTION_NAME,
+                with_payload=True,
+                with_vectors=False,
+                limit=limit,
+            )
+            output = []
+            for record in records:
+                payload = record.payload or {}
+                output.append(
+                    {
+                        "id": str(record.id),
+                        "document": payload.get("text", ""),
+                        "metadata": {k: v for k, v in payload.items() if k != "text"},
+                    }
+                )
+            return output
+        except Exception:
+            return []
 
 
 # ──────────────────────────────────────────────────────────

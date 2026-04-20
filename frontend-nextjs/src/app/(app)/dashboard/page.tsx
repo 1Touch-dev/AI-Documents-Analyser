@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import gsap from "gsap";
-import { motion } from "motion/react";
 import {
   Bar,
   BarChart,
@@ -250,47 +249,35 @@ export default function DashboardPage() {
       </article>
 
       <div ref={cardsRef} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <motion.article
-          whileHover={{ y: -4 }}
-          className="rounded-xl border border-white/15 bg-white/5 p-5 shadow-lg shadow-indigo-950/25 backdrop-blur-md"
-        >
+        <article className="rounded-xl border border-white/15 bg-white/5 p-5 shadow-lg shadow-indigo-950/25 backdrop-blur-md transition-transform duration-200 hover:-translate-y-1">
           <h3 className="mb-2 text-sm font-medium text-slate-300">Total Documents</h3>
           <p className="text-xl font-semibold text-white">
             {isLoading ? "Loading..." : dashboardKpis.totalDocuments.toLocaleString()}
           </p>
           <p className="mt-1 text-xs text-slate-400">Filtered by selected date range</p>
-        </motion.article>
+        </article>
 
-        <motion.article
-          whileHover={{ y: -4 }}
-          className="rounded-xl border border-white/15 bg-white/5 p-5 shadow-lg shadow-indigo-950/25 backdrop-blur-md"
-        >
+        <article className="rounded-xl border border-white/15 bg-white/5 p-5 shadow-lg shadow-indigo-950/25 backdrop-blur-md transition-transform duration-200 hover:-translate-y-1">
           <h3 className="mb-2 text-sm font-medium text-slate-300">Knowledge Chunks</h3>
           <p className="text-xl font-semibold text-white">
             {isLoading ? "Loading..." : dashboardKpis.totalChunks.toLocaleString()}
           </p>
           <p className="mt-1 text-xs text-slate-400">{dashboardKpis.avgChunks.toFixed(1)} avg/document</p>
-        </motion.article>
+        </article>
 
-        <motion.article
-          whileHover={{ y: -4 }}
-          className="rounded-xl border border-white/15 bg-white/5 p-5 shadow-lg shadow-indigo-950/25 backdrop-blur-md"
-        >
+        <article className="rounded-xl border border-white/15 bg-white/5 p-5 shadow-lg shadow-indigo-950/25 backdrop-blur-md transition-transform duration-200 hover:-translate-y-1">
           <h3 className="mb-2 text-sm font-medium text-slate-300">Storage Used</h3>
           <p className="text-xl font-semibold text-white">{dashboardKpis.totalSizeMb.toFixed(1)} MB</p>
           <p className="mt-1 text-xs text-slate-400">{dashboardKpis.avgSizeMb.toFixed(2)} MB avg/document</p>
-        </motion.article>
+        </article>
 
-        <motion.article
-          whileHover={{ y: -4 }}
-          className="rounded-xl border border-white/15 bg-white/5 p-5 shadow-lg shadow-indigo-950/25 backdrop-blur-md"
-        >
+        <article className="rounded-xl border border-white/15 bg-white/5 p-5 shadow-lg shadow-indigo-950/25 backdrop-blur-md transition-transform duration-200 hover:-translate-y-1">
           <h3 className="mb-2 text-sm font-medium text-slate-300">Backend Health</h3>
           <p className="text-xl font-semibold text-white">
             {health ? `${health.status} (${health.app})` : "Loading..."}
           </p>
           <p className="mt-1 text-xs text-slate-400">{models.length} models available</p>
-        </motion.article>
+        </article>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
@@ -437,4 +424,3 @@ export default function DashboardPage() {
     </section>
   );
 }
-

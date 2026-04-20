@@ -3,6 +3,7 @@ FastAPI application – all API endpoints for the AI Knowledge Platform.
 """
 
 import logging
+import json
 import re
 import time
 import uuid
@@ -44,6 +45,7 @@ from config.settings import settings
 from db.database import get_db, init_db
 from db.models import Document, User
 from services.document_parser import DocumentParser
+from services.currency_service import CurrencyService
 from services.s3_storage import S3StorageService
 
 # ── Logging ──────────────────────────────────────────────
@@ -100,6 +102,148 @@ def _get_services():
             _parser = DocumentParser()
             _report_gen = ReportGenerator(_llm_router)
     return _llm_router, _rag_pipeline, _s3, _parser, _report_gen
+
+
+def _extract_json_object(raw_text: str) -> dict[str, Any]:
+    text = (raw_text or "").strip()
+    if text.startswith("```"):
+        lines = [line for line in text.splitlines() if not line.strip().startswith("```")]
+        text = "\n".join(lines).strip()
+
+    start = text.find("{")
+    end = text.rfind("}")
+    if start == -1 or end == -1 or end <= start:
+        raise ValueError("No JSON object found in model output.")
+    return json.loads(text[start : end + 1])
+
+
+def _default_financial_dashboard() -> dict[str, Any]:
+    revenue = {
+        "f_and_b": 0.0,
+        "sponsorship": 0.0,
+        "tickets": 0.0,
+        "retail": 0.0,
+        "player_sales": 0.0,
+    }
+    expenses = {
+        "player_salary": 0.0,
+        "coach_salary": 0.0,
+        "travel": 0.0,
+        "stadium": 0.0,
+        "retail": 0.0,
+        "f_and_b": 0.0,
+        "back_office": 0.0,
+        "misc": 0.0,
+    }
+    return {
+        "revenue": revenue,
+        "expenses": expenses,
+        "totals": {
+            "revenue_total": round(sum(revenue.values()), 2),
+            "expense_total": round(sum(expenses.values()), 2),
+            "net_total": round(sum(revenue.values()) - sum(expenses.values()), 2),
+        },
+        "notes": [],
+        "source_documents": [],
+    }
+
+
+def _normalize_financial_dashboard(payload: dict[str, Any]) -> dict[str, Any]:
+    normalized = _default_financial_dashboard()
+    for section in ("revenue", "expenses"):
+        section_data = payload.get(section, {})
+        if isinstance(section_data, dict):
+            for key in normalized[section]:
+                value = section_data.get(key, 0)
+                try:
+                    normalized[section][key] = round(float(value or 0), 2)
+                except (TypeError, ValueError):
+                    normalized[section][key] = 0.0
+
+    notes = payload.get("notes", [])
+    if isinstance(notes, list):
+        normalized["notes"] = [str(item) for item in notes[:10]]
+
+    source_documents = payload.get("source_documents", [])
+    if isinstance(source_documents, list):
+        normalized["source_documents"] = [str(item) for item in source_documents[:20]]
+
+    normalized["totals"] = {
+        "revenue_total": round(sum(normalized["revenue"].values()), 2),
+        "expense_total": round(sum(normalized["expenses"].values()), 2),
+        "net_total": round(
+            sum(normalized["revenue"].values()) - sum(normalized["expenses"].values()),
+            2,
+        ),
+    }
+    return normalized
+
+
+async def _translate_to_english(
+    text: str,
+    model_name: str,
+    api_keys: dict[str, str | None] | None = None,
+) -> str:
+    if not text.strip():
+        return text
+    llm, *_ = _get_services()
+    try:
+        translated = await llm.generate(
+            model_name=model_name,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Translate the user's content into clear professional English. "
+                        "Preserve citations like [1], [2], bullet structure, and all numeric values. "
+                        "Return only the translated text."
+                    ),
+                },
+                {"role": "user", "content": text},
+            ],
+            temperature=0.1,
+            max_tokens=4096,
+            api_keys=api_keys,
+        )
+        return translated.strip() or text
+    except Exception as exc:
+        logger.warning("Translation step failed, returning original answer: %s", exc)
+        return text
+
+
+def _extract_storage_doc_ids(db: Session) -> set[str]:
+    storage_doc_ids: set[str] = set()
+
+    try:
+        docs = db.query(Document.id, Document.source_path).all()
+    except Exception:
+        docs = []
+
+    for doc_id, source_path in docs:
+        source = str(source_path or "")
+        if source.startswith("documents/"):
+            storage_doc_ids.add(str(doc_id))
+            continue
+        if source and not source.startswith("documents/"):
+            try:
+                import os
+
+                if os.path.exists(source):
+                    storage_doc_ids.add(str(doc_id))
+            except Exception:
+                pass
+
+    if settings.aws_access_key_id and settings.aws_access_key_id != "your-access-key":
+        try:
+            _, _, s3, _, _ = _get_services()
+            for key in s3.list_files(prefix="documents/"):
+                match = re.match(r"documents/([0-9a-fA-F-]{36})/", key)
+                if match:
+                    storage_doc_ids.add(match.group(1))
+        except Exception as exc:
+            logger.warning("Storage listing skipped for document status endpoint: %s", exc)
+
+    return storage_doc_ids
 
 
 # ── Lifespan ─────────────────────────────────────────────
@@ -183,6 +327,8 @@ class QueryRequest(BaseModel):
     openai_api_key: str | None = None
     anthropic_api_key: str | None = None
     gemini_api_key: str | None = None
+    translate_to_english: bool = False
+    target_currency: str = "BRL"
 
 class QueryResponse(BaseModel):
     answer: str
@@ -213,6 +359,14 @@ class ReportRequest(BaseModel):
     output_format: str = "markdown"
     model: str = "auto"
     top_k: int = 10
+    openai_api_key: str | None = None
+    anthropic_api_key: str | None = None
+    gemini_api_key: str | None = None
+
+class FinancialDashboardRequest(BaseModel):
+    model: str = "auto"
+    top_k: int = 24
+    category: str | None = None
     openai_api_key: str | None = None
     anthropic_api_key: str | None = None
     gemini_api_key: str | None = None
@@ -500,14 +654,25 @@ async def query_documents(
     """Send a question through the RAG pipeline with Redis caching."""
     _, rag, _, _, _ = _get_services()
     cache = get_cache_service()
+    target_currency = (body.target_currency or "BRL").upper()
+    if target_currency not in CurrencyService.SUPPORTED_CURRENCIES:
+        raise HTTPException(400, f"Unsupported currency: {target_currency}")
+    api_keys = {
+        "openai_api_key": body.openai_api_key,
+        "anthropic_api_key": body.anthropic_api_key,
+        "gemini_api_key": body.gemini_api_key,
+    }
+    use_cache = not body.translate_to_english and target_currency == "BRL"
 
     # Try cache first (100x faster for repeated queries)
-    cached_result = cache.get(
-        question=body.question,
-        model=body.model,
-        top_k=body.top_k,
-        category=body.category,
-    )
+    cached_result = None
+    if use_cache:
+        cached_result = cache.get(
+            question=body.question,
+            model=body.model,
+            top_k=body.top_k,
+            category=body.category,
+        )
 
     # Manage conversation session
     conv_mgr = ConversationManager()
@@ -530,29 +695,44 @@ async def query_documents(
     else:
         # Fetch all document titles for global context awareness
         doc_titles = [d.title for d in db.query(Document.title).filter(Document.status == "ready").all()]
-
-        result = await rag.query(
-            question=body.question,
-            model_name=body.model,
-            prompt_template=body.prompt_template,
-            top_k=body.top_k,
-            temperature=body.temperature,
-            api_keys={
-                "openai_api_key": body.openai_api_key,
-                "anthropic_api_key": body.anthropic_api_key,
-                "gemini_api_key": body.gemini_api_key,
-            },
-            full_doc_list=doc_titles
-        )
+        try:
+            result = await rag.query(
+                question=body.question,
+                model_name=body.model,
+                prompt_template=body.prompt_template,
+                top_k=body.top_k,
+                temperature=body.temperature,
+                api_keys=api_keys,
+                full_doc_list=doc_titles
+            )
+        except Exception as exc:
+            logger.exception("Query generation failed: %s", exc)
+            raise HTTPException(
+                status_code=502,
+                detail="Query generation failed. Please verify OPENAI_API_KEY and outbound API access.",
+            ) from exc
 
         # Cache the result for 1 hour
-        cache.set(
-            question=body.question,
-            model=body.model,
-            top_k=body.top_k,
-            result=result,
-            category=body.category,
+        if use_cache:
+            cache.set(
+                question=body.question,
+                model=body.model,
+                top_k=body.top_k,
+                result=result,
+                category=body.category,
+            )
+
+    answer = result["answer"]
+    if target_currency != "BRL":
+        answer = CurrencyService.convert_text(answer, target_currency)
+
+    if body.translate_to_english:
+        answer = await _translate_to_english(
+            answer,
+            model_name=result["model_used"],
+            api_keys=api_keys,
         )
+    result["answer"] = answer
 
     # Add assistant message
     conv_mgr.add_message(
@@ -985,6 +1165,51 @@ async def batch_status(batch_id: str):
     }
 
 
+@app.get("/api/documents/status", tags=["Documents"])
+async def document_index_status(db: Session = Depends(get_db)):
+    """Compare uploaded documents with the indexed vector store state."""
+    embedder = get_embedding_service()
+    vector_store = get_vector_store(dimension=embedder.dimension)
+    vector_docs = vector_store.get_all_documents(limit=5000)
+    indexed_doc_ids = {
+        str(item.get("metadata", {}).get("doc_id"))
+        for item in vector_docs
+        if item.get("metadata", {}).get("doc_id")
+    }
+    storage_doc_ids = _extract_storage_doc_ids(db)
+
+    def serialize(doc: Document) -> dict[str, Any]:
+        doc_id = str(doc.id)
+        return {
+            "document_id": doc_id,
+            "title": doc.title,
+            "file_type": doc.file_type,
+            "db_status": doc.status,
+            "uploaded_at": doc.timestamp.isoformat() if doc.timestamp else None,
+            "source_path": doc.source_path,
+            "storage_present": doc_id in storage_doc_ids if storage_doc_ids else bool(doc.source_path),
+            "indexed": doc_id in indexed_doc_ids,
+        }
+
+    docs = db.query(Document).order_by(Document.timestamp.desc()).all()
+    indexed = []
+    not_indexed = []
+    for doc in docs:
+        row = serialize(doc)
+        if row["indexed"]:
+            indexed.append(row)
+        else:
+            not_indexed.append(row)
+
+    return {
+        "indexed": indexed,
+        "not_indexed": not_indexed,
+        "indexed_count": len(indexed),
+        "not_indexed_count": len(not_indexed),
+        "total_documents": len(docs),
+    }
+
+
 # ══════════════════════════════════════════════════════════
 #  Analytics endpoints
 # ══════════════════════════════════════════════════════════
@@ -1017,6 +1242,103 @@ async def analytics_content_insights(db: Session = Depends(get_db)):
     return AnalyticsEngine.content_insights(db, vector_store)
 
 
+@app.post("/api/analytics/financial_dashboard", tags=["Analytics"])
+async def analytics_financial_dashboard(
+    body: FinancialDashboardRequest,
+    db: Session = Depends(get_db),
+):
+    """Extract a lightweight revenue/expense dashboard from indexed documents."""
+    llm, *_ = _get_services()
+    embedder = get_embedding_service()
+    vector_store = get_vector_store(dimension=embedder.dimension)
+
+    filter_metadata = {"category": body.category} if body.category else None
+    query_embedding = embedder.embed_query(
+        "financial data revenue expenses sponsorship tickets retail player sales salary travel stadium back office"
+    )
+    results = vector_store.search(
+        query_embedding=query_embedding,
+        top_k=max(8, min(body.top_k, 40)),
+        filter_metadata=filter_metadata,
+    )
+    if not results:
+        raise HTTPException(400, "No indexed document context available for financial extraction.")
+
+    source_documents = list(
+        dict.fromkeys(
+            [
+                result.get("metadata", {}).get("title", "")
+                for result in results
+                if result.get("metadata", {}).get("title")
+            ]
+        )
+    )
+    context = "\n\n".join(
+        f"[{idx + 1}] {result.get('document', '')[:1200]}"
+        for idx, result in enumerate(results)
+    )
+
+    prompt = (
+        "Extract financial data into JSON with revenue and expenses categories.\n"
+        "Use only the supplied document context. If a value is missing, use 0.\n"
+        "Return valid JSON only using this exact schema:\n"
+        "{\n"
+        '  "revenue": {\n'
+        '    "f_and_b": number,\n'
+        '    "sponsorship": number,\n'
+        '    "tickets": number,\n'
+        '    "retail": number,\n'
+        '    "player_sales": number\n'
+        "  },\n"
+        '  "expenses": {\n'
+        '    "player_salary": number,\n'
+        '    "coach_salary": number,\n'
+        '    "travel": number,\n'
+        '    "stadium": number,\n'
+        '    "retail": number,\n'
+        '    "f_and_b": number,\n'
+        '    "back_office": number,\n'
+        '    "misc": number\n'
+        "  },\n"
+        '  "notes": ["short note"]\n'
+        "}\n\n"
+        f"Context:\n{context}"
+    )
+
+    api_keys = {
+        "openai_api_key": body.openai_api_key,
+        "anthropic_api_key": body.anthropic_api_key,
+        "gemini_api_key": body.gemini_api_key,
+    }
+    resolved_model = llm.resolve_model(body.model, "financial dashboard extraction", api_keys)
+    try:
+        raw_response = await llm.generate(
+            model_name=resolved_model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You extract finance data from documents. Return only valid JSON. "
+                        "Do not add commentary or markdown fences."
+                    ),
+                },
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.1,
+            max_tokens=2048,
+            api_keys=api_keys,
+        )
+        dashboard = _normalize_financial_dashboard(_extract_json_object(raw_response))
+    except Exception as exc:
+        logger.warning("Financial dashboard extraction failed: %s", exc)
+        dashboard = _default_financial_dashboard()
+        dashboard["notes"] = ["Financial extraction could not complete with the current model backend."]
+
+    dashboard["source_documents"] = source_documents[:20]
+    dashboard["model_used"] = resolved_model
+    return dashboard
+
+
 # ══════════════════════════════════════════════════════════
 #  Utility endpoints
 # ══════════════════════════════════════════════════════════
@@ -1027,7 +1349,52 @@ async def list_available_models():
     return {"models": llm.list_models()}
 
 
+@app.get("/api/detect_currency", tags=["Utility"])
+async def detect_currency():
+    """Heuristically detect the dominant currency in indexed document chunks.
+
+    Scans stored text for symbol patterns (R$, $, €, £, ¥, …) and ISO-code
+    patterns (100 USD, 200 EUR) — no LLM, no hallucination.
+    Returns the most frequent currency code and a confidence level.
+    """
+    embedder = get_embedding_service()
+    vector_store = get_vector_store(dimension=embedder.dimension)
+    docs = vector_store.get_all_documents(limit=300)
+
+    counts: dict[str, int] = {}
+
+    for doc in docs:
+        text = doc.get("document", "")
+        if not text:
+            continue
+
+        # BRL with optional multiplier — count separately since _BRL_PATTERN is specific
+        for _ in CurrencyService._BRL_PATTERN.finditer(text):
+            counts["BRL"] = counts.get("BRL", 0) + 1
+
+        # Generic symbol patterns ($, €, £, ¥, …)
+        for m in CurrencyService._SYMBOL_PATTERN.finditer(text):
+            code = CurrencyService._symbol_to_code(m.group("symbol"))
+            if code:
+                counts[code] = counts.get(code, 0) + 1
+
+        # ISO-code suffix patterns (100 USD, 200 EUR)
+        for m in CurrencyService._ISO_PATTERN.finditer(text):
+            code = m.group("code").upper()
+            if code in CurrencyService.SUPPORTED_CURRENCIES:
+                counts[code] = counts.get(code, 0) + 1
+
+    if not counts:
+        return {"currency": "BRL", "confidence": "none", "counts": {}}
+
+    top = max(counts, key=lambda k: counts[k])
+    total = sum(counts.values())
+    ratio = counts[top] / total
+    confidence = "high" if ratio >= 0.60 else "medium" if ratio >= 0.35 else "low"
+
+    return {"currency": top, "confidence": confidence, "counts": counts}
+
+
 @app.get("/api/health", tags=["Utility"])
 async def health_check():
     return {"status": "healthy", "app": settings.app_name}
-

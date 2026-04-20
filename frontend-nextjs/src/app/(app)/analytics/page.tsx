@@ -26,16 +26,36 @@ import {
 import {
   getAnalyticsContent,
   getAnalyticsContentInsights,
+  getFinancialDashboard,
   getAnalyticsOverview,
   getAnalyticsStorage,
   listDocuments,
   type DocumentItem,
+  type FinancialDashboardResponse,
 } from "@/lib/api";
 import { useAuth } from "@/contexts/auth-context";
+import { useAppPreferences } from "@/contexts/app-preferences-context";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 const PIE_COLORS = ["#22d3ee", "#6366f1", "#34d399", "#f59e0b", "#f472b6", "#60a5fa"];
+const REVENUE_LABELS: Record<string, string> = {
+  f_and_b: "F&B",
+  sponsorship: "Sponsorship",
+  tickets: "Tickets",
+  retail: "Retail",
+  player_sales: "Player Sales",
+};
+const EXPENSE_LABELS: Record<string, string> = {
+  player_salary: "Player Salary",
+  coach_salary: "Coach Salary",
+  travel: "Travel",
+  stadium: "Stadium",
+  retail: "Retail",
+  f_and_b: "F&B",
+  back_office: "Back Office",
+  misc: "Misc",
+};
 
 type MultiSelectChipProps = {
   label: string;
@@ -91,6 +111,11 @@ function MultiSelectChip({ label, options, selected, onChange }: MultiSelectChip
 
 export default function AnalyticsPage() {
   const { token } = useAuth();
+  const {
+    selectedModel,
+    selectedCategory,
+    openaiApiKey,
+  } = useAppPreferences();
   const [content, setContent] = useState<{
     total_estimated_words: number;
     total_reading_time_min: number;
@@ -129,6 +154,8 @@ export default function AnalyticsPage() {
   const [explorerCategory, setExplorerCategory] = useState("all");
   const [explorerType, setExplorerType] = useState("all");
   const [explorerStatus, setExplorerStatus] = useState("all");
+  const [financialDashboard, setFinancialDashboard] = useState<FinancialDashboardResponse | null>(null);
+  const [isFinancialLoading, setIsFinancialLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -247,10 +274,6 @@ export default function AnalyticsPage() {
     return Object.entries(buckets).map(([name, value]) => ({ name, value }));
   }, [filteredDocuments]);
 
-  const keywordData = Object.entries(content?.word_frequencies ?? {})
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 12)
-    .map(([name, value]) => ({ name, value }));
   const topicData = (contentInsights?.topics ?? []).slice(0, 12).map((item) => ({
     name: item.topic,
     value: item.frequency,
@@ -279,6 +302,22 @@ export default function AnalyticsPage() {
     ],
   };
 
+  const financialChartData = useMemo(() => {
+    if (!financialDashboard) return [];
+    return [
+      ...Object.entries(financialDashboard.revenue).map(([key, value]) => ({
+        name: REVENUE_LABELS[key] || key,
+        value,
+        fill: "#22c55e",
+      })),
+      ...Object.entries(financialDashboard.expenses).map(([key, value]) => ({
+        name: EXPENSE_LABELS[key] || key,
+        value,
+        fill: "#f97316",
+      })),
+    ];
+  }, [financialDashboard]);
+
   const explorerDocuments = useMemo(() => {
     return filteredDocuments.filter((doc) => {
       const matchesCategory =
@@ -293,6 +332,26 @@ export default function AnalyticsPage() {
       return matchesCategory && matchesType && matchesStatus && matchesSearch;
     });
   }, [explorerCategory, explorerSearch, explorerStatus, explorerType, filteredDocuments]);
+
+  async function loadFinancialDashboard() {
+    setError(null);
+    setIsFinancialLoading(true);
+    try {
+      const response = await getFinancialDashboard(
+        {
+          model: selectedModel || "auto",
+          category: selectedCategory || null,
+          openai_api_key: openaiApiKey || null,
+        },
+        token ?? undefined
+      );
+      setFinancialDashboard(response);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to extract financial dashboard.");
+    } finally {
+      setIsFinancialLoading(false);
+    }
+  }
 
   return (
     <section className="space-y-5">
@@ -412,6 +471,129 @@ export default function AnalyticsPage() {
           </p>
         </article>
       </div>
+
+      <article className="space-y-4 rounded-xl border border-white/15 bg-white/5 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-white">Financial Dashboard</p>
+            <p className="text-xs text-slate-300">
+              LLM-based extraction for revenue and expense categories.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void loadFinancialDashboard()}
+            disabled={isFinancialLoading}
+            className="rounded-lg bg-gradient-to-r from-indigo-500 to-cyan-500 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+          >
+            {isFinancialLoading ? "Extracting..." : "Extract Financial Data"}
+          </button>
+        </div>
+
+        {financialDashboard ? (
+          <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+            <div className="overflow-x-auto rounded-xl border border-white/10 bg-slate-950/40">
+              <table className="min-w-full text-sm">
+                <thead className="bg-white/5 text-left text-slate-300">
+                  <tr>
+                    <th className="px-4 py-3">Category</th>
+                    <th className="px-4 py-3">Revenue</th>
+                    <th className="px-4 py-3">Expense</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Array.from(
+                    new Set([
+                      ...Object.keys(financialDashboard.revenue),
+                      ...Object.keys(financialDashboard.expenses),
+                    ])
+                  ).map((key) => (
+                    <tr key={key} className="border-t border-white/10 text-slate-100">
+                      <td className="px-4 py-3">
+                        {REVENUE_LABELS[key] || EXPENSE_LABELS[key] || key}
+                      </td>
+                      <td className="px-4 py-3 text-emerald-300">
+                        {(financialDashboard.revenue as Record<string, number>)[key]?.toLocaleString() ??
+                          "0"}
+                      </td>
+                      <td className="px-4 py-3 text-orange-300">
+                        {(financialDashboard.expenses as Record<string, number>)[key]?.toLocaleString() ??
+                          "0"}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="border-t border-white/10 bg-white/5 font-semibold text-white">
+                    <td className="px-4 py-3">Totals</td>
+                    <td className="px-4 py-3 text-emerald-300">
+                      {financialDashboard.totals.revenue_total.toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3 text-orange-300">
+                      {financialDashboard.totals.expense_total.toLocaleString()}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div className="space-y-4">
+              <article className="h-80 rounded-xl border border-white/10 bg-slate-950/40 p-3">
+                <p className="mb-2 text-xs text-slate-300">Bar Chart</p>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={financialChartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <XAxis dataKey="name" stroke="#cbd5e1" angle={-25} textAnchor="end" height={70} />
+                    <YAxis stroke="#cbd5e1" />
+                    <RechartsTooltip />
+                    <Bar dataKey="value">
+                      {financialChartData.map((entry, idx) => (
+                        <Cell key={`financial-bar-${idx}`} fill={entry.fill} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </article>
+
+              <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-1">
+                <div className="rounded-lg border border-white/10 bg-slate-950/40 p-3">
+                  <p className="text-xs text-slate-300">Revenue Total</p>
+                  <p className="mt-1 text-xl font-semibold text-emerald-300">
+                    {financialDashboard.totals.revenue_total.toLocaleString()}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-white/10 bg-slate-950/40 p-3">
+                  <p className="text-xs text-slate-300">Expense Total</p>
+                  <p className="mt-1 text-xl font-semibold text-orange-300">
+                    {financialDashboard.totals.expense_total.toLocaleString()}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-white/10 bg-slate-950/40 p-3">
+                  <p className="text-xs text-slate-300">Net Total</p>
+                  <p className="mt-1 text-xl font-semibold text-cyan-200">
+                    {financialDashboard.totals.net_total.toLocaleString()}
+                  </p>
+                </div>
+              </div>
+
+              {!!financialDashboard.notes.length && (
+                <div className="rounded-lg border border-white/10 bg-slate-950/40 p-3">
+                  <p className="text-xs font-semibold text-slate-200">Notes</p>
+                  <div className="mt-2 space-y-1">
+                    {financialDashboard.notes.map((note, idx) => (
+                      <p key={`financial-note-${idx}`} className="text-xs text-slate-300">
+                        {note}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-slate-300">
+            Extract financial data to populate the table and bar chart.
+          </p>
+        )}
+      </article>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <article className="h-96 rounded-xl border border-white/15 bg-white/5 p-4">
@@ -765,4 +947,3 @@ export default function AnalyticsPage() {
     </section>
   );
 }
-

@@ -7,7 +7,7 @@ import { useAppPreferences } from "@/contexts/app-preferences-context";
 
 export default function ReportGenerationPage() {
   const { token } = useAuth();
-  const { selectedModel, openaiApiKey, anthropicApiKey, geminiApiKey } = useAppPreferences();
+  const { selectedModel, openaiApiKey } = useAppPreferences();
   const [topic, setTopic] = useState("");
   const [query, setQuery] = useState("");
   const [reportType, setReportType] = useState("general");
@@ -30,8 +30,6 @@ export default function ReportGenerationPage() {
           output_format: outputFormat,
           model: selectedModel || "auto",
           openai_api_key: openaiApiKey || null,
-          anthropic_api_key: anthropicApiKey || null,
-          gemini_api_key: geminiApiKey || null,
         },
         token ?? undefined
       );
@@ -113,4 +111,3 @@ export default function ReportGenerationPage() {
     </section>
   );
 }
-

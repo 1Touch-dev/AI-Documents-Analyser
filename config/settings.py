@@ -33,12 +33,8 @@ class Settings(BaseSettings):
     aws_region: str = "us-east-1"
     s3_bucket_name: str = "ai-knowledge-platform-docs"
 
-    # ── Ollama ───────────────────────────────────────────
-    ollama_base_url: str = "http://localhost:11434"
-
-    # ── External LLM Keys (Optional) ────────────────────
+    # ── LLM Keys ────────────────────────────────────────
     openai_api_key: str = ""
-    anthropic_api_key: str = ""
 
     # ── Embeddings ───────────────────────────────────────
     # Switched to bge-base for 2.5x faster performance with only 2-3% quality loss

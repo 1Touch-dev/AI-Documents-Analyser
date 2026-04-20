@@ -570,7 +570,7 @@ with st.sidebar:
     def format_model_label(m):
         if m == "auto": return "auto (Recommended)"
         if m in ["llama3.2", "tinyllama"]: return f"{m} (Ready)"
-        if m in ["llama3", "mistral", "mixtral", "gemma"]: return f"{m} (Not installed - install yourself via Ollama)"
+        if m in ["llama3", "mistral", "mixtral", "gemma"]: return f"{m} (Uses GPT API — cloud model)"
         return f"{m} (Requires API Key)"
 
     st.session_state.selected_model = st.selectbox(

@@ -55,6 +55,53 @@ export type ReportResponse = {
   output_format?: string;
 };
 
+export type FinancialDashboardResponse = {
+  revenue: {
+    f_and_b: number;
+    sponsorship: number;
+    tickets: number;
+    retail: number;
+    player_sales: number;
+  };
+  expenses: {
+    player_salary: number;
+    coach_salary: number;
+    travel: number;
+    stadium: number;
+    retail: number;
+    f_and_b: number;
+    back_office: number;
+    misc: number;
+  };
+  totals: {
+    revenue_total: number;
+    expense_total: number;
+    net_total: number;
+  };
+  notes: string[];
+  source_documents: string[];
+  model_used?: string;
+};
+
+export type DocumentStatusItem = {
+  document_id: string;
+  title: string;
+  file_type: string;
+  db_status: string;
+  uploaded_at: string | null;
+  source_path: string;
+  storage_present: boolean;
+  indexed: boolean;
+};
+
+export type DocumentStatusResponse = {
+  indexed: DocumentStatusItem[];
+  not_indexed: DocumentStatusItem[];
+  indexed_count: number;
+  not_indexed_count: number;
+  total_documents: number;
+};
+
 export type UploadBatchResponse = {
   batch_id: string;
   total_submitted: number;
@@ -225,6 +272,22 @@ export function deletePrompt(promptId: string, token?: string) {
   );
 }
 
+export function deleteConversation(sessionId: string, token?: string) {
+  return request<{ deleted: boolean }>(
+    `/conversations/${sessionId}`,
+    { method: "DELETE" },
+    token
+  );
+}
+
+export function detectCurrency(token?: string) {
+  return request<{ currency: string; confidence: string; counts: Record<string, number> }>(
+    "/detect_currency",
+    { method: "GET" },
+    token
+  );
+}
+
 export function listConversations(token?: string, category?: string) {
   const query = category ? `?limit=50&category=${encodeURIComponent(category)}` : "?limit=50";
   return request<{ conversations: ConversationItem[] }>(
@@ -265,6 +328,8 @@ export function queryDocuments(
     openai_api_key?: string | null;
     anthropic_api_key?: string | null;
     gemini_api_key?: string | null;
+    translate_to_english?: boolean;
+    target_currency?: string;
   },
   token?: string
 ) {
@@ -276,6 +341,10 @@ export function queryDocuments(
     },
     token
   );
+}
+
+export function getDocumentStatus(token?: string) {
+  return request<DocumentStatusResponse>("/documents/status", { method: "GET" }, token);
 }
 
 export function getAnalyticsOverview(token?: string) {
@@ -331,6 +400,27 @@ export function getAnalyticsContentInsights(token?: string) {
   }>("/analytics/content_insights", { method: "GET" }, token);
 }
 
+export function getFinancialDashboard(
+  payload: {
+    model?: string;
+    top_k?: number;
+    category?: string | null;
+    openai_api_key?: string | null;
+    anthropic_api_key?: string | null;
+    gemini_api_key?: string | null;
+  },
+  token?: string
+) {
+  return request<FinancialDashboardResponse>(
+    "/analytics/financial_dashboard",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    token
+  );
+}
+
 export function generateReport(
   payload: {
     topic: string;
@@ -354,4 +444,3 @@ export function generateReport(
     token
   );
 }
-

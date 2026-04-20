@@ -1,151 +1,210 @@
 # AI Knowledge Platform — Deployment Manual
 
-This manual provides step-by-step instructions to deploy the AI Knowledge Platform. The application has been designed as a fully containerized, production-ready stack using Docker.
+This manual provides step-by-step instructions to deploy the AI Knowledge Platform on an AWS EC2 instance or any Linux server. The application uses Docker Compose for production deployment.
 
 ---
 
 ## 1. System Requirements
 
-The platform runs a lightweight, robust microservice architecture but integrates a Local AI Model (`Llama 3.2 3B`) and a local Embedding Model by default.
+The platform is API-first: all language model generation runs through the **OpenAI GPT API** — no local LLM is required. Hardware requirements are therefore minimal.
 
-### Minimum Specifications:
-- **CPU:** 2+ vCPUs
-- **RAM:** 8 GB minimum (Required to run the 3B parameter local LLM and embedding models in memory).
-- **Storage:** 50 GB SSD (For operating system, Docker images, database volumes, and vector store data).
-- **OS:** Any Linux distribution (Ubuntu 22.04+ recommended) or macOS.
+### Minimum Specifications
+| Resource | Minimum | Recommended |
+|---|---|---|
+| CPU | 2 vCPU | 4 vCPU |
+| RAM | 4 GB | 8 GB |
+| Storage | 20 GB SSD | 50 GB SSD |
+| OS | Ubuntu 22.04+ | Ubuntu 22.04 LTS |
 
-### Recommended AWS EC2 Instance:
-- **Instance Type:** `t3a.large` or `t3.large` (2 vCPU, 8 GB RAM).
-- **Purchasing Option:** Spot Instance (for minimal cost, ~$15-18/month).
+> **Note:** The embedding model runs locally for vector search. The default is `BAAI/bge-base-en-v1.5` (~440 MB, 768-dim). For higher quality embeddings, override with `EMBEDDING_MODEL=BAAI/bge-large-en-v1.5` (~1.2 GB, 1024-dim). No GPU is required for either model.
+
+### Recommended AWS EC2 Instance
+- **Instance Type:** `t3.medium` (2 vCPU, 4 GB RAM) — sufficient for most workloads
+- **Instance Type:** `t3.large` (2 vCPU, 8 GB RAM) — recommended for concurrent users or bge-large model
+- **Storage:** 30 GB GP3 EBS volume
 
 ---
 
-## 2. Prerequisites Setup
+## 2. Prerequisites
 
-Before deploying the application, ensure the host machine has the following tools installed.
-
-### Install Docker & Docker Compose plugin
-On Ubuntu/Debian:
+### Install Docker & Docker Compose
 ```bash
-sudo apt update
-sudo apt install -y docker.io docker-compose-v2
+sudo apt update && sudo apt install -y docker.io docker-compose-v2
 sudo systemctl enable --now docker
 sudo usermod -aG docker $USER
-# (Log out and back in for group changes to take effect)
+# Log out and back in for group changes to take effect
 ```
 
-### Install Ollama (For Local Models)
-Ollama serves the local LLM used by the platform.
-```bash
-curl -fsSL https://ollama.com/install.sh | sh
-
-# Pull the default Llama 3 model
-ollama pull llama3.2
-```
+### Required External Accounts
+- **OpenAI API Key** — required for all GPT features (chat, translation, reports, financial extraction). Get one at [platform.openai.com](https://platform.openai.com).
+- **AWS S3 Bucket** — required for document storage. The system falls back to local disk when S3 is not configured (not recommended for production).
 
 ---
 
-## 3. Clone and Configure the Application
+## 3. Clone and Configure
 
 ### 1. Clone the Repository
-Clone the application code to your deployment server:
 ```bash
 git clone <your-repository-url> ai-knowledge-platform
 cd ai-knowledge-platform
 ```
 
 ### 2. Configure Environment Variables
-You must configure the application secrets and AWS connectivity. The application expects an AWS S3 bucket to store uploaded documents securely.
-
 ```bash
 cp .env.example .env
 nano .env
 ```
 
-Ensure the following variables are correctly populated:
+Populate these required values:
+
 ```ini
-# PostgreSQL (Change the password for production!)
-DATABASE_URL=postgresql://postgres:postgres@db:5432/ai_platform
+# ── Database ─────────────────────────────────────────────────────
+DATABASE_URL=postgresql://postgres:your_secure_password@db:5432/ai_knowledge_platform
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=your_secure_password
-POSTGRES_DB=ai_platform
+POSTGRES_DB=ai_knowledge_platform
 
-# AWS S3 Configuration
+# ── OpenAI (Required for all GPT features) ───────────────────────
+OPENAI_API_KEY=sk-your-openai-key
+
+# ── AWS S3 (Required for production document storage) ────────────
 AWS_ACCESS_KEY_ID=your_aws_access_key
 AWS_SECRET_ACCESS_KEY=your_aws_secret_key
 AWS_REGION=us-east-1
 S3_BUCKET_NAME=your-bucket-name
 
-# Security
-JWT_SECRET_KEY=generate_a_random_secure_string
+# ── Redis (Query caching — 100× speedup on repeated queries) ─────
+REDIS_URL=redis://redis:6379/0
+
+# ── Auth ─────────────────────────────────────────────────────────
+SECRET_KEY=generate_a_long_random_string_here
+
+# ── Embeddings (Optional — defaults to bge-base-en-v1.5) ─────────
+# Uncomment for higher quality embeddings (uses ~1.2 GB RAM):
+# EMBEDDING_MODEL=BAAI/bge-large-en-v1.5
 ```
 
 ---
 
-## 4. Deploying the Stack
-
-Once Docker is installed and `.env` is configured, deploying the entire stack takes a single command. This will build both the FastAPI backend and the Streamlit frontend, and provision the Postgres and ChromaDB databases.
+## 4. Deploy the Stack
 
 ```bash
 docker compose up --build -d
 ```
 
-### Verification
-Wait 1-2 minutes for the databases to initialize, then verify the services:
+Wait 60–90 seconds for databases to initialise, then verify:
+
 ```bash
 docker compose ps
 ```
-You should see 4 containers running:
-1. `ai-frontend` (Port 8501)
-2. `ai-backend` (Port 8000)
-3. `ai-db` (Port 5432)
-4. `ai-chroma` (Port 8001)
+
+Expected running containers:
+
+| Container | Port | Purpose |
+|---|---|---|
+| `ai-backend` | 8010 | FastAPI backend |
+| `ai-frontend` | 3001 | Next.js frontend |
+| `ai-db` | 5432 | PostgreSQL |
+| `ai-chroma` | 8001 | ChromaDB vector store |
+| `ai-redis` | 6379 | Redis cache |
 
 ---
 
 ## 5. Accessing the Platform
 
-If deploying on a local machine or a cloud server with a Public IP, open your web browser and navigate to:
+| Service | URL |
+|---|---|
+| Main Application (Next.js UI) | `http://<your-server-ip>:3001` |
+| Backend API Docs (Swagger) | `http://<your-server-ip>:8010/docs` |
+| Health Check | `http://<your-server-ip>:8010/api/health` |
+| Currency Detection | `http://<your-server-ip>:8010/api/detect_currency` |
 
-- **Main Application (Streamlit UI):** `http://<your-server-ip>:8501`
-- **Backend API Docs (FastAPI):** `http://<your-server-ip>:8000/docs`
-
-> **Firewall Note:** Ensure that TCP Port **8501** is open in your AWS Security Group, DigitalOcean Firewall, or local firewall (e.g., `sudo ufw allow 8501`).
+> **Firewall Note:** Open TCP ports **3001** and **8010** in your AWS Security Group. Port **8501** (legacy Streamlit) is no longer used.
 
 ---
 
-## 6. (Optional) Local Development Deployment Without Docker
+## 6. Local Development (Without Docker)
 
-If you wish to run the app directly on your host machine for development:
+### First-Time Setup
+```bash
+cd /home/ubuntu/AI-Documents-Analyser
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+# Edit .env — add OPENAI_API_KEY at minimum
+```
 
-1. **Install Python 3.11+**
-2. **Setup Virtual Environment:**
-   ```bash
-   cd "/Volumes/Seagate/AI Documents Analyser"
-   python3 -m venv venv
-   source venv/bin/activate
-   pip install -r requirements.txt
-   ```
-3. **Configure `.env` for local API URL (recommended on macOS):**
-   ```ini
-   BACKEND_API_URL=http://127.0.0.1:8000/api
-   ```
-4. **Start PostgreSQL Locally** (e.g., via Homebrew or Docker run).
-5. **Start the Backend:**
-   ```bash
-   uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
-   ```
-6. **Start the Frontend (in a new terminal):**
-   ```bash
-   streamlit run frontend/streamlit_app.py --server.address 0.0.0.0 --server.port 8501
-   ```
-7. **Health Check:**
-   ```bash
-   curl -sS http://127.0.0.1:8000/api/health
-   curl -I http://127.0.0.1:8501
-   ```
-8. **Clean restart commands (if needed):**
-   ```bash
-   pkill -f "uvicorn backend.main:app" || true
-   pkill -f "streamlit run frontend/streamlit_app.py" || true
-   ```
+### Start Services
+
+**Terminal 1 — Backend (port 8010):**
+```bash
+cd /home/ubuntu/AI-Documents-Analyser
+source .venv/bin/activate
+uvicorn backend.main:app --host 0.0.0.0 --port 8010
+```
+
+**Terminal 2 — Frontend (port 3001):**
+```bash
+cd /home/ubuntu/AI-Documents-Analyser/frontend-nextjs
+npm install       # first time only
+npm run build     # first time or after code changes
+npm run start -- --hostname 0.0.0.0 --port 3001
+```
+
+### Health Checks
+```bash
+curl -sS http://localhost:8010/api/health
+# → {"status":"healthy","app":"AI Knowledge Platform"}
+
+curl -sS http://localhost:8010/api/detect_currency
+# → {"currency":"BRL","confidence":"high","counts":{"BRL":1224}}
+
+curl -o /dev/null -w "%{http_code}" http://localhost:3001
+# → 200
+```
+
+### Clean Restart
+```bash
+pkill -f "uvicorn backend.main:app" || true
+pkill -f "next.*3001" || true
+```
+
+---
+
+## 7. Key Environment Variables Reference
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `OPENAI_API_KEY` | **Yes** | — | GPT API key for all AI features |
+| `DATABASE_URL` | Yes | `postgresql://...` | PostgreSQL connection string |
+| `REDIS_URL` | No | `redis://localhost:6379/0` | Redis for query caching |
+| `S3_BUCKET_NAME` | No* | — | AWS S3 bucket for documents |
+| `AWS_ACCESS_KEY_ID` | No* | — | AWS credentials |
+| `SECRET_KEY` | Yes | `change-me` | JWT signing secret |
+| `EMBEDDING_MODEL` | No | `BAAI/bge-base-en-v1.5` | Local embedding model (override to `bge-large-en-v1.5` for higher quality) |
+| `VECTOR_STORE_TYPE` | No | `chroma` | `chroma` or `qdrant` |
+| `CHUNK_SIZE` | No | `1000` | Document chunk size (chars) |
+
+> *S3 falls back to local `data/uploads/` directory when not configured.
+
+---
+
+## 8. Architecture Diagram
+
+```
+┌──────────────────┐      ┌──────────────────┐      ┌──────────────────┐
+│  Next.js (React) │─────▶│   FastAPI        │─────▶│   PostgreSQL     │
+│  frontend-nextjs │      │   backend        │      │   :5432          │
+│  :3001           │      │   :8010          │      └──────────────────┘
+└──────────────────┘      └──────┬───────────┘
+                                 │
+                    ┌────────────┼────────────┐
+                    ▼            ▼            ▼
+              ┌──────────┐  ┌──────────┐  ┌──────────┐
+              │ ChromaDB │  │ OpenAI   │  │  Redis   │
+              │ :8001    │  │ GPT API  │  │  :6379   │
+              └──────────┘  └──────────┘  └──────────┘
+```
+
+> **No local LLM required.** All generation runs through the OpenAI GPT API.

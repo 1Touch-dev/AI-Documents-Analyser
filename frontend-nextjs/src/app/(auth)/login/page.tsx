@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
-import { motion } from "motion/react";
 import { useAuth } from "@/contexts/auth-context";
 import { AuthShell } from "@/components/auth-shell";
 
@@ -35,6 +34,7 @@ export default function LoginPage() {
     setIsSubmitting(true);
     try {
       await loginUser(username, password);
+      window.location.assign(nextPath);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Login failed.");
     } finally {
@@ -83,15 +83,14 @@ export default function LoginPage() {
           </p>
         ) : null}
 
-        <motion.button
-          whileTap={{ scale: 0.98 }}
+        <button
+          type="submit"
           disabled={isSubmitting}
           className="w-full rounded-lg bg-gradient-to-r from-indigo-500 to-cyan-500 px-3 py-2.5 text-sm font-medium text-white shadow-lg shadow-indigo-900/30 hover:brightness-110 disabled:opacity-60"
         >
           {isSubmitting ? "Signing in..." : "Sign in"}
-        </motion.button>
+        </button>
       </form>
     </AuthShell>
   );
 }
-

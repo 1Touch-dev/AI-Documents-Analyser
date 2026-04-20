@@ -2,6 +2,17 @@
 
 import { createContext, useContext, useMemo, useState } from "react";
 
+// All currencies accepted by the backend API.
+export const SUPPORTED_CURRENCY_CODES = [
+  "BRL","USD","CAD","MXN","ARS","CLP","COP","PEN",
+  "EUR","GBP","CHF","NOK","SEK","DKK","PLN","CZK","HUF","RON","TRY","RUB","UAH",
+  "JPY","CNY","INR","KRW","SGD","HKD","TWD","THB","IDR","MYR","PHP","VND",
+  "AUD","NZD",
+  "AED","SAR","QAR","ILS","EGP","ZAR","NGN","KES","PKR","BDT",
+] as const;
+
+export type CurrencyCode = (typeof SUPPORTED_CURRENCY_CODES)[number];
+
 type AppPreferences = {
   selectedModel: string;
   selectedCategory: string;
@@ -9,6 +20,8 @@ type AppPreferences = {
   openaiApiKey: string;
   anthropicApiKey: string;
   geminiApiKey: string;
+  translateToEnglish: boolean;
+  targetCurrency: string;
 };
 
 type AppPreferencesContextValue = AppPreferences & {
@@ -18,27 +31,35 @@ type AppPreferencesContextValue = AppPreferences & {
   setOpenaiApiKey: (value: string) => void;
   setAnthropicApiKey: (value: string) => void;
   setGeminiApiKey: (value: string) => void;
+  setTranslateToEnglish: (value: boolean) => void;
+  setTargetCurrency: (value: string) => void;
 };
 
 const STORAGE_KEY = "akp_preferences";
 
 const AppPreferencesContext = createContext<AppPreferencesContextValue | null>(null);
 
+function isValidCurrency(code: unknown): code is string {
+  return typeof code === "string" && (SUPPORTED_CURRENCY_CODES as readonly string[]).includes(code);
+}
+
 function loadInitial(): AppPreferences {
-  if (typeof window === "undefined") {
-    return {
-      selectedModel: "auto",
-      selectedCategory: "general",
-      selectedPromptTemplate: "",
-      openaiApiKey: "",
-      anthropicApiKey: "",
-      geminiApiKey: "",
-    };
-  }
+  const defaults: AppPreferences = {
+    selectedModel: "auto",
+    selectedCategory: "general",
+    selectedPromptTemplate: "",
+    openaiApiKey: "",
+    anthropicApiKey: "",
+    geminiApiKey: "",
+    translateToEnglish: false,
+    targetCurrency: "BRL",
+  };
+
+  if (typeof window === "undefined") return defaults;
 
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) throw new Error("no local data");
+    if (!raw) return defaults;
     const parsed = JSON.parse(raw) as Partial<AppPreferences>;
     return {
       selectedModel: parsed.selectedModel || "auto",
@@ -47,16 +68,13 @@ function loadInitial(): AppPreferences {
       openaiApiKey: parsed.openaiApiKey || "",
       anthropicApiKey: parsed.anthropicApiKey || "",
       geminiApiKey: parsed.geminiApiKey || "",
+      translateToEnglish: Boolean(parsed.translateToEnglish),
+      targetCurrency: isValidCurrency(parsed.targetCurrency)
+        ? parsed.targetCurrency
+        : "BRL",
     };
   } catch {
-    return {
-      selectedModel: "auto",
-      selectedCategory: "general",
-      selectedPromptTemplate: "",
-      openaiApiKey: "",
-      anthropicApiKey: "",
-      geminiApiKey: "",
-    };
+    return defaults;
   }
 }
 
@@ -80,7 +98,10 @@ export function AppPreferencesProvider({ children }: { children: React.ReactNode
       setOpenaiApiKey: (openaiApiKey) => persist({ ...prefs, openaiApiKey }),
       setAnthropicApiKey: (anthropicApiKey) => persist({ ...prefs, anthropicApiKey }),
       setGeminiApiKey: (geminiApiKey) => persist({ ...prefs, geminiApiKey }),
+      setTranslateToEnglish: (translateToEnglish) => persist({ ...prefs, translateToEnglish }),
+      setTargetCurrency: (targetCurrency) => persist({ ...prefs, targetCurrency }),
     }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [prefs]
   );
 
@@ -96,4 +117,3 @@ export function useAppPreferences() {
   }
   return context;
 }
-

@@ -3,9 +3,11 @@
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import {
   deleteDocument,
+  getDocumentStatus,
   getBatchStatus,
   listDocuments,
   type BatchStatusResponse,
+  type DocumentStatusResponse,
   type DocumentItem,
   type UploadBatchResponse,
   uploadBatch,
@@ -34,8 +36,10 @@ export default function DocumentsPage() {
   const [category, setCategory] = useState("general");
   const [uploadSummary, setUploadSummary] = useState<UploadBatchResponse | null>(null);
   const [batchStatus, setBatchStatus] = useState<BatchStatusResponse | null>(null);
+  const [documentStatus, setDocumentStatus] = useState<DocumentStatusResponse | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
 
   const metrics = useMemo(() => {
     const ready = documents.filter((d) => normalizeStatus(d.status) === "ready").length;
@@ -148,6 +152,19 @@ export default function DocumentsPage() {
       await refreshDocuments(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Delete failed.");
+    }
+  }
+
+  async function onCheckDocumentStatus() {
+    setError(null);
+    setIsCheckingStatus(true);
+    try {
+      const result = await getDocumentStatus(token ?? undefined);
+      setDocumentStatus(result);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Status check failed.");
+    } finally {
+      setIsCheckingStatus(false);
     }
   }
 
@@ -280,14 +297,92 @@ export default function DocumentsPage() {
           </tbody>
         </table>
       </div>
-      <button
-        onClick={() => refreshDocuments(true)}
-        disabled={isRefreshing}
-        className="rounded-lg border border-white/25 px-4 py-2 text-sm text-slate-200 hover:bg-white/10 disabled:opacity-60"
-      >
-        {isRefreshing ? "Refreshing..." : "Refresh"}
-      </button>
+      <div className="flex flex-wrap gap-3">
+        <button
+          onClick={() => refreshDocuments(true)}
+          disabled={isRefreshing}
+          className="rounded-lg border border-white/25 px-4 py-2 text-sm text-slate-200 hover:bg-white/10 disabled:opacity-60"
+        >
+          {isRefreshing ? "Refreshing..." : "Refresh"}
+        </button>
+        <button
+          onClick={() => void onCheckDocumentStatus()}
+          disabled={isCheckingStatus}
+          className="rounded-lg bg-gradient-to-r from-indigo-500 to-cyan-500 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+        >
+          {isCheckingStatus ? "Checking..." : "Check Document Status"}
+        </button>
+      </div>
+
+      {documentStatus && (
+        <article className="space-y-4 rounded-xl border border-white/15 bg-white/5 p-5">
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-lg border border-white/10 bg-slate-950/40 p-3">
+              <p className="text-xs text-slate-300">Uploaded</p>
+              <p className="mt-1 text-xl font-semibold text-white">
+                {documentStatus.total_documents}
+              </p>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-slate-950/40 p-3">
+              <p className="text-xs text-slate-300">Indexed</p>
+              <p className="mt-1 text-xl font-semibold text-emerald-300">
+                {documentStatus.indexed_count}
+              </p>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-slate-950/40 p-3">
+              <p className="text-xs text-slate-300">Not Indexed</p>
+              <p className="mt-1 text-xl font-semibold text-amber-300">
+                {documentStatus.not_indexed_count}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            <div className="rounded-xl border border-white/10 bg-slate-950/40 p-4">
+              <p className="text-sm font-semibold text-white">Indexed Documents</p>
+              <div className="mt-3 space-y-2">
+                {documentStatus.indexed.length ? (
+                  documentStatus.indexed.map((item) => (
+                    <div
+                      key={item.document_id}
+                      className="rounded-lg border border-white/10 bg-white/5 px-3 py-2"
+                    >
+                      <p className="text-sm text-slate-100">{item.title}</p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        {item.file_type} · storage {item.storage_present ? "ok" : "missing"}
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-slate-300">No indexed documents found.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-slate-950/40 p-4">
+              <p className="text-sm font-semibold text-white">Uploaded But Not Indexed</p>
+              <div className="mt-3 space-y-2">
+                {documentStatus.not_indexed.length ? (
+                  documentStatus.not_indexed.map((item) => (
+                    <div
+                      key={item.document_id}
+                      className="rounded-lg border border-amber-300/20 bg-amber-500/10 px-3 py-2"
+                    >
+                      <p className="text-sm text-slate-100">{item.title}</p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        {item.file_type} · db {item.db_status} · storage{" "}
+                        {item.storage_present ? "ok" : "missing"}
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-slate-300">All uploaded documents are indexed.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </article>
+      )}
     </section>
   );
 }
-

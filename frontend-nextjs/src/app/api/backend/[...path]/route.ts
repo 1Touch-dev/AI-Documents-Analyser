@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { BACKEND_API_BASE_URL } from "@/lib/config";
 
+const AUTH_COOKIE_NAME = "akp_token";
+
+function isAuthTokenResponse(path: string[]) {
+  const joinedPath = path.join("/");
+  return joinedPath === "auth/login" || joinedPath === "auth/register";
+}
+
 function buildTargetUrl(path: string[], request: NextRequest) {
   const normalizedBase = BACKEND_API_BASE_URL.replace(/\/$/, "");
   const joinedPath = path.join("/");
@@ -27,7 +34,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
 
   let backendResponse: Response;
   try {
-    const fetchOptions: any = {
+    const fetchOptions: RequestInit & { duplex?: "half" } = {
       method: request.method,
       headers,
       body: requestBody,
@@ -59,12 +66,32 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   const contentType =
     backendResponse.headers.get("content-type") ?? "application/json; charset=utf-8";
 
-  return new NextResponse(responseText, {
+  const response = new NextResponse(responseText, {
     status: backendResponse.status,
     headers: {
       "content-type": contentType,
     },
   });
+
+  if (backendResponse.ok && isAuthTokenResponse(path)) {
+    try {
+      const payload = JSON.parse(responseText) as { access_token?: string };
+      if (payload.access_token) {
+        response.cookies.set({
+          name: AUTH_COOKIE_NAME,
+          value: payload.access_token,
+          path: "/",
+          sameSite: "strict",
+          maxAge: 60 * 60 * 24,
+          httpOnly: false,
+        });
+      }
+    } catch {
+      // Ignore cookie setup when the upstream auth response isn't valid JSON.
+    }
+  }
+
+  return response;
 }
 
 export async function GET(
@@ -101,4 +128,3 @@ export async function DELETE(
 ) {
   return proxy(request, context);
 }
-

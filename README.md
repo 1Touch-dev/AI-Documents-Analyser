@@ -3,23 +3,25 @@
 A production-ready AI-powered document analysis and knowledge management platform.  
 Upload documents, query them using multiple LLMs, manage prompts and conversations, generate reports, and visualize data — all from a unified interface.
 
+This branch now uses API-based GPT models only. Local model execution through Ollama/Gemma has been removed from the active runtime path.
+
 ---
 
 ## Architecture
 
 ```
 ┌──────────────┐      ┌──────────────┐      ┌──────────────┐
-│   Streamlit  │─────▶│   FastAPI    │─────▶│  PostgreSQL  │
+│   Next.js    │─────▶│   FastAPI    │─────▶│  PostgreSQL  │
 │   Frontend   │      │   Backend    │      │   Database   │
-│   :8501      │      │   :8000      │      │   :5432      │
+│   :3000      │      │   :8010      │      │   :5432      │
 └──────────────┘      └──────┬───────┘      └──────────────┘
                              │
                     ┌────────┼────────┐
                     ▼        ▼        ▼
-              ┌─────────┐ ┌──────┐ ┌──────────┐
-              │ ChromaDB│ │Ollama│ │  AWS S3   │
-              │  :8001  │ │:11434│ │  Storage  │
-              └─────────┘ └──────┘ └──────────┘
+              ┌─────────┐ ┌─────────┐ ┌──────────┐
+              │ ChromaDB│ │ OpenAI  │ │  AWS S3   │
+              │  :8001  │ │  GPT API│ │  Storage  │
+              └─────────┘ └─────────┘ └──────────┘
 ```
 
 ## Features
@@ -28,7 +30,7 @@ Upload documents, query them using multiple LLMs, manage prompts and conversatio
 |---|---|
 | 📄 Document Ingestion | Upload PDF, DOCX, PPTX, XLSX, CSV, TXT, JSON |
 | 🔍 RAG Query | Retrieval-augmented generation with source citations |
-| 🤖 Multi-LLM | Ollama (Llama 3, Mistral, Mixtral, Gemma), OpenAI, Claude |
+| 🤖 GPT API | All generation now runs through OpenAI GPT API models |
 | 📝 Prompt Templates | Create, edit, and reuse prompt templates |
 | 💬 Conversations | Persistent chat history, categorized sessions |
 | 📊 Dashboards | Plotly charts, data visualizations |
@@ -50,7 +52,7 @@ For detailed guides, please refer to the comprehensive manuals located in the `D
 ### Prerequisites
 
 - **Docker** & **Docker Compose**
-- **Ollama** (for local LLMs) — [install guide](https://ollama.ai)
+- **OpenAI API key**
 - **AWS S3 bucket** (for document storage)
 
 ### 1. Clone & Configure
@@ -59,28 +61,28 @@ For detailed guides, please refer to the comprehensive manuals located in the `D
 cp .env.example .env
 # Edit .env with your credentials:
 #   - AWS S3 keys
-#   - OpenAI / Anthropic API keys (optional)
+#   - OpenAI API key (required for chat, translation, reports, and financial extraction)
 #   - PostgreSQL password
 ```
 
-### 2. Pull an Ollama Model
+Required environment variable:
 
-```bash
-ollama pull llama3
+```ini
+OPENAI_API_KEY=your_key
 ```
 
-### 3. Launch
+### 2. Launch
 
 ```bash
 docker compose up --build -d
 ```
 
-### 4. Access
+### 3. Access
 
 | Service | URL |
 |---|---|
-| 🖥️ Streamlit UI | [http://localhost:8501](http://localhost:8501) |
-| ⚡ FastAPI Docs | [http://localhost:8000/docs](http://localhost:8000/docs) |
+| 🖥️ Next.js UI | [http://localhost:3000](http://localhost:3000) |
+| ⚡ FastAPI Docs | [http://localhost:8010/docs](http://localhost:8010/docs) |
 | 🗄️ PostgreSQL | `localhost:5432` |
 | 🔷 ChromaDB | `localhost:8001` |
 
@@ -91,47 +93,41 @@ docker compose up --build -d
 ### First-time setup
 
 ```bash
-cd "/Volumes/Seagate/AI Documents Analyser"
-python3 -m venv venv
-source venv/bin/activate
+cd /home/ubuntu/AI-Documents-Analyser
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-```
-
-Set this in `.env` for reliable local connectivity on macOS:
-
-```ini
-BACKEND_API_URL=http://127.0.0.1:8000/api
 ```
 
 ### Start services (2 terminals)
 
 Terminal 1 (Backend):
 ```bash
-cd "/Volumes/Seagate/AI Documents Analyser"
-source venv/bin/activate
-uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+cd /home/ubuntu/AI-Documents-Analyser
+source .venv/bin/activate
+uvicorn backend.main:app --host 0.0.0.0 --port 8010
 ```
 
 Terminal 2 (Frontend):
 ```bash
-cd "/Volumes/Seagate/AI Documents Analyser"
-source venv/bin/activate
-streamlit run frontend/streamlit_app.py --server.address 0.0.0.0 --server.port 8501
+cd /home/ubuntu/AI-Documents-Analyser/frontend-nextjs
+npm install
+NEXT_PUBLIC_BACKEND_API_URL=http://127.0.0.1:8010/api npm run dev -- --hostname 0.0.0.0 --port 3000
 ```
 
 ### Quick health checks
 
 ```bash
-curl -sS http://127.0.0.1:8000/api/health
-curl -I http://127.0.0.1:8501
+curl -sS http://127.0.0.1:8010/api/health
+curl -I http://127.0.0.1:3000
 ```
 
 ### Clean restart (if ports are stuck)
 
 ```bash
 pkill -f "uvicorn backend.main:app" || true
-pkill -f "streamlit run frontend/streamlit_app.py" || true
+pkill -f "next dev --hostname 0.0.0.0 --port 3000" || true
 ```
 
 ---
@@ -150,7 +146,8 @@ AI Documents Analyser/
 │   ├── conversation_manager.py  # Chat session management
 │   └── report_generator.py      # Report generation
 ├── frontend/
-│   └── streamlit_app.py         # Streamlit web UI
+│   └── streamlit_app.py         # Legacy Streamlit UI
+├── frontend-nextjs/             # Active local/prod frontend
 ├── services/
 │   ├── s3_storage.py            # AWS S3 client
 │   └── document_parser.py       # Multi-format text extraction
@@ -175,10 +172,13 @@ AI Documents Analyser/
 |---|---|---|
 | `POST` | `/api/auth/register` | Register new user |
 | `POST` | `/api/auth/login` | Login and get JWT token |
-| `POST` | `/api/upload_document` | Upload & ingest document |
+| `POST` | `/api/upload_document` | Upload & ingest a single document |
+| `POST` | `/api/upload_batch` | Upload multiple documents (background processing) |
+| `GET` | `/api/batch_status/{batch_id}` | Poll batch upload progress |
 | `GET` | `/api/documents` | List documents |
 | `DELETE` | `/api/documents/{id}` | Delete document |
-| `POST` | `/api/query` | RAG query with source citations |
+| `GET` | `/api/documents/status` | Index status: indexed vs not_indexed |
+| `POST` | `/api/query` | RAG query — supports `translate_to_english` and `target_currency` |
 | `GET` | `/api/prompts` | List prompt templates |
 | `POST` | `/api/prompts` | Create prompt template |
 | `PUT` | `/api/prompts/{id}` | Update prompt template |
@@ -188,10 +188,15 @@ AI Documents Analyser/
 | `POST` | `/api/conversations` | Create conversation |
 | `DELETE` | `/api/conversations/{id}` | Delete conversation |
 | `POST` | `/api/generate_report` | Generate structured report |
-| `GET` | `/api/models` | List available LLM models |
+| `GET` | `/api/analytics/overview` | Document & storage overview stats |
+| `GET` | `/api/analytics/content` | Word count, reading time, frequencies |
+| `GET` | `/api/analytics/content_insights` | Topics, entities, financial context |
+| `GET` | `/api/analytics/storage` | Storage usage stats |
+| `POST` | `/api/analytics/financial_dashboard` | GPT-based revenue/expense extraction |
+| `GET` | `/api/models` | List available GPT models |
 | `GET` | `/api/health` | Health check |
 
-Full interactive docs at [http://localhost:8000/docs](http://localhost:8000/docs)
+Full interactive docs at [http://localhost:8010/docs](http://localhost:8010/docs)
 
 ---
 
@@ -205,11 +210,19 @@ All configuration is managed via environment variables (`.env`). See `.env.examp
 |---|---|---|
 | `DATABASE_URL` | `postgresql://...` | PostgreSQL connection |
 | `S3_BUCKET_NAME` | — | AWS S3 bucket for documents |
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server URL |
-| `EMBEDDING_MODEL` | `BAAI/bge-large-en-v1.5` | Embedding model |
+| `OPENAI_API_KEY` | — | **Required.** API key for all GPT features (chat, translation, reports, financial extraction) |
+| `REDIS_URL` | `redis://localhost:6379/0` | Redis connection for query caching. Set to your Redis instance URL. |
+| `EMBEDDING_MODEL` | `BAAI/bge-base-en-v1.5` | Embedding model |
 | `VECTOR_STORE_TYPE` | `chroma` | `chroma` or `qdrant` |
 | `CHUNK_SIZE` | `1000` | Document chunk size (chars) |
 | `TOP_K` | `5` | Number of chunks to retrieve |
+
+## Notes
+
+- The active backend runtime now uses only OpenAI GPT API models.
+- Local model execution paths such as Ollama and Gemma are disabled.
+- Internet/API access is required for chat, translation, report generation, and financial extraction.
+- The primary UI for this branch is the Next.js app in `frontend-nextjs`.
 
 ---
 
