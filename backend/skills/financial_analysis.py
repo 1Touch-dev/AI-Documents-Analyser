@@ -56,6 +56,7 @@ async def analyze_financials(
     llm_router: Any,
     model: str = "auto",
     api_keys: dict[str, str | None] | None = None,
+    provider: str = "openai",
 ) -> dict[str, Any]:
     """
     Extract structured financial insights from document text.
@@ -70,7 +71,13 @@ async def analyze_financials(
     if not document_text or not document_text.strip():
         return _empty_result("No document text provided.")
 
-    resolved_model = llm_router.resolve_model(model, "financial analysis", api_keys)
+    from backend.llm_router import _is_bedrock_provider
+    from config.settings import settings as _settings
+    resolved_model = (
+        (model or "").strip() or _settings.bedrock_default_model
+        if _is_bedrock_provider(provider)
+        else llm_router.resolve_model(model, "financial analysis", api_keys)
+    )
     prompt = _build_prompt(document_text)
 
     try:
@@ -83,6 +90,7 @@ async def analyze_financials(
             temperature=0.1,
             max_tokens=2048,
             api_keys=api_keys,
+            provider=provider,
         )
         result = _parse_json(raw)
         result["model_used"] = resolved_model

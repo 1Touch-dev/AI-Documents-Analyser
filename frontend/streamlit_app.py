@@ -212,7 +212,9 @@ for key, default in {
     "username": "",
     "session_id": None,
     "chat_messages": [],
+    "selected_provider": "openai",
     "selected_model": "auto",
+    "bedrock_custom_model": "",
     "selected_prompt": None,
     "selected_category": None,
     "batch_id": None,
@@ -563,23 +565,102 @@ with st.sidebar:
 
     st.markdown("---")
 
-    # ── Model Selection ──────────────────────────────────
-    st.markdown("#### 🤖 Model")
-    model_options = ["auto", "llama3.2", "tinyllama", "llama3", "mistral", "mixtral", "gemma", "gpt-5.4", "o3-mini", "claude-4.6-sonnet", "claude-4.6-opus", "gemini-3.1-pro", "gemini-3-flash", "gemini-3.1-flash"]
+    # ── Provider + Model Selection ────────────────────────
+    st.markdown("#### 🤖 AI Provider & Model")
 
-    def format_model_label(m):
-        if m == "auto": return "auto (Recommended)"
-        if m in ["llama3.2", "tinyllama"]: return f"{m} (Ready)"
-        if m in ["llama3", "mistral", "mixtral", "gemma"]: return f"{m} (Uses GPT API — cloud model)"
-        return f"{m} (Requires API Key)"
-
-    st.session_state.selected_model = st.selectbox(
-        "Select LLM",
-        model_options,
-        index=0,
-        format_func=format_model_label,
-        label_visibility="collapsed",
+    # Provider selector
+    _provider_idx = 0 if st.session_state.selected_provider == "openai" else 1
+    st.session_state.selected_provider = st.selectbox(
+        "Provider",
+        ["openai", "bedrock"],
+        index=_provider_idx,
+        format_func=lambda p: (
+            "☁️  OpenAI  (GPT-4o / GPT-4.1)"
+            if p == "openai"
+            else "🌩️  AWS Bedrock  (Claude · Nova · Llama · Mistral · Cohere)"
+        ),
     )
+
+    if st.session_state.selected_provider == "openai":
+        # OpenAI: simple dropdown
+        _openai_opts = ["auto", "gpt-4o", "gpt-4.1", "gpt-4.1-mini"]
+        if st.session_state.selected_model not in _openai_opts:
+            st.session_state.selected_model = "auto"
+        st.session_state.selected_model = st.selectbox(
+            "Model",
+            _openai_opts,
+            index=_openai_opts.index(st.session_state.selected_model),
+            format_func=lambda m: "auto · smart routing (Recommended)" if m == "auto" else m,
+            label_visibility="collapsed",
+        )
+        st.session_state.bedrock_custom_model = ""
+
+    else:
+        # Bedrock: dropdown of well-known models + free-text override
+        _bedrock_defaults = [
+            "amazon.nova-lite-v1:0",
+            "amazon.nova-micro-v1:0",
+            "amazon.nova-pro-v1:0",
+            "us.anthropic.claude-sonnet-4-5-20251203-v1:0",
+            "us.anthropic.claude-haiku-3-5-20241022-v1:0",
+            "us.anthropic.claude-opus-4-5-20251101-v1:0",
+            "us.anthropic.claude-opus-4-7-20260416-v1:0",
+            "us.meta.llama3-70b-instruct-v1:0",
+            "us.meta.llama3-8b-instruct-v1:0",
+            "mistral.mistral-large-2402-v1:0",
+            "mistral.mixtral-8x7b-instruct-v0:1",
+            "cohere.command-r-plus-v1:0",
+            "[ Enter custom model ID below ]",
+        ]
+        _labels = {
+            "amazon.nova-lite-v1:0":                        "Nova Lite · Amazon (fast + multimodal)",
+            "amazon.nova-micro-v1:0":                       "Nova Micro · Amazon (fastest / cheapest)",
+            "amazon.nova-pro-v1:0":                         "Nova Pro · Amazon (highest quality)",
+            "us.anthropic.claude-sonnet-4-5-20251203-v1:0": "Claude Sonnet 4.6 · Anthropic (balanced)",
+            "us.anthropic.claude-haiku-3-5-20241022-v1:0":  "Claude Haiku · Anthropic (fast)",
+            "us.anthropic.claude-opus-4-5-20251101-v1:0":   "Claude Opus 4.6 · Anthropic (flagship)",
+            "us.anthropic.claude-opus-4-7-20260416-v1:0":   "Claude Opus 4.7 · Anthropic (latest)",
+            "us.meta.llama3-70b-instruct-v1:0":             "Llama 3 70B · Meta (open weights)",
+            "us.meta.llama3-8b-instruct-v1:0":              "Llama 3 8B · Meta (lightweight)",
+            "mistral.mistral-large-2402-v1:0":              "Mistral Large · Mistral AI",
+            "mistral.mixtral-8x7b-instruct-v0:1":           "Mixtral 8×7B · Mistral AI (MoE)",
+            "cohere.command-r-plus-v1:0":                   "Command R+ · Cohere (RAG-optimised)",
+            "[ Enter custom model ID below ]":               "[ Enter custom model ID below ]",
+        }
+
+        _cur = st.session_state.selected_model
+        _sel_idx = _bedrock_defaults.index(_cur) if _cur in _bedrock_defaults else 0
+        _dropdown_choice = st.selectbox(
+            "Bedrock Model",
+            _bedrock_defaults,
+            index=_sel_idx,
+            format_func=lambda m: _labels.get(m, m),
+            label_visibility="collapsed",
+        )
+
+        st.caption(
+            "💡 Any Bedrock model ID is accepted — enter it below to use a model "
+            "not listed in the dropdown."
+        )
+        _custom = st.text_input(
+            "Custom Bedrock model ID (optional)",
+            value=st.session_state.bedrock_custom_model,
+            placeholder="e.g. us.anthropic.claude-opus-4-7-20260416-v1:0",
+            label_visibility="collapsed",
+        ).strip()
+        st.session_state.bedrock_custom_model = _custom
+
+        # Custom field takes precedence over dropdown
+        if _custom:
+            st.session_state.selected_model = _custom
+            st.info(f"Using custom model: `{_custom}`")
+        else:
+            effective = (
+                _dropdown_choice
+                if _dropdown_choice != "[ Enter custom model ID below ]"
+                else "amazon.nova-lite-v1:0"
+            )
+            st.session_state.selected_model = effective
 
     st.markdown("---")
 
@@ -661,6 +742,7 @@ with tab_chat:
             payload = {
                 "question": question,
                 "model": st.session_state.selected_model,
+                "provider": st.session_state.selected_provider,
                 "top_k": 5,
                 "temperature": 0.7,
                 "category": st.session_state.selected_category,

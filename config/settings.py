@@ -27,11 +27,16 @@ class Settings(BaseSettings):
     # ── Database ─────────────────────────────────────────
     database_url: str = "postgresql://postgres:postgres@localhost:5432/ai_knowledge_platform"
 
-    # ── AWS S3 ───────────────────────────────────────────
+    # ── AWS S3 + Bedrock ─────────────────────────────────
+    # Same IAM credentials serve both S3 and Bedrock.
     aws_access_key_id: str = ""
     aws_secret_access_key: str = ""
     aws_region: str = "us-east-1"
     s3_bucket_name: str = "ai-knowledge-platform-docs"
+    # Optional bearer token for Bedrock (some enterprise setups require it)
+    aws_bearer_token_bedrock: str = ""
+    # Default Bedrock model used when provider=bedrock and no model is specified
+    bedrock_default_model: str = "amazon.nova-lite-v1:0"
 
     # ── LLM Keys ────────────────────────────────────────
     openai_api_key: str = ""

@@ -446,38 +446,95 @@ docker compose logs -f ai-backend
 
 ## 7. Test Checklist
 
-### Core Features
+### Core Features (OpenAI)
 - [ ] Login with valid credentials → dashboard redirect
 - [ ] Register new user → success
 - [ ] Upload PDF → status reaches `ready`
 - [ ] Batch upload (3+ files) → all processed
-- [ ] Ask a question → GPT answer with formatted markdown (bold, lists)
-- [ ] `model_used` is `gpt-4o` or `gpt-4.1` (never local model)
-- [ ] Copy button on assistant message → clipboard receives text, button shows "Copied"
+- [ ] Ask a question (provider=openai) → GPT answer with formatted markdown
+- [ ] `model_used` is `gpt-4o` or `gpt-4.1`
+- [ ] Copy button on assistant message → clipboard receives text
 - [ ] Translate to English → answer in English, citations preserved
-- [ ] Currency auto-detected on Chat page load → "Default (X — CODE, auto-detected)" in dropdown
-- [ ] Currency USD selected → R$ values converted in answer using live rates
-- [ ] Currency EUR selected → amounts converted in answer using live rates
-- [ ] All 45 currency options visible in dropdown (Americas, Europe, Asia-Pacific, Middle East, South Asia)
-- [ ] Financial Dashboard → revenue + expenses tables rendered (F&B, Sponsorship, Tickets, Retail, Player Sales / Player Salary, Coach Salary, Travel, Stadium, etc.)
+- [ ] Currency auto-detected on Chat page load
+- [ ] Currency USD selected → R$ values converted
+- [ ] Financial Dashboard → revenue + expenses tables rendered
 - [ ] Check Document Status → indexed / not_indexed lists returned
-- [ ] Delete conversation via trash icon → removed from sidebar, chat cleared if active
+- [ ] Delete conversation via trash icon → removed from sidebar
 - [ ] Create, use, and delete a prompt template
 - [ ] Conversation history persists after page refresh
 
+### Model Switching Validation
+- [ ] Sidebar shows **Provider** dropdown: "☁️ OpenAI" and "🌩️ AWS Bedrock"
+- [ ] Switching to Bedrock changes model list to Bedrock model IDs
+- [ ] Switching back to OpenAI restores GPT options (auto / gpt-4o / gpt-4.1 / mini)
+- [ ] **Custom model text field** appears in Bedrock mode — accepts any model ID
+- [ ] Entering a custom model ID in the text field overrides the dropdown
+- [ ] Chat with `provider=bedrock, model=amazon.nova-lite-v1:0` → answer received
+- [ ] Skills Workbench shows Provider + Model selectors + custom ID field
+- [ ] Running a skill with `provider=bedrock` + custom model ID → structured result
+
+### AWS Bedrock Validation
+
+```bash
+EC2 URL: http://54.175.54.77:8000
+
+# 1. Nova Lite (default Bedrock model)
+curl -X POST http://54.175.54.77:8000/api/query \
+  -H "Content-Type: application/json" \
+  -d '{"question":"Summarize documents","model":"amazon.nova-lite-v1:0","provider":"bedrock"}'
+
+# 2. Claude Opus 4.7 (latest Anthropic)
+curl -X POST http://54.175.54.77:8000/api/query \
+  -H "Content-Type: application/json" \
+  -d '{"question":"Analyze financials","model":"us.anthropic.claude-opus-4-7-20260416-v1:0","provider":"bedrock"}'
+
+# 3. Custom/unknown model ID (no allowlist — passes straight to Converse API)
+curl -X POST http://54.175.54.77:8000/api/query \
+  -H "Content-Type: application/json" \
+  -d '{"question":"Test","model":"any.new.model-id-v1:0","provider":"bedrock"}'
+
+# 4. Financial dashboard via Bedrock
+curl -X POST http://54.175.54.77:8000/api/analytics/financial_dashboard \
+  -H "Content-Type: application/json" \
+  -d '{"provider":"bedrock","model":"amazon.nova-pro-v1:0"}'
+
+# 5. Skills via Bedrock
+curl -X POST http://54.175.54.77:8000/api/skills/run \
+  -H "Content-Type: application/json" \
+  -d '{"skill":"consulting_insights","input":{},"provider":"bedrock","model":"amazon.nova-pro-v1:0"}'
+
+# 6. Verify model listing includes Bedrock
+curl http://54.175.54.77:8000/api/models
+# Expected: {models:[...], all_models:{openai:[...], bedrock:[12 entries]}, providers:[openai,bedrock]}
+```
+
+- [ ] `POST /api/query` with `provider=bedrock` → answer from Bedrock
+- [ ] `POST /api/skills/run` with `provider=bedrock` → structured skill result
+- [ ] `POST /api/analytics/financial_dashboard` with `provider=bedrock` → JSON dashboard
+- [ ] `GET /api/models` → `all_models.bedrock` has 12+ entries, `note` field present
+- [ ] Unknown/new Bedrock model ID → passed to Converse API (no 400 rejection)
+- [ ] Missing AWS credentials → clean `RuntimeError: AWS credentials not configured`
+
 ### API
 - [ ] `GET /api/health` → `{"status":"healthy"}`
-- [ ] `GET /api/models` → only GPT models listed
-- [ ] `GET /api/detect_currency` → `{"currency":"...","confidence":"high/medium/low",...}`
-- [ ] `POST /api/query` → 200 with answer
+- [ ] `GET /api/models` → `all_models` contains both `openai` and `bedrock` keys
+- [ ] `GET /api/detect_currency` → `{"currency":"...","confidence":"..."}`
+- [ ] `POST /api/query` → 200 with answer (openai or bedrock)
 - [ ] `POST /api/analytics/financial_dashboard` → structured JSON
 - [ ] `GET /api/documents/status` → indexed + not_indexed
 - [ ] `DELETE /api/conversations/{id}` → `{"deleted":true}`
-- [ ] Bad API key → clean error message, no stack trace
+- [ ] Bad OpenAI key → clean error, no stack trace
 - [ ] Invalid currency → 400 with clean message
+- [ ] `GET /api/skills` → lists 3 skills
+
+### Skills System Tests
+- [ ] `POST /api/skills/run {"skill":"financial_analysis","provider":"openai","model":"auto","input":{}}` → result
+- [ ] `POST /api/skills/run {"skill":"report_generation","provider":"bedrock","model":"amazon.nova-pro-v1:0","input":{}}` → result
+- [ ] `POST /api/skills/run {"skill":"consulting_insights","provider":"bedrock","model":"us.anthropic.claude-opus-4-7-20260416-v1:0","input":{}}` → SWOT result
 
 ### Regression
 - [ ] No reference to `localhost:11434` in active code
 - [ ] No reference to Ollama in API responses
-- [ ] `/api/models` returns `["gpt-4.1","gpt-4.1-mini","gpt-4o"]` only
-- [ ] Currency rate source is fawazahmed0 (not static table) — check backend logs for "Rate BRL→USD: 0.19..."
+- [ ] All existing `/api/query` calls without `provider` field still work (defaults to "openai")
+- [ ] Currency rate source is fawazahmed0 (not static)
+- [ ] Skills system works for both providers without breaking changes

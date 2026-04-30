@@ -3,7 +3,7 @@
 A production-ready AI-powered document analysis and knowledge management platform.  
 Upload documents, query them using multiple LLMs, manage prompts and conversations, generate reports, and visualize data — all from a unified interface.
 
-This branch now uses API-based GPT models only. Local model execution through Ollama/Gemma has been removed from the active runtime path.
+This system supports **two AI providers**: OpenAI GPT (default) and AWS Bedrock (any model via the universal Converse API). Switch providers per-request with a single `"provider"` field. Any valid Bedrock model ID is accepted — not limited to a fixed list.
 
 ---
 
@@ -217,12 +217,88 @@ All configuration is managed via environment variables (`.env`). See `.env.examp
 | `CHUNK_SIZE` | `1000` | Document chunk size (chars) |
 | `TOP_K` | `5` | Number of chunks to retrieve |
 
+## Multi-Model Architecture
+
+### How provider routing works
+
+```
+API request  { "provider": "openai"|"bedrock", "model": "<model_id>", ... }
+                         │
+               LLMRouter.generate()
+                         │
+         ┌───────────────┴────────────────┐
+         ▼                                ▼
+   OpenAI GPT API                AWS Bedrock Converse API
+   (gpt-4o, gpt-4.1, …)         (ANY model ID accepted)
+```
+
+### OpenAI models
+
+| ID | Notes |
+|---|---|
+| `gpt-4o` | Fast; auto-selected for simple queries |
+| `gpt-4.1` | Higher reasoning; auto-selected for complex queries |
+| `gpt-4.1-mini` | Lightweight / low-latency |
+
+### AWS Bedrock models (default list — not an allowlist)
+
+Any valid Bedrock model ID works. Examples:
+
+| Example model_id | Provider | Notes |
+|---|---|---|
+| `amazon.nova-micro-v1:0` | Amazon | Fastest / cheapest |
+| `amazon.nova-lite-v1:0` | Amazon | Fast + multimodal |
+| `amazon.nova-pro-v1:0` | Amazon | Highest quality Nova |
+| `us.anthropic.claude-sonnet-4-5-20251203-v1:0` | Anthropic | Balanced |
+| `us.anthropic.claude-haiku-3-5-20241022-v1:0` | Anthropic | Fast |
+| `us.anthropic.claude-opus-4-5-20251101-v1:0` | Anthropic | Flagship |
+| `us.anthropic.claude-opus-4-7-20260416-v1:0` | Anthropic | Latest |
+| `us.meta.llama3-70b-instruct-v1:0` | Meta | Open weights |
+| `mistral.mistral-large-2402-v1:0` | Mistral | Strong reasoning |
+| `cohere.command-r-plus-v1:0` | Cohere | RAG-optimised |
+
+To use a model not in the list, simply pass its Bedrock model ID directly — no code change required.
+
+### Switching providers
+
+```bash
+# OpenAI (default)
+curl -X POST http://54.175.54.77:8000/api/query \
+  -H "Content-Type: application/json" \
+  -d '{"question":"Summarize","model":"gpt-4o","provider":"openai"}'
+
+# Bedrock — Amazon Nova Pro
+curl -X POST http://54.175.54.77:8000/api/query \
+  -H "Content-Type: application/json" \
+  -d '{"question":"Summarize","model":"amazon.nova-pro-v1:0","provider":"bedrock"}'
+
+# Bedrock — Claude Opus 4.7
+curl -X POST http://54.175.54.77:8000/api/query \
+  -H "Content-Type: application/json" \
+  -d '{"question":"Analyze financials","model":"us.anthropic.claude-opus-4-7-20260416-v1:0","provider":"bedrock"}'
+
+# Bedrock — any custom model ID
+curl -X POST http://54.175.54.77:8000/api/skills/run \
+  -H "Content-Type: application/json" \
+  -d '{"skill":"financial_analysis","provider":"bedrock","model":"<your-model-id>","input":{}}'
+```
+
+### Required environment variables
+
+```ini
+OPENAI_API_KEY=sk-...                  # For OpenAI provider
+AWS_ACCESS_KEY_ID=...                  # For Bedrock (same key as S3)
+AWS_SECRET_ACCESS_KEY=...
+AWS_REGION=us-east-1
+BEDROCK_DEFAULT_MODEL=amazon.nova-lite-v1:0   # Default when no model specified
+```
+
 ## Notes
 
-- The active backend runtime now uses only OpenAI GPT API models.
-- Local model execution paths such as Ollama and Gemma are disabled.
-- Internet/API access is required for chat, translation, report generation, and financial extraction.
-- The primary UI for this branch is the Next.js app in `frontend-nextjs`.
+- Bedrock requires IAM `bedrock:Converse` permission — see the Deployment Manual.
+- Any Bedrock model ID is accepted; the BEDROCK_DEFAULT_MODELS list is informational only.
+- Internet/API access required for all generation (both providers).
+- Frontend: use the **Provider** + **Model** dropdowns, or type any model ID in the custom field.
 
 ---
 

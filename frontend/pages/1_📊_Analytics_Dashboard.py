@@ -535,10 +535,90 @@ st.markdown(
 
 BACKEND_URL = "http://localhost:8000"
 
+# ── Provider + Model selector ─────────────────────────────
+_cfg_col1, _cfg_col2, _cfg_col3 = st.columns([1, 2, 2])
+
+with _cfg_col1:
+    _skill_provider = st.selectbox(
+        "Provider",
+        ["openai", "bedrock"],
+        key="skills_provider",
+        format_func=lambda p: "☁️ OpenAI" if p == "openai" else "🌩️ AWS Bedrock",
+    )
+
+with _cfg_col2:
+    _bedrock_dropdown_opts = [
+        "amazon.nova-lite-v1:0",
+        "amazon.nova-micro-v1:0",
+        "amazon.nova-pro-v1:0",
+        "us.anthropic.claude-sonnet-4-5-20251203-v1:0",
+        "us.anthropic.claude-haiku-3-5-20241022-v1:0",
+        "us.anthropic.claude-opus-4-5-20251101-v1:0",
+        "us.anthropic.claude-opus-4-7-20260416-v1:0",
+        "us.meta.llama3-70b-instruct-v1:0",
+        "us.meta.llama3-8b-instruct-v1:0",
+        "mistral.mistral-large-2402-v1:0",
+        "mistral.mixtral-8x7b-instruct-v0:1",
+        "cohere.command-r-plus-v1:0",
+        "[ Enter custom ID → ]",
+    ]
+    _openai_opts = ["auto", "gpt-4o", "gpt-4.1", "gpt-4.1-mini"]
+
+    if _skill_provider == "bedrock":
+        _skill_model_dd = st.selectbox(
+            "Bedrock Model",
+            _bedrock_dropdown_opts,
+            key="skills_model_dd",
+            format_func=lambda m: m.split(".")[-1].split(":")[0] if m != "[ Enter custom ID → ]" else m,
+            label_visibility="collapsed",
+        )
+    else:
+        _skill_model_dd = st.selectbox(
+            "OpenAI Model",
+            _openai_opts,
+            key="skills_openai_model",
+            label_visibility="collapsed",
+        )
+
+with _cfg_col3:
+    _custom_model_id = st.text_input(
+        "Custom Bedrock model ID (overrides dropdown)",
+        key="skills_custom_model",
+        placeholder="e.g. us.anthropic.claude-opus-4-7-20260416-v1:0",
+        label_visibility="collapsed",
+    ).strip()
+
+# Resolve effective model
+if _skill_provider == "bedrock":
+    _skill_model = (
+        _custom_model_id
+        if _custom_model_id
+        else (
+            _skill_model_dd
+            if _skill_model_dd != "[ Enter custom ID → ]"
+            else "amazon.nova-lite-v1:0"
+        )
+    )
+    if _custom_model_id:
+        st.info(f"Using custom Bedrock model: `{_custom_model_id}`")
+else:
+    _skill_model = _skill_model_dd
+
+st.caption(
+    f"**Active:** provider=`{_skill_provider}` · model=`{_skill_model}` — "
+    "any valid Bedrock model ID is accepted."
+)
+
+
 def _run_skill(skill_name: str, extra_input: dict | None = None) -> dict | None:
-    payload = {"skill": skill_name, "input": extra_input or {}}
+    payload = {
+        "skill": skill_name,
+        "input": extra_input or {},
+        "provider": _skill_provider,
+        "model": _skill_model,
+    }
     try:
-        resp = requests.post(f"{BACKEND_URL}/api/skills/run", json=payload, timeout=60)
+        resp = requests.post(f"{BACKEND_URL}/api/skills/run", json=payload, timeout=90)
         resp.raise_for_status()
         return resp.json().get("result", {})
     except requests.exceptions.ConnectionError:

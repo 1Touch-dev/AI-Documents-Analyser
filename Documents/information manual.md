@@ -18,18 +18,52 @@ The ingestion pipeline transforms unstructured text (like a messy PDF or a Power
 
 ---
 
-## 2. GPT API LLM Router
+## 2. Multi-Provider LLM Router
 
 Retrieval-Augmented Generation (RAG) forces the AI to answer based _only_ on evidence retrieved from uploaded documents, preventing hallucination.
 
-- **GPT-Only Architecture:** This branch routes **all** generation through the **OpenAI GPT API**. No local models (Ollama, Llama, Gemma) are used. An `OPENAI_API_KEY` environment variable is required.
-- **Model Registry:** Three production GPT models are available:
-  - `gpt-4o` — fast, cost-efficient; used for simple queries (auto-selected default)
-  - `gpt-4.1` — higher reasoning capacity; auto-selected for long or complex queries
-  - `gpt-4.1-mini` — lightweight option for low-latency use cases
-- **Legacy Alias Mapping:** If a request specifies an old model name (`llama3`, `gemma`, `mistral`, etc.), the `LLMRouter` silently remaps it to the closest GPT model so no request ever fails.
-- **Auto-Routing:** When model is set to `"auto"`, the router inspects the query length and keyword complexity to choose between `gpt-4o` (fast) and `gpt-4.1` (deep reasoning) automatically.
-- **Global Context Awareness:** Before answering, the system injects a dynamically generated index of every file currently in the knowledge base into the system prompt, so the model always knows what documents are available.
+### Provider Architecture
+
+Every API request carries a `provider` field (`"openai"` or `"bedrock"`). The `LLMRouter` dispatches accordingly:
+
+```
+Request { provider, model, messages }
+         │
+         LLMRouter.generate()
+         │
+   ┌─────┴──────┐
+   ▼            ▼
+OpenAI API   Bedrock Converse API
+(GPT-4o/4.1) (any model ID)
+```
+
+### OpenAI Provider
+
+- Routes through the OpenAI Chat Completions API.
+- Three registered models: `gpt-4o` (fast), `gpt-4.1` (reasoning), `gpt-4.1-mini` (lightweight).
+- **Auto-routing:** `model="auto"` selects `gpt-4o` for simple queries and `gpt-4.1` for complex ones (based on length + keyword heuristics).
+- **Legacy aliases:** old model names (`llama3`, `gemma`, etc.) are silently remapped to the nearest GPT equivalent.
+
+### AWS Bedrock Provider
+
+- Routes through the **AWS Bedrock Converse API** — one unified call for all model families.
+- **No allowlist:** any valid Bedrock model ID is accepted and passed straight through. Adding a new model requires zero code changes.
+- **Async-safe:** boto3 (synchronous) runs in `asyncio.to_thread()` to avoid blocking the FastAPI event loop.
+- **Cross-region inference profiles:** model IDs prefixed with `us.` use AWS's multi-region routing for higher availability.
+
+### When to use which model
+
+| Use Case | Recommended Model | Provider |
+|---|---|---|
+| Fast document Q&A | `gpt-4o` or `amazon.nova-micro-v1:0` | openai / bedrock |
+| Complex multi-document analysis | `gpt-4.1` or `us.anthropic.claude-opus-4-7-20260416-v1:0` | openai / bedrock |
+| Financial extraction | `gpt-4.1` or `amazon.nova-pro-v1:0` | openai / bedrock |
+| Cost-sensitive bulk processing | `gpt-4.1-mini` or `amazon.nova-micro-v1:0` | openai / bedrock |
+| RAG-optimised retrieval | `gpt-4o` or `cohere.command-r-plus-v1:0` | openai / bedrock |
+
+### Global Context Awareness
+
+Before answering, the system injects a dynamically generated index of every file currently in the knowledge base into the system prompt — regardless of which provider is used.
 
 ---
 

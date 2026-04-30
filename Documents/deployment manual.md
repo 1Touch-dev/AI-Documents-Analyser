@@ -36,8 +36,90 @@ sudo usermod -aG docker $USER
 ```
 
 ### Required External Accounts
-- **OpenAI API Key** — required for all GPT features (chat, translation, reports, financial extraction). Get one at [platform.openai.com](https://platform.openai.com).
-- **AWS S3 Bucket** — required for document storage. The system falls back to local disk when S3 is not configured (not recommended for production).
+- **OpenAI API Key** — required for all GPT features when using the OpenAI provider. Get one at [platform.openai.com](https://platform.openai.com).
+- **AWS Account** — required for S3 document storage **and** Bedrock multi-model generation. Both use the same IAM credentials.
+
+---
+
+## AWS Bedrock Setup
+
+### 1. Enable Model Access in the AWS Console
+
+1. Open [AWS Bedrock → Model Access](https://console.aws.amazon.com/bedrock/home#/modelaccess)
+2. Click **Manage model access** and enable:
+   - Anthropic (Claude Opus, Sonnet, Haiku)
+   - Amazon (Nova Micro, Lite, Pro)
+   - Meta (Llama 3)
+   - Mistral (Mistral Large, Mixtral)
+   - Cohere (Command R+)
+3. Wait 1–5 minutes for access to propagate.
+
+### 2. IAM Permissions
+
+Add this policy to the IAM user used by the platform:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Action": [
+      "bedrock:InvokeModel",
+      "bedrock:InvokeModelWithResponseStream",
+      "bedrock:Converse",
+      "bedrock:ConverseStream"
+    ],
+    "Resource": [
+      "arn:aws:bedrock:*::foundation-model/*",
+      "arn:aws:bedrock:*:*:inference-profile/*"
+    ]
+  }]
+}
+```
+
+> The same `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` used for S3 work for Bedrock — just attach the policy above.
+
+### 3. Environment Variables
+
+```ini
+AWS_ACCESS_KEY_ID=your_key
+AWS_SECRET_ACCESS_KEY=your_secret
+AWS_REGION=us-east-1
+BEDROCK_DEFAULT_MODEL=amazon.nova-lite-v1:0   # used when provider=bedrock and no model given
+AWS_BEARER_TOKEN_BEDROCK=                      # optional: for enterprise/SSO setups
+```
+
+### 4. Region Constraints
+
+- **Cross-region inference profiles** (model IDs prefixed `us.`) work in `us-east-1` and `us-west-2`.
+- Direct model IDs (e.g. `amazon.nova-lite-v1:0`) are region-specific — ensure you are in the correct region.
+- Recommended region: **us-east-1** (widest model availability).
+
+### 5. Using Custom / New Models
+
+No code change is needed. Pass the model ID directly in any API request:
+
+```bash
+curl -X POST http://localhost:8000/api/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "Summarize this document",
+    "provider": "bedrock",
+    "model": "us.anthropic.claude-opus-4-7-20260416-v1:0"
+  }'
+```
+
+The Converse API passes the `model` field straight through — any valid Bedrock model ID is accepted without updating a whitelist.
+
+### 6. Verify Bedrock Access
+
+```bash
+# Quick connectivity test via the platform API
+curl -X POST http://localhost:8000/api/skills/run \
+  -H "Content-Type: application/json" \
+  -d '{"skill":"report_generation","input":{},"provider":"bedrock","model":"amazon.nova-lite-v1:0"}'
+# Expected: {"skill":"report_generation","result":{...}}
+```
 
 ---
 

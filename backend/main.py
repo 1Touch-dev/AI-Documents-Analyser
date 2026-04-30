@@ -341,6 +341,7 @@ class UserLogin(BaseModel):
 class QueryRequest(BaseModel):
     question: str
     model: str = "auto"
+    provider: str = "openai"   # "openai" | "bedrock" — any Bedrock model ID accepted
     prompt_template: str | None = None
     top_k: int = 5
     temperature: float = 0.7
@@ -380,6 +381,7 @@ class ReportRequest(BaseModel):
     report_type: str = "general"
     output_format: str = "markdown"
     model: str = "auto"
+    provider: str = "openai"
     top_k: int = 10
     openai_api_key: str | None = None
     anthropic_api_key: str | None = None
@@ -387,6 +389,7 @@ class ReportRequest(BaseModel):
 
 class FinancialDashboardRequest(BaseModel):
     model: str = "auto"
+    provider: str = "openai"
     top_k: int = 24
     category: str | None = None
     openai_api_key: str | None = None
@@ -397,6 +400,8 @@ class FinancialDashboardRequest(BaseModel):
 class SkillRunRequest(BaseModel):
     skill: str = Field(..., description="Skill name: financial_analysis | report_generation | consulting_insights")
     input: dict[str, Any] = Field(default_factory=dict, description="Skill input payload")
+    provider: str = Field("openai", description="LLM provider: openai | bedrock")
+    model: str = Field("auto", description="Model name/ID. Any Bedrock model ID accepted when provider=bedrock")
 
 
 # ══════════════════════════════════════════════════════════
@@ -726,6 +731,7 @@ async def query_documents(
             result = await rag.query(
                 question=body.question,
                 model_name=body.model,
+                provider=body.provider,
                 prompt_template=body.prompt_template,
                 top_k=body.top_k,
                 temperature=body.temperature,
@@ -1339,7 +1345,12 @@ async def analytics_financial_dashboard(
         "anthropic_api_key": body.anthropic_api_key,
         "gemini_api_key": body.gemini_api_key,
     }
-    resolved_model = llm.resolve_model(body.model, "financial dashboard extraction", api_keys)
+    from backend.llm_router import _is_bedrock_provider
+    resolved_model = (
+        (body.model or "").strip() or settings.bedrock_default_model
+        if _is_bedrock_provider(body.provider)
+        else llm.resolve_model(body.model, "financial dashboard extraction", api_keys)
+    )
     try:
         raw_response = await llm.generate(
             model_name=resolved_model,
@@ -1356,6 +1367,7 @@ async def analytics_financial_dashboard(
             temperature=0.1,
             max_tokens=2048,
             api_keys=api_keys,
+            provider=body.provider,
         )
         dashboard = _normalize_financial_dashboard(_extract_json_object(raw_response))
     except Exception as exc:
@@ -1375,7 +1387,12 @@ async def analytics_financial_dashboard(
 @app.get("/api/models", tags=["Utility"])
 async def list_available_models():
     llm, *_ = _get_services()
-    return {"models": llm.list_models()}
+    return {
+        "models": llm.list_models(),          # backwards-compat: OpenAI only
+        "all_models": llm.list_all_models(),   # all providers
+        "providers": ["openai", "bedrock"],
+        "note": "For Bedrock, any valid model ID is accepted — not limited to the listed defaults.",
+    }
 
 
 @app.get("/api/detect_currency", tags=["Utility"])
@@ -1480,6 +1497,9 @@ async def run_skill(
 
     llm, *_ = _get_services()
     input_data = dict(body.input)
+    # Inject provider + model so skills can forward them to the LLM router
+    input_data.setdefault("provider", body.provider)
+    input_data.setdefault("model", body.model)
 
     # Auto-fetch context from vector store when caller does not supply text
     if not input_data.get("context") and not input_data.get("document_text"):
@@ -1502,7 +1522,7 @@ async def run_skill(
             logger.warning("Skills auto-context retrieval failed: %s", exc)
 
     try:
-        result = await route_skill(body.skill, input_data, llm)
+        result = await route_skill(body.skill, input_data, llm, provider=body.provider)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
