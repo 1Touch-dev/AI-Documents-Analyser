@@ -21,6 +21,7 @@ STEPS = [
     "collect_metrics",
     "generate_summary",
     "compile_report",
+    "generate_business_insight",
 ]
 
 OUTPUT_SCHEMA = {
@@ -70,10 +71,22 @@ async def run(
     model_used = report.pop("model_used", model)
     report.pop("skill", None)
 
+    from backend.services.insight_engine import generate_business_insight
+    business_insight = await generate_business_insight(
+        structured_data=report,
+        workflow_type="report",
+        llm_router=llm_router,
+        provider=provider,
+        model=model_used,
+        api_keys=api_keys,
+    )
+    completed_steps.append("generate_business_insight")
+
     return {
         "workflow": "report",
         "steps": completed_steps,
         "result": report,
+        "business_insight": business_insight,
         "model_used": model_used,
         "provider": provider,
     }

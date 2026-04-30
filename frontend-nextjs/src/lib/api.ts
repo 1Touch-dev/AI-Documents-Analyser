@@ -585,3 +585,49 @@ export type UserProfile = {
 export function getMe(token?: string) {
   return request<UserProfile>("/auth/me", { method: "GET" }, token);
 }
+
+// ── Business analysis ─────────────────────────────────────────────────────────
+
+export type BusinessInsight = {
+  summary: string;
+  key_findings: string[];
+  risks: string[];
+  recommendations: string[];
+};
+
+export type WorkflowResult = {
+  workflow: string;
+  steps: string[];
+  result: Record<string, unknown>;
+  business_insight?: BusinessInsight;
+  model_used: string;
+  provider: string;
+  duration_ms: number;
+};
+
+export type UnifiedAnalysis = {
+  analysis_type: string;
+  provider: string;
+  model: string;
+  workflows: Record<string, WorkflowResult>;
+  summary: Record<string, string>;
+};
+
+export function classifyWorkflow(query: string, token?: string) {
+  return request<{ workflow: string; query: string }>(
+    "/workflows/classify",
+    { method: "POST", body: JSON.stringify({ query }) },
+    token
+  );
+}
+
+export function runOneClickAnalysis(
+  payload: { provider?: string; model?: string; context?: string; openai_api_key?: string | null },
+  token?: string
+) {
+  return request<UnifiedAnalysis>(
+    "/workflows/analyze",
+    { method: "POST", body: JSON.stringify(payload) },
+    token
+  );
+}

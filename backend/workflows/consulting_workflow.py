@@ -21,6 +21,7 @@ STEPS = [
     "swot_analysis",
     "strategic_planning",
     "compile_output",
+    "generate_business_insight",
 ]
 
 OUTPUT_SCHEMA = {
@@ -72,10 +73,22 @@ async def run(
     model_used = insights.pop("model_used", model)
     insights.pop("skill", None)
 
+    from backend.services.insight_engine import generate_business_insight
+    business_insight = await generate_business_insight(
+        structured_data=insights,
+        workflow_type="consulting",
+        llm_router=llm_router,
+        provider=provider,
+        model=model_used,
+        api_keys=api_keys,
+    )
+    completed_steps.append("generate_business_insight")
+
     return {
         "workflow": "consulting",
         "steps": completed_steps,
         "result": insights,
+        "business_insight": business_insight,
         "model_used": model_used,
         "provider": provider,
     }

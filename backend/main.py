@@ -1592,6 +1592,91 @@ async def list_workflows_endpoint():
     return {"workflows": list_workflows()}
 
 
+# ── Natural language classifier ───────────────────────────────────────────────
+
+class ClassifyRequest(BaseModel):
+    query: str = Field(..., description="Natural language query to classify")
+
+
+@app.post("/api/workflows/classify", tags=["Workflows"])
+async def classify_workflow(body: ClassifyRequest):
+    """Classify a natural-language query to the best matching workflow."""
+    from backend.services.insight_engine import classify_query
+    workflow = classify_query(body.query)
+    return {"workflow": workflow, "query": body.query}
+
+
+# ── One-click analysis: runs all 3 workflows ──────────────────────────────────
+
+class AnalyzeRequest(BaseModel):
+    provider: str = Field("openai", description="LLM provider")
+    model: str = Field("auto", description="Model name/ID")
+    openai_api_key: str | None = None
+    context: str = Field("", description="Optional context text (uses vector store if omitted)")
+
+
+@app.post("/api/workflows/analyze", tags=["Workflows"])
+@limiter.limit("5/minute")
+async def one_click_analyze(
+    request: Request,
+    body: AnalyzeRequest,
+    user: User = Depends(require_auth),
+    db: Session = Depends(get_db),
+):
+    """
+    One-click business analysis: runs financial + consulting + report workflows
+    in sequence and returns a unified business report.
+    """
+    require_permission(user, "run_workflow")
+    llm, *_ = _get_services()
+    api_keys = {"openai_api_key": body.openai_api_key}
+    from backend.workflows.workflow_engine import run_workflow
+    from backend.utils.retry import with_retry, make_workflow_fallback
+
+    audit_log(db, "one_click_analyze", user=user, request=request,
+              detail={"provider": body.provider, "model": body.model})
+
+    input_data = {"context": body.context, "document_text": body.context}
+    results = {}
+    for wf in ("financial", "consulting", "report"):
+        try:
+            results[wf] = await with_retry(
+                run_workflow,
+                workflow_name=wf,
+                input_data=input_data,
+                llm_router=llm,
+                provider=body.provider,
+                model=body.model,
+                api_keys=api_keys,
+                max_retries=1,
+                timeout_s=90.0,
+                fallback=make_workflow_fallback(wf),
+            )
+        except Exception as exc:
+            logger.warning("One-click: workflow '%s' failed: %s", wf, exc)
+            results[wf] = make_workflow_fallback(wf)
+
+    # Cost tracking (bulk)
+    await log_usage_async(
+        db=db, provider=body.provider, model=body.model,
+        action="one_click_analyze",
+        prompt_text=body.context[:1000],
+        completion_text=str(results)[:3000],
+        user=user,
+    )
+
+    return {
+        "analysis_type": "unified_business_report",
+        "provider": body.provider,
+        "model": body.model,
+        "workflows": results,
+        "summary": {
+            wf: results[wf].get("business_insight", {}).get("summary", "")
+            for wf in results
+        },
+    }
+
+
 @app.post("/api/workflows/run", tags=["Workflows"])
 @limiter.limit(RL_WORKFLOW)
 async def run_workflow_endpoint(
@@ -1748,6 +1833,7 @@ class WebhookRequest(BaseModel):
     context: str = ""
     openai_api_key: str | None = None
     webhook_secret: str | None = None  # optional shared secret for n8n
+    schedule: str | None = None        # e.g. "daily" | "weekly" — metadata for n8n scheduling
 
 
 def _check_webhook_secret(provided: str | None) -> None:

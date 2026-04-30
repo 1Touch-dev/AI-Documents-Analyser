@@ -542,3 +542,80 @@ LLM calls wrap with:
 JWT_SECRET=<strong-secret-min-32-chars>
 WEBHOOK_SECRET=<shared-secret-for-n8n>   # optional
 ```
+
+---
+
+## Business Capabilities
+
+The platform is designed as a **decision system**, not just a data tool. Every output answers:
+1. **What happened?** — plain-English summary
+2. **Why does it matter?** — key findings with context
+3. **What should we do?** — specific, actionable recommendations
+
+### One-Click Business Analysis
+
+```bash
+# Run all 3 workflows (financial + consulting + report) in one API call
+POST /api/workflows/analyze
+{
+  "provider": "openai",
+  "model": "auto"
+}
+```
+
+Returns a unified business report with executive insights from all three perspectives.
+
+### Natural Language Entry
+
+```bash
+POST /api/workflows/classify
+{"query": "What is our profit margin and biggest cost driver?"}
+# → {"workflow": "financial"}
+```
+
+The system automatically routes to the correct workflow. Works in the UI via the search bar on the Workflows page.
+
+### Executive Dashboard
+
+Every workflow result includes a `business_insight` object:
+```json
+{
+  "summary":         "2-3 sentence plain-English executive overview",
+  "key_findings":    ["Revenue $4.2M, 3.2% ahead of budget", ...],
+  "risks":           ["Over-reliance on ticket revenue", ...],
+  "recommendations": ["Launch digital subscription platform", ...]
+}
+```
+
+This powers the **Executive View** in the UI — Insight Card → Findings → Risks → Actions.
+
+### Automated Workflows (n8n-ready)
+
+Webhooks accept a `schedule` field for n8n scheduling:
+```json
+POST /api/webhooks/financial
+{
+  "provider": "openai",
+  "model": "auto",
+  "schedule": "daily",
+  "context": "Optional context text"
+}
+```
+
+### Demo Mode
+
+Navigate to `/demo` in the frontend to see pre-loaded sample analysis for a sports organisation:
+- Financial performance with revenue/expense breakdown
+- SWOT consulting analysis with strategic actions
+- Executive report with KPIs and recommendations
+
+No documents needed — instant demonstration of AI output quality.
+
+### Frontend Pages
+
+| Page | URL | Purpose |
+|------|-----|---------|
+| Demo | `/demo` | Pre-loaded sample analysis |
+| Workflows | `/workflows` | Live AI analysis with NL entry + one-click |
+| Saved Reports | `/saved-reports` | Report history with export |
+| Usage & Audit | `/usage` | Cost tracking + security trail |

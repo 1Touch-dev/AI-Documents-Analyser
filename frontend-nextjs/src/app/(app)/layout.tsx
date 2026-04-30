@@ -19,10 +19,12 @@ import {
   Workflow,
   BookMarked,
   Activity,
+  PlayCircle,
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 
 const NAV_ITEMS = [
+  { href: "/demo", label: "Demo", icon: PlayCircle },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/chat", label: "Chat", icon: MessageCircle },
   { href: "/documents", label: "Documents", icon: Files },

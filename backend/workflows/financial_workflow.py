@@ -21,6 +21,7 @@ STEPS = [
     "extract_financials",
     "calculate_totals",
     "generate_insights",
+    "generate_business_insight",
 ]
 
 OUTPUT_SCHEMA = {
@@ -88,13 +89,25 @@ async def run(
     model_used = financial_data.pop("model_used", model)
     financial_data.pop("skill", None)
 
+    structured_result = {**financial_data, "totals": totals}
+
+    # ── Step 5: generate plain-English business insight ────────────────────────
+    from backend.services.insight_engine import generate_business_insight
+    business_insight = await generate_business_insight(
+        structured_data=structured_result,
+        workflow_type="financial",
+        llm_router=llm_router,
+        provider=provider,
+        model=model_used,
+        api_keys=api_keys,
+    )
+    completed_steps.append("generate_business_insight")
+
     return {
         "workflow": "financial",
         "steps": completed_steps,
-        "result": {
-            **financial_data,
-            "totals": totals,
-        },
+        "result": structured_result,
+        "business_insight": business_insight,
         "model_used": model_used,
         "provider": provider,
     }
