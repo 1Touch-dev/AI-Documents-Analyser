@@ -199,6 +199,7 @@ export default function ChatPage() {
     setTranslateToEnglish,
     targetCurrency,
     setTargetCurrency,
+    updatePrefs,
   } = useAppPreferences();
 
   // Resolve the effective model sent to the backend
@@ -607,9 +608,12 @@ export default function ChatPage() {
                       <select
                         value={selectedProvider}
                         onChange={(e) => {
-                          setSelectedProvider(e.target.value);
-                          setBedrockCustomModel("");
-                          setSelectedModel(e.target.value === "bedrock" ? "amazon.nova-lite-v1:0" : "auto");
+                          const p = e.target.value;
+                          updatePrefs({
+                            selectedProvider: p,
+                            selectedModel: p === "bedrock" ? "amazon.nova-lite-v1:0" : "auto",
+                            bedrockCustomModel: "",
+                          });
                         }}
                         className="mt-1 w-full rounded-lg border border-white/20 bg-slate-950/60 px-3 py-2 text-sm text-white"
                       >

@@ -37,6 +37,9 @@ type AppPreferencesContextValue = AppPreferences & {
   setGeminiApiKey: (value: string) => void;
   setTranslateToEnglish: (value: boolean) => void;
   setTargetCurrency: (value: string) => void;
+  // Atomic multi-field update — avoids stale-closure overwrite when several
+  // fields must change together (e.g. switching provider resets model too).
+  updatePrefs: (patch: Partial<AppPreferences>) => void;
 };
 
 const STORAGE_KEY = "akp_preferences";
@@ -99,6 +102,7 @@ export function AppPreferencesProvider({ children }: { children: React.ReactNode
   const value = useMemo<AppPreferencesContextValue>(
     () => ({
       ...prefs,
+      updatePrefs: (patch: Partial<AppPreferences>) => persist({ ...prefs, ...patch }),
       setSelectedProvider: (selectedProvider) => persist({ ...prefs, selectedProvider }),
       setSelectedModel: (selectedModel) => persist({ ...prefs, selectedModel }),
       setBedrockCustomModel: (bedrockCustomModel) => persist({ ...prefs, bedrockCustomModel }),

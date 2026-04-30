@@ -989,7 +989,7 @@ export default function AnalyticsPage() {
             AI Provider
             <select
               value={skillProvider}
-              onChange={(e) => { setSkillProvider(e.target.value); setSkillBedrockCustom(""); setSkillModel(e.target.value === "bedrock" ? "amazon.nova-lite-v1:0" : "auto"); }}
+              onChange={(e) => { const p = e.target.value; setSkillProvider(p); setSkillModel(p === "bedrock" ? "amazon.nova-lite-v1:0" : "auto"); setSkillBedrockCustom(""); }}
               className="mt-1 w-full rounded-lg border border-white/20 bg-slate-950/60 px-3 py-2 text-sm text-white"
             >
               <option value="openai">☁️  OpenAI  (GPT-4o / GPT-4.1)</option>
