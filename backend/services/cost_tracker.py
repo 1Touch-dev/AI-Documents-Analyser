@@ -178,6 +178,7 @@ def get_usage_summary(db, user=None, days: int = 30) -> dict:
             "total_requests": len(records),
             "total_tokens": total_tokens,
             "total_cost_usd": round(total_cost, 4),
+            "cost_type": "estimated",  # token counts are character-length approximations
             "by_model": {k: {**v, "cost": round(v["cost"], 4)} for k, v in by_model.items()},
         }
     except Exception as exc:

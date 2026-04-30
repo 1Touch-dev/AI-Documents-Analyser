@@ -83,7 +83,7 @@ export default function UsagePage() {
           {[
             { label: "Total Requests", value: summary.total_requests.toLocaleString(), icon: Activity, color: "text-cyan-300" },
             { label: "Total Tokens", value: summary.total_tokens.toLocaleString(), icon: Zap, color: "text-indigo-300" },
-            { label: "Est. Cost (USD)", value: `$${summary.total_cost_usd.toFixed(4)}`, icon: DollarSign, color: "text-emerald-300" },
+            { label: "Est. Cost (USD) ¹", value: `$${summary.total_cost_usd.toFixed(4)}`, icon: DollarSign, color: "text-emerald-300" },
             { label: "Period", value: `${summary.period_days} days`, icon: Clock, color: "text-slate-300" },
           ].map(({ label, value, icon: Icon, color }) => (
             <article key={label} className="rounded-2xl border border-white/15 bg-white/5 p-4">
@@ -130,6 +130,13 @@ export default function UsagePage() {
 
       {summary && Object.keys(summary.by_model).length === 0 && !loadingSum && (
         <p className="text-sm text-slate-400">No LLM usage recorded yet. Run a workflow or skill to generate data.</p>
+      )}
+
+      {summary && (
+        <p className="text-xs text-slate-500">
+          ¹ <strong className="text-slate-400">Estimated cost</strong> — token counts are approximated from response
+          character length (~4 chars/token). Actual API costs may differ slightly.
+        </p>
       )}
 
       {/* Audit log */}

@@ -511,6 +511,7 @@ export type UsageSummary = {
   total_requests: number;
   total_tokens: number;
   total_cost_usd: number;
+  cost_type: "estimated" | "exact";
   by_model: Record<string, { requests: number; tokens: number; cost: number }>;
 };
 

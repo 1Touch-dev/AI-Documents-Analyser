@@ -61,6 +61,11 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 1440  # 24 h
 
+    # ── Webhooks ─────────────────────────────────────────
+    # Required in production: all /api/webhooks/* calls must supply this via
+    # the x-webhook-secret header. Startup logs a WARNING if not set.
+    webhook_secret: str = ""
+
     # ── Rate Limiting ────────────────────────────────────
     rate_limit: str = "60/minute"
 

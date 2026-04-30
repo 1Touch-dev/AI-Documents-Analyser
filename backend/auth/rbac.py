@@ -51,7 +51,8 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "query_documents",
     },
     "viewer": {
-        "view_reports", "view_usage", "query_documents",
+        "view_reports", "view_usage",
+        # viewer cannot query documents — read-only access to saved reports and usage stats only
     },
 }
 

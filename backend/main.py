@@ -278,6 +278,12 @@ def _extract_storage_doc_ids(db: Session) -> set[str]:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting AI Knowledge Platform …")
+    if not settings.webhook_secret:
+        logger.warning(
+            "SECURITY WARNING: WEBHOOK_SECRET is not set. "
+            "Webhook endpoints (/api/webhooks/*) are unauthenticated. "
+            "Set WEBHOOK_SECRET in .env before exposing this service publicly."
+        )
     try:
         init_db()
         logger.info("Database tables ensured.")
@@ -703,8 +709,10 @@ async def query_documents(
     request: Request,
     body: QueryRequest,
     db: Session = Depends(get_db),
+    user: User = Depends(require_auth),
 ):
-    """Send a question through the RAG pipeline with Redis caching."""
+    """Send a question through the RAG pipeline with Redis caching. Requires query_documents permission."""
+    require_permission(user, "query_documents")
     _, rag, _, _, _ = _get_services()
     cache = get_cache_service()
     target_currency = (body.target_currency or "BRL").upper()
@@ -1832,21 +1840,30 @@ class WebhookRequest(BaseModel):
     document_text: str = ""
     context: str = ""
     openai_api_key: str | None = None
-    webhook_secret: str | None = None  # optional shared secret for n8n
     schedule: str | None = None        # e.g. "daily" | "weekly" — metadata for n8n scheduling
 
 
-def _check_webhook_secret(provided: str | None) -> None:
-    """If WEBHOOK_SECRET is set in settings, enforce it."""
-    expected = getattr(settings, "webhook_secret", None)
-    if expected and expected != provided:
-        raise HTTPException(status_code=403, detail="Invalid webhook secret.")
+def _verify_webhook_secret(request: Request) -> None:
+    """
+    Enforce webhook authentication via the x-webhook-secret header.
+    - If WEBHOOK_SECRET is configured in settings: the header MUST be present
+      and match exactly → 401 on any mismatch or absence.
+    - If WEBHOOK_SECRET is not configured: log a startup warning (logged once
+      at app start) and allow the request through so dev environments work.
+    """
+    expected = settings.webhook_secret
+    if not expected:
+        # Already warned at startup; permissive in dev, not recommended in prod.
+        return
+    provided = request.headers.get("x-webhook-secret", "")
+    if not provided or provided != expected:
+        raise HTTPException(status_code=401, detail="Unauthorized: invalid or missing x-webhook-secret header.")
 
 
 @app.post("/api/webhooks/financial", tags=["Webhooks"])
-async def webhook_financial(body: WebhookRequest, db: Session = Depends(get_db)):
-    """n8n-ready webhook — financial workflow."""
-    _check_webhook_secret(body.webhook_secret)
+async def webhook_financial(request: Request, body: WebhookRequest, db: Session = Depends(get_db)):
+    """n8n-ready webhook — financial workflow. Requires x-webhook-secret header."""
+    _verify_webhook_secret(request)
     llm, *_ = _get_services()
     from backend.workflows.workflow_engine import run_workflow
     try:
@@ -1865,9 +1882,9 @@ async def webhook_financial(body: WebhookRequest, db: Session = Depends(get_db))
 
 
 @app.post("/api/webhooks/consulting", tags=["Webhooks"])
-async def webhook_consulting(body: WebhookRequest, db: Session = Depends(get_db)):
-    """n8n-ready webhook — consulting workflow."""
-    _check_webhook_secret(body.webhook_secret)
+async def webhook_consulting(request: Request, body: WebhookRequest, db: Session = Depends(get_db)):
+    """n8n-ready webhook — consulting workflow. Requires x-webhook-secret header."""
+    _verify_webhook_secret(request)
     llm, *_ = _get_services()
     from backend.workflows.workflow_engine import run_workflow
     try:
@@ -1886,9 +1903,9 @@ async def webhook_consulting(body: WebhookRequest, db: Session = Depends(get_db)
 
 
 @app.post("/api/webhooks/report", tags=["Webhooks"])
-async def webhook_report(body: WebhookRequest, db: Session = Depends(get_db)):
-    """n8n-ready webhook — report workflow."""
-    _check_webhook_secret(body.webhook_secret)
+async def webhook_report(request: Request, body: WebhookRequest, db: Session = Depends(get_db)):
+    """n8n-ready webhook — report workflow. Requires x-webhook-secret header."""
+    _verify_webhook_secret(request)
     llm, *_ = _get_services()
     from backend.workflows.workflow_engine import run_workflow
     try:
