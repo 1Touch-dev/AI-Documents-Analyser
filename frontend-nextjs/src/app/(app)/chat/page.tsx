@@ -183,8 +183,12 @@ const mdComponents = {
 export default function ChatPage() {
   const { token } = useAuth();
   const {
+    selectedProvider,
+    setSelectedProvider,
     selectedModel,
     setSelectedModel,
+    bedrockCustomModel,
+    setBedrockCustomModel,
     selectedCategory,
     setSelectedCategory,
     selectedPromptTemplate,
@@ -196,6 +200,12 @@ export default function ChatPage() {
     targetCurrency,
     setTargetCurrency,
   } = useAppPreferences();
+
+  // Resolve the effective model sent to the backend
+  const effectiveModel =
+    selectedProvider === "bedrock" && bedrockCustomModel.trim()
+      ? bedrockCustomModel.trim()
+      : selectedModel || "auto";
 
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState<
@@ -336,7 +346,8 @@ export default function ChatPage() {
       const result = await queryDocuments(
         {
           question: currentQuestion,
-          model: selectedModel || "auto",
+          model: effectiveModel,
+          provider: selectedProvider,
           category: selectedCategory || null,
           prompt_template: selectedPromptTemplate || undefined,
           openai_api_key: openaiApiKey || null,
@@ -479,7 +490,10 @@ export default function ChatPage() {
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/15 bg-white/5 p-3">
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-slate-300">
-                Model: {selectedModel || "auto"}
+                {selectedProvider === "bedrock" ? "🌩️ Bedrock" : "☁️ OpenAI"}
+              </span>
+              <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-slate-300">
+                Model: {effectiveModel}
               </span>
               <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-slate-300">
                 Category: {selectedCategory || "general"}
@@ -587,18 +601,78 @@ export default function ChatPage() {
                   <div className="space-y-3">
                     <h4 className="text-sm font-semibold text-white">Query Controls</h4>
 
+                    {/* Provider selector */}
                     <label className="block text-xs text-slate-300">
-                      Model
+                      AI Provider
                       <select
-                        value={selectedModel}
-                        onChange={(e) => setSelectedModel(e.target.value)}
+                        value={selectedProvider}
+                        onChange={(e) => {
+                          setSelectedProvider(e.target.value);
+                          setBedrockCustomModel("");
+                          setSelectedModel(e.target.value === "bedrock" ? "amazon.nova-lite-v1:0" : "auto");
+                        }}
                         className="mt-1 w-full rounded-lg border border-white/20 bg-slate-950/60 px-3 py-2 text-sm text-white"
                       >
-                        {models.map((model) => (
-                          <option key={model} value={model}>{model}</option>
-                        ))}
+                        <option value="openai">☁️  OpenAI  (GPT-4o / GPT-4.1)</option>
+                        <option value="bedrock">🌩️  AWS Bedrock  (Claude · Nova · Llama · Mistral · Cohere)</option>
                       </select>
                     </label>
+
+                    {/* Model selector — changes based on provider */}
+                    {selectedProvider === "openai" ? (
+                      <label className="block text-xs text-slate-300">
+                        Model
+                        <select
+                          value={selectedModel}
+                          onChange={(e) => setSelectedModel(e.target.value)}
+                          className="mt-1 w-full rounded-lg border border-white/20 bg-slate-950/60 px-3 py-2 text-sm text-white"
+                        >
+                          {["auto", "gpt-4o", "gpt-4.1", "gpt-4.1-mini"].map((m) => (
+                            <option key={m} value={m}>{m === "auto" ? "auto · smart routing (Recommended)" : m}</option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : (
+                      <>
+                        <label className="block text-xs text-slate-300">
+                          Bedrock Model
+                          <select
+                            value={selectedModel}
+                            onChange={(e) => { setSelectedModel(e.target.value); setBedrockCustomModel(""); }}
+                            className="mt-1 w-full rounded-lg border border-white/20 bg-slate-950/60 px-3 py-2 text-sm text-white"
+                          >
+                            <option value="amazon.nova-lite-v1:0">Nova Lite · Amazon (fast + multimodal)</option>
+                            <option value="amazon.nova-micro-v1:0">Nova Micro · Amazon (fastest / cheapest)</option>
+                            <option value="amazon.nova-pro-v1:0">Nova Pro · Amazon (highest quality)</option>
+                            <option value="us.anthropic.claude-sonnet-4-5-20251203-v1:0">Claude Sonnet 4.6 · Anthropic (balanced)</option>
+                            <option value="us.anthropic.claude-haiku-3-5-20241022-v1:0">Claude Haiku · Anthropic (fast)</option>
+                            <option value="us.anthropic.claude-opus-4-5-20251101-v1:0">Claude Opus 4.6 · Anthropic (flagship)</option>
+                            <option value="us.anthropic.claude-opus-4-7-20260416-v1:0">Claude Opus 4.7 · Anthropic (latest)</option>
+                            <option value="us.meta.llama3-70b-instruct-v1:0">Llama 3 70B · Meta</option>
+                            <option value="us.meta.llama3-8b-instruct-v1:0">Llama 3 8B · Meta</option>
+                            <option value="mistral.mistral-large-2402-v1:0">Mistral Large · Mistral AI</option>
+                            <option value="mistral.mixtral-8x7b-instruct-v0:1">Mixtral 8×7B · Mistral AI</option>
+                            <option value="cohere.command-r-plus-v1:0">Command R+ · Cohere (RAG-optimised)</option>
+                          </select>
+                        </label>
+                        <label className="block text-xs text-slate-300">
+                          Custom Bedrock Model ID
+                          <span className="ml-1 text-slate-500">(overrides dropdown — any model ID accepted)</span>
+                          <input
+                            type="text"
+                            value={bedrockCustomModel}
+                            onChange={(e) => setBedrockCustomModel(e.target.value)}
+                            placeholder="e.g. us.anthropic.claude-opus-4-7-20260416-v1:0"
+                            className="mt-1 w-full rounded-lg border border-cyan-500/30 bg-slate-950/60 px-3 py-2 text-sm text-cyan-100 placeholder-slate-500"
+                          />
+                          {bedrockCustomModel.trim() && (
+                            <p className="mt-1 text-[11px] text-cyan-400">
+                              ✓ Using custom model: {bedrockCustomModel.trim()}
+                            </p>
+                          )}
+                        </label>
+                      </>
+                    )}
 
                     <label className="block text-xs text-slate-300">
                       Category
