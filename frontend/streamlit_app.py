@@ -212,6 +212,7 @@ for key, default in {
     "username": "",
     "session_id": None,
     "chat_messages": [],
+    "selected_provider": "openai",
     "selected_model": "auto",
     "selected_prompt": None,
     "selected_category": None,
@@ -563,23 +564,69 @@ with st.sidebar:
 
     st.markdown("---")
 
-    # ── Model Selection ──────────────────────────────────
-    st.markdown("#### 🤖 Model")
-    model_options = ["auto", "llama3.2", "tinyllama", "llama3", "mistral", "mixtral", "gemma", "gpt-5.4", "o3-mini", "claude-4.6-sonnet", "claude-4.6-opus", "gemini-3.1-pro", "gemini-3-flash", "gemini-3.1-flash"]
+    # ── Provider + Model Selection ────────────────────────
+    st.markdown("#### 🤖 AI Provider & Model")
 
-    def format_model_label(m):
-        if m == "auto": return "auto (Recommended)"
-        if m in ["llama3.2", "tinyllama"]: return f"{m} (Ready)"
-        if m in ["llama3", "mistral", "mixtral", "gemma"]: return f"{m} (Uses GPT API — cloud model)"
-        return f"{m} (Requires API Key)"
-
-    st.session_state.selected_model = st.selectbox(
-        "Select LLM",
-        model_options,
-        index=0,
-        format_func=format_model_label,
-        label_visibility="collapsed",
+    st.session_state.selected_provider = st.selectbox(
+        "Provider",
+        ["openai", "bedrock"],
+        index=0 if st.session_state.selected_provider == "openai" else 1,
+        format_func=lambda p: "☁️ OpenAI (GPT)" if p == "openai" else "🌩️ AWS Bedrock (Claude / Nova / Llama)",
     )
+
+    _openai_opts = ["auto", "gpt-4o", "gpt-4.1", "gpt-4.1-mini"]
+    _bedrock_opts = [
+        "nova-lite", "nova-micro", "nova-pro",
+        "claude-sonnet-4.6", "claude-haiku",
+        "claude-opus-4.6", "claude-opus-4.7",
+        "llama3-70b", "llama3-8b",
+        "mistral-large", "mixtral-8x7b",
+        "cohere-command-r+",
+    ]
+    _bedrock_labels = {
+        "nova-lite":         "Nova Lite (Amazon · fast + cheap)",
+        "nova-micro":        "Nova Micro (Amazon · fastest)",
+        "nova-pro":          "Nova Pro (Amazon · highest quality)",
+        "claude-sonnet-4.6": "Claude Sonnet 4.6 (Anthropic · balanced)",
+        "claude-haiku":      "Claude Haiku (Anthropic · fast)",
+        "claude-opus-4.6":   "Claude Opus 4.6 (Anthropic · flagship)",
+        "claude-opus-4.7":   "Claude Opus 4.7 (Anthropic · latest)",
+        "llama3-70b":        "Llama 3 70B (Meta · open weights)",
+        "llama3-8b":         "Llama 3 8B (Meta · lightweight)",
+        "mistral-large":     "Mistral Large (Mistral AI)",
+        "mixtral-8x7b":      "Mixtral 8x7B (Mistral AI · MoE)",
+        "cohere-command-r+": "Command R+ (Cohere · RAG-optimised)",
+    }
+
+    if st.session_state.selected_provider == "bedrock":
+        model_opts = _bedrock_opts
+        def _fmt_bedrock(m): return _bedrock_labels.get(m, m)
+        # Reset to nova-lite if coming from openai
+        if st.session_state.selected_model not in _bedrock_opts:
+            st.session_state.selected_model = "nova-lite"
+        st.session_state.selected_model = st.selectbox(
+            "Bedrock Model",
+            model_opts,
+            index=model_opts.index(st.session_state.selected_model)
+                  if st.session_state.selected_model in model_opts else 0,
+            format_func=_fmt_bedrock,
+            label_visibility="collapsed",
+        )
+    else:
+        model_opts = _openai_opts
+        def _fmt_openai(m):
+            if m == "auto": return "auto · smart routing (Recommended)"
+            return m
+        if st.session_state.selected_model not in _openai_opts:
+            st.session_state.selected_model = "auto"
+        st.session_state.selected_model = st.selectbox(
+            "OpenAI Model",
+            model_opts,
+            index=model_opts.index(st.session_state.selected_model)
+                  if st.session_state.selected_model in model_opts else 0,
+            format_func=_fmt_openai,
+            label_visibility="collapsed",
+        )
 
     st.markdown("---")
 
@@ -661,6 +708,7 @@ with tab_chat:
             payload = {
                 "question": question,
                 "model": st.session_state.selected_model,
+                "provider": st.session_state.selected_provider,
                 "top_k": 5,
                 "temperature": 0.7,
                 "category": st.session_state.selected_category,

@@ -45,6 +45,7 @@ async def generate_consulting_insights(
     llm_router: Any,
     model: str = "auto",
     api_keys: dict[str, str | None] | None = None,
+    provider: str = "openai",
 ) -> dict[str, Any]:
     """
     Provide consulting-style strategic insights from document context.
@@ -60,8 +61,9 @@ async def generate_consulting_insights(
     if not context or not context.strip():
         return _empty_result("No context provided.")
 
-    resolved_model = llm_router.resolve_model(
-        model, "analyze strategy recommend comprehensive", api_keys
+    resolved_model = (
+        model if provider == "bedrock"
+        else llm_router.resolve_model(model, "analyze strategy recommend comprehensive", api_keys)
     )
     prompt = _build_prompt(context)
 
@@ -75,6 +77,7 @@ async def generate_consulting_insights(
             temperature=0.3,
             max_tokens=2048,
             api_keys=api_keys,
+            provider=provider,
         )
         result = _parse_json(raw)
         result["model_used"] = resolved_model

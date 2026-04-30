@@ -39,6 +39,7 @@ async def generate_report(
     llm_router: Any,
     model: str = "auto",
     api_keys: dict[str, str | None] | None = None,
+    provider: str = "openai",
 ) -> dict[str, Any]:
     """
     Generate a structured business report from document context.
@@ -54,7 +55,10 @@ async def generate_report(
     if not context or not context.strip():
         return _empty_result("No context provided.")
 
-    resolved_model = llm_router.resolve_model(model, "generate report comprehensive", api_keys)
+    resolved_model = (
+        model if provider == "bedrock"
+        else llm_router.resolve_model(model, "generate report comprehensive", api_keys)
+    )
     prompt = _build_prompt(context)
 
     try:
@@ -67,6 +71,7 @@ async def generate_report(
             temperature=0.2,
             max_tokens=2048,
             api_keys=api_keys,
+            provider=provider,
         )
         result = _parse_json(raw)
         result["model_used"] = resolved_model

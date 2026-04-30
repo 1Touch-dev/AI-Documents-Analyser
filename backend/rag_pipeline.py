@@ -122,6 +122,7 @@ class RAGPipeline:
         self,
         question: str,
         model_name: str = "auto",
+        provider: str = "openai",
         prompt_template: str | None = None,
         top_k: int | None = None,
         temperature: float = 0.7,
@@ -138,8 +139,11 @@ class RAGPipeline:
         """
         k = top_k or settings.top_k
 
-        # 1. Resolve model
-        resolved_model = self.llm.resolve_model(model_name, question, api_keys)
+        # 1. Resolve model (Bedrock models are passed through as-is)
+        if provider == "bedrock":
+            resolved_model = model_name
+        else:
+            resolved_model = self.llm.resolve_model(model_name, question, api_keys)
 
         # 2. Embed the query
         query_embedding = self.embedder.embed_query(question)
@@ -204,6 +208,7 @@ class RAGPipeline:
             messages=messages,
             temperature=temperature,
             api_keys=api_keys,
+            provider=provider,
         )
 
         logger.info(

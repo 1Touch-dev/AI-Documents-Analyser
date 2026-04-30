@@ -3,7 +3,7 @@
 A production-ready AI-powered document analysis and knowledge management platform.  
 Upload documents, query them using multiple LLMs, manage prompts and conversations, generate reports, and visualize data — all from a unified interface.
 
-This branch now uses API-based GPT models only. Local model execution through Ollama/Gemma has been removed from the active runtime path.
+This system supports **two AI provider backends**: OpenAI GPT (default) and AWS Bedrock (Claude, Nova, Llama, Mistral, Cohere). Switch providers per-request with a single `"provider"` field.
 
 ---
 
@@ -217,12 +217,80 @@ All configuration is managed via environment variables (`.env`). See `.env.examp
 | `CHUNK_SIZE` | `1000` | Document chunk size (chars) |
 | `TOP_K` | `5` | Number of chunks to retrieve |
 
+## Multi-Model System
+
+The platform routes AI generation through two providers. Switch with the `provider` field in any API request.
+
+### OpenAI Provider (default)
+
+| Model | ID | Use Case |
+|---|---|---|
+| GPT-4o | `gpt-4o` | Fast, cost-efficient (auto-default for simple queries) |
+| GPT-4.1 | `gpt-4.1` | Higher reasoning (auto-selected for complex queries) |
+| GPT-4.1-mini | `gpt-4.1-mini` | Lightweight, low-latency |
+
+### AWS Bedrock Provider
+
+All calls use the Bedrock **Converse API** — one unified interface for all model families.
+
+| Friendly Name | Provider | Notes |
+|---|---|---|
+| `nova-micro` | Amazon | Fastest + cheapest |
+| `nova-lite` | Amazon | Fast + multimodal |
+| `nova-pro` | Amazon | Highest quality Nova |
+| `claude-sonnet-4.6` | Anthropic | Balanced performance |
+| `claude-haiku` | Anthropic | Fast responses |
+| `claude-opus-4.6` | Anthropic | High reasoning |
+| `claude-opus-4.7` | Anthropic | Latest flagship |
+| `llama3-70b` | Meta | Open weights, 70B |
+| `llama3-8b` | Meta | Open weights, lightweight |
+| `mistral-large` | Mistral | Strong reasoning |
+| `mixtral-8x7b` | Mistral | MoE efficiency |
+| `cohere-command-r+` | Cohere | RAG-optimised |
+
+### Switching Providers
+
+**Chat query via API:**
+```bash
+# OpenAI (default)
+curl -X POST http://localhost:8000/api/query \
+  -d '{"question":"Summarize","model":"gpt-4o","provider":"openai"}'
+
+# AWS Bedrock — Claude Sonnet
+curl -X POST http://localhost:8000/api/query \
+  -d '{"question":"Summarize","model":"claude-sonnet-4.6","provider":"bedrock"}'
+
+# AWS Bedrock — Amazon Nova Pro
+curl -X POST http://localhost:8000/api/query \
+  -d '{"question":"Summarize","model":"nova-pro","provider":"bedrock"}'
+```
+
+**Skills with Bedrock:**
+```bash
+curl -X POST http://localhost:8000/api/skills/run \
+  -d '{"skill":"financial_analysis","input":{},"provider":"bedrock"}'
+```
+
+**UI:** Use the **Provider** and **Model** dropdowns in the sidebar (chat) or the Skills Workbench (analytics page).
+
+### Required Environment Variables
+
+```ini
+# OpenAI
+OPENAI_API_KEY=sk-...
+
+# AWS Bedrock (same IAM key as S3)
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+AWS_REGION=us-east-1
+BEDROCK_DEFAULT_MODEL=nova-lite
+```
+
 ## Notes
 
-- The active backend runtime now uses only OpenAI GPT API models.
-- Local model execution paths such as Ollama and Gemma are disabled.
-- Internet/API access is required for chat, translation, report generation, and financial extraction.
-- The primary UI for this branch is the Next.js app in `frontend-nextjs`.
+- Bedrock requires IAM permissions for `bedrock:Converse` — see the Deployment Manual.
+- Internet/API access is required for all AI generation (both providers).
+- The primary UI is the Streamlit app in `frontend/`.
 
 ---
 

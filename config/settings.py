@@ -33,6 +33,13 @@ class Settings(BaseSettings):
     aws_region: str = "us-east-1"
     s3_bucket_name: str = "ai-knowledge-platform-docs"
 
+    # ── AWS Bedrock ──────────────────────────────────────
+    # No extra key needed — uses aws_access_key_id / aws_secret_access_key above.
+    # AWS_BEDROCK_API is available in .env for bearer-token auth if required.
+    aws_bedrock_api: str = ""
+    bedrock_default_model: str = "nova-lite"
+    bedrock_enabled: bool = True
+
     # ── LLM Keys ────────────────────────────────────────
     openai_api_key: str = ""
 

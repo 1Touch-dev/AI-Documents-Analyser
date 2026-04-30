@@ -37,7 +37,97 @@ sudo usermod -aG docker $USER
 
 ### Required External Accounts
 - **OpenAI API Key** — required for all GPT features (chat, translation, reports, financial extraction). Get one at [platform.openai.com](https://platform.openai.com).
-- **AWS S3 Bucket** — required for document storage. The system falls back to local disk when S3 is not configured (not recommended for production).
+- **AWS Account** — required for S3 document storage **and** Bedrock multi-model access. The system falls back to local disk when S3 is not configured (not recommended for production).
+
+---
+
+## AWS Bedrock Setup
+
+### 1. Enable Bedrock Model Access
+
+AWS Bedrock models must be explicitly enabled per AWS account before they can be called.
+
+1. Open the [AWS Bedrock console](https://console.aws.amazon.com/bedrock/)
+2. Navigate to **Model Access** → **Manage model access**
+3. Enable the following model families:
+   - ✅ **Anthropic** — Claude Opus 4.x, Sonnet 4.x, Haiku
+   - ✅ **Amazon** — Nova Micro, Nova Lite, Nova Pro
+   - ✅ **Meta** — Llama 3 (8B, 70B)
+   - ✅ **Mistral** — Mistral Large, Mixtral 8x7B
+   - ✅ **Cohere** — Command R+
+4. Wait 1–5 minutes for access to propagate.
+
+### 2. Required IAM Permissions
+
+Attach the following policy to the IAM user / role used by the platform:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "BedrockConverse",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock:InvokeModel",
+        "bedrock:InvokeModelWithResponseStream",
+        "bedrock:Converse",
+        "bedrock:ConverseStream"
+      ],
+      "Resource": [
+        "arn:aws:bedrock:*::foundation-model/*",
+        "arn:aws:bedrock:*:*:inference-profile/*"
+      ]
+    }
+  ]
+}
+```
+
+The same `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` used for S3 can be used for Bedrock — just add the policy above to the same IAM user.
+
+### 3. Environment Variables for Bedrock
+
+Add to your `.env`:
+
+```ini
+# ── AWS Bedrock ───────────────────────────────────────────
+AWS_ACCESS_KEY_ID=your_aws_access_key        # same key as S3
+AWS_SECRET_ACCESS_KEY=your_aws_secret_key    # same key as S3
+AWS_REGION=us-east-1                          # Bedrock region (us-east-1 recommended)
+BEDROCK_DEFAULT_MODEL=nova-lite               # default model when provider=bedrock
+```
+
+### 4. Verify Bedrock Access
+
+```bash
+# From the server, test with AWS CLI:
+aws bedrock-runtime converse \
+  --model-id amazon.nova-lite-v1:0 \
+  --messages '[{"role":"user","content":[{"text":"Hello"}]}]' \
+  --region us-east-1
+
+# Or via the platform API:
+curl -X POST http://localhost:8000/api/skills/run \
+  -H "Content-Type: application/json" \
+  -d '{"skill":"report_generation","input":{},"provider":"bedrock"}'
+```
+
+### 5. Supported Bedrock Models
+
+| Friendly Name | Bedrock Model ID | Provider | Use Case |
+|---|---|---|---|
+| `nova-micro` | `amazon.nova-micro-v1:0` | Amazon | Fastest, cheapest |
+| `nova-lite` | `amazon.nova-lite-v1:0` | Amazon | Fast + multimodal |
+| `nova-pro` | `amazon.nova-pro-v1:0` | Amazon | Highest quality Nova |
+| `claude-sonnet-4.6` | `us.anthropic.claude-sonnet-4-5-20251203-v1:0` | Anthropic | Balanced |
+| `claude-haiku` | `us.anthropic.claude-haiku-3-5-20241022-v1:0` | Anthropic | Fast |
+| `claude-opus-4.6` | `us.anthropic.claude-opus-4-5-20251101-v1:0` | Anthropic | High reasoning |
+| `claude-opus-4.7` | `us.anthropic.claude-opus-4-7-20260416-v1:0` | Anthropic | Latest flagship |
+| `llama3-70b` | `us.meta.llama3-70b-instruct-v1:0` | Meta | Open weights |
+| `llama3-8b` | `us.meta.llama3-8b-instruct-v1:0` | Meta | Lightweight |
+| `mistral-large` | `mistral.mistral-large-2402-v1:0` | Mistral | Strong reasoning |
+| `mixtral-8x7b` | `mistral.mixtral-8x7b-instruct-v0:1` | Mistral | MoE efficiency |
+| `cohere-command-r+` | `cohere.command-r-plus-v1:0` | Cohere | RAG-optimised |
 
 ---
 

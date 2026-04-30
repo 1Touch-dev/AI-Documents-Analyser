@@ -535,10 +535,44 @@ st.markdown(
 
 BACKEND_URL = "http://localhost:8000"
 
+# ── Provider + Model selector for Skills ─────────────────
+_sk_sel_col1, _sk_sel_col2, _sk_sel_col3 = st.columns([1, 2, 3])
+with _sk_sel_col1:
+    skill_provider = st.selectbox(
+        "Provider",
+        ["openai", "bedrock"],
+        key="skill_provider",
+        help="Select the AI provider to run skills against.",
+    )
+with _sk_sel_col2:
+    _openai_models = ["auto", "gpt-4o", "gpt-4.1", "gpt-4.1-mini"]
+    _bedrock_models = [
+        "nova-lite", "nova-micro", "nova-pro",
+        "claude-sonnet-4.6", "claude-haiku",
+        "claude-opus-4.6", "claude-opus-4.7",
+        "llama3-70b", "llama3-8b",
+        "mistral-large", "mixtral-8x7b",
+        "cohere-command-r+",
+    ]
+    _model_choices = _bedrock_models if skill_provider == "bedrock" else _openai_models
+    skill_model = st.selectbox(
+        "Model",
+        _model_choices,
+        key="skill_model",
+        help="Choose the specific model for the selected provider.",
+    )
+with _sk_sel_col3:
+    st.info(
+        f"**Provider:** `{skill_provider}` · **Model:** `{skill_model}`  \n"
+        "Skills will use this configuration for all three workflows below."
+    )
+
+
 def _run_skill(skill_name: str, extra_input: dict | None = None) -> dict | None:
-    payload = {"skill": skill_name, "input": extra_input or {}}
+    inp = {**(extra_input or {}), "model": skill_model}
+    payload = {"skill": skill_name, "input": inp, "provider": skill_provider}
     try:
-        resp = requests.post(f"{BACKEND_URL}/api/skills/run", json=payload, timeout=60)
+        resp = requests.post(f"{BACKEND_URL}/api/skills/run", json=payload, timeout=90)
         resp.raise_for_status()
         return resp.json().get("result", {})
     except requests.exceptions.ConnectionError:

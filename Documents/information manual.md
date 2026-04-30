@@ -18,18 +18,44 @@ The ingestion pipeline transforms unstructured text (like a messy PDF or a Power
 
 ---
 
-## 2. GPT API LLM Router
+## 2. Multi-Provider LLM Router
 
 Retrieval-Augmented Generation (RAG) forces the AI to answer based _only_ on evidence retrieved from uploaded documents, preventing hallucination.
 
-- **GPT-Only Architecture:** This branch routes **all** generation through the **OpenAI GPT API**. No local models (Ollama, Llama, Gemma) are used. An `OPENAI_API_KEY` environment variable is required.
-- **Model Registry:** Three production GPT models are available:
-  - `gpt-4o` — fast, cost-efficient; used for simple queries (auto-selected default)
-  - `gpt-4.1` — higher reasoning capacity; auto-selected for long or complex queries
-  - `gpt-4.1-mini` — lightweight option for low-latency use cases
-- **Legacy Alias Mapping:** If a request specifies an old model name (`llama3`, `gemma`, `mistral`, etc.), the `LLMRouter` silently remaps it to the closest GPT model so no request ever fails.
-- **Auto-Routing:** When model is set to `"auto"`, the router inspects the query length and keyword complexity to choose between `gpt-4o` (fast) and `gpt-4.1` (deep reasoning) automatically.
-- **Global Context Awareness:** Before answering, the system injects a dynamically generated index of every file currently in the knowledge base into the system prompt, so the model always knows what documents are available.
+### Provider Architecture
+
+The platform now supports **two AI providers** via a unified `LLMRouter`:
+
+| Provider | Key | Models Available |
+|---|---|---|
+| **OpenAI** | `OPENAI_API_KEY` | GPT-4o, GPT-4.1, GPT-4.1-mini |
+| **AWS Bedrock** | `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` | Claude, Nova, Llama, Mistral, Cohere |
+
+### OpenAI Provider (default)
+- Routes all generation through the OpenAI GPT API.
+- **Model Registry:** `gpt-4o` (fast), `gpt-4.1` (reasoning), `gpt-4.1-mini` (lightweight).
+- **Auto-Routing:** When `model="auto"`, the router inspects query complexity to choose `gpt-4o` vs `gpt-4.1` automatically.
+- **Legacy Alias Mapping:** Old model names (`llama3`, `gemma`, `mistral`, etc.) are silently remapped to GPT equivalents.
+
+### AWS Bedrock Provider
+- Routes generation through the **AWS Bedrock Converse API** — a single unified interface for 40+ models across providers.
+- **No per-provider formatting:** The Converse API abstracts away provider differences — same call works for Claude, Nova, Llama, Mistral, and Cohere.
+- **Cross-region inference profiles:** Model IDs prefixed with `us.` use AWS's cross-region routing for higher availability and throughput.
+- **Async-safe:** boto3 (synchronous) runs in a thread pool (`asyncio.to_thread`) so it never blocks the FastAPI event loop.
+
+### Model Selection Logic
+
+```
+User selects provider + model in UI
+         │
+         ▼
+   provider == "openai"?
+   ├── YES → LLMRouter._call_openai(resolved GPT model)
+   └── NO  → LLMRouter._call_bedrock(Bedrock model ID via converse API)
+```
+
+### Global Context Awareness
+Before answering, the system injects a dynamically generated index of every file currently in the knowledge base into the system prompt, so the model always knows what documents are available — regardless of which provider is used.
 
 ---
 

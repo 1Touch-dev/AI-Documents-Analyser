@@ -446,38 +446,83 @@ docker compose logs -f ai-backend
 
 ## 7. Test Checklist
 
-### Core Features
+### Core Features (OpenAI)
 - [ ] Login with valid credentials → dashboard redirect
 - [ ] Register new user → success
 - [ ] Upload PDF → status reaches `ready`
 - [ ] Batch upload (3+ files) → all processed
-- [ ] Ask a question → GPT answer with formatted markdown (bold, lists)
+- [ ] Ask a question (provider=openai) → GPT answer with formatted markdown (bold, lists)
 - [ ] `model_used` is `gpt-4o` or `gpt-4.1` (never local model)
 - [ ] Copy button on assistant message → clipboard receives text, button shows "Copied"
 - [ ] Translate to English → answer in English, citations preserved
 - [ ] Currency auto-detected on Chat page load → "Default (X — CODE, auto-detected)" in dropdown
 - [ ] Currency USD selected → R$ values converted in answer using live rates
-- [ ] Currency EUR selected → amounts converted in answer using live rates
-- [ ] All 45 currency options visible in dropdown (Americas, Europe, Asia-Pacific, Middle East, South Asia)
-- [ ] Financial Dashboard → revenue + expenses tables rendered (F&B, Sponsorship, Tickets, Retail, Player Sales / Player Salary, Coach Salary, Travel, Stadium, etc.)
+- [ ] Financial Dashboard → revenue + expenses tables rendered
 - [ ] Check Document Status → indexed / not_indexed lists returned
-- [ ] Delete conversation via trash icon → removed from sidebar, chat cleared if active
+- [ ] Delete conversation via trash icon → removed from sidebar
 - [ ] Create, use, and delete a prompt template
 - [ ] Conversation history persists after page refresh
 
+### Multi-Provider / Model Switching Tests
+- [ ] Sidebar shows **Provider** dropdown with "OpenAI (GPT)" and "AWS Bedrock (Claude / Nova / Llama)"
+- [ ] Switching provider to "bedrock" changes model dropdown to Bedrock model list
+- [ ] Switching back to "openai" restores GPT model options
+- [ ] Chat query with `provider=openai` + `model=gpt-4o` → response from OpenAI
+- [ ] Chat query with `provider=bedrock` + `model=nova-lite` → response from Bedrock
+- [ ] Analytics Skills Workbench shows Provider + Model selectors above skill buttons
+- [ ] Running "Financial Analysis" with `provider=bedrock` + `model=nova-pro` → structured JSON result
+
+### AWS Bedrock Validation Steps
+```bash
+# 1. Test Bedrock connectivity directly via API
+curl -X POST http://localhost:8000/api/skills/run \
+  -H "Content-Type: application/json" \
+  -d '{"skill":"report_generation","input":{},"provider":"bedrock"}'
+# Expected: {"skill":"report_generation","result":{...}}
+
+# 2. Test Nova Micro (fastest)
+curl -X POST http://localhost:8000/api/query \
+  -H "Content-Type: application/json" \
+  -d '{"question":"Summarize the documents","model":"nova-micro","provider":"bedrock"}'
+
+# 3. Test Claude Sonnet via Bedrock
+curl -X POST http://localhost:8000/api/query \
+  -H "Content-Type: application/json" \
+  -d '{"question":"What are the key financial figures?","model":"claude-sonnet-4.6","provider":"bedrock"}'
+
+# 4. Verify all models are returned
+curl http://localhost:8000/api/models
+# Expected: {"models":[...openai...],"all_models":{"openai":[...],"bedrock":[...12 models...]}}
+```
+
+- [ ] `POST /api/skills/run` with `provider=bedrock` → Bedrock response
+- [ ] `POST /api/query` with `provider=bedrock, model=nova-lite` → answer from Bedrock
+- [ ] `GET /api/models` → returns `all_models` with both `openai` and `bedrock` sections
+- [ ] `POST /api/analytics/financial_dashboard` with `provider=bedrock` → structured dashboard JSON
+- [ ] Invalid Bedrock model name → graceful fallback to nova-lite (logged as warning)
+- [ ] Missing AWS credentials → clean error: "AWS credentials not configured"
+
 ### API
 - [ ] `GET /api/health` → `{"status":"healthy"}`
-- [ ] `GET /api/models` → only GPT models listed
+- [ ] `GET /api/models` → contains `all_models.bedrock` with 12+ entries
 - [ ] `GET /api/detect_currency` → `{"currency":"...","confidence":"high/medium/low",...}`
-- [ ] `POST /api/query` → 200 with answer
+- [ ] `POST /api/query` → 200 with answer (openai or bedrock)
 - [ ] `POST /api/analytics/financial_dashboard` → structured JSON
 - [ ] `GET /api/documents/status` → indexed + not_indexed
 - [ ] `DELETE /api/conversations/{id}` → `{"deleted":true}`
 - [ ] Bad API key → clean error message, no stack trace
 - [ ] Invalid currency → 400 with clean message
+- [ ] `GET /api/skills` → lists 3 skills with descriptions
+
+### Skills System Tests
+- [ ] `POST /api/skills/run {"skill":"financial_analysis","input":{},"provider":"openai"}` → structured result
+- [ ] `POST /api/skills/run {"skill":"report_generation","input":{},"provider":"bedrock"}` → structured result
+- [ ] `POST /api/skills/run {"skill":"consulting_insights","input":{},"provider":"bedrock"}` → SWOT result
+- [ ] Unknown skill name → 400 with descriptive error listing supported skills
 
 ### Regression
 - [ ] No reference to `localhost:11434` in active code
 - [ ] No reference to Ollama in API responses
-- [ ] `/api/models` returns `["gpt-4.1","gpt-4.1-mini","gpt-4o"]` only
-- [ ] Currency rate source is fawazahmed0 (not static table) — check backend logs for "Rate BRL→USD: 0.19..."
+- [ ] Existing `/api/query` endpoint unchanged (backwards-compatible, provider defaults to "openai")
+- [ ] Currency rate source is fawazahmed0 (not static table)
+- [ ] Skills system still works after Bedrock integration (no breaking changes)
