@@ -13,3 +13,41 @@
 
   URL: http://0.0.0.0:8501
 
+
+> frontend-nextjs@0.1.0 start
+> next start -p 3001
+
+▲ Next.js 16.2.1
+- Local:         http://localhost:3001
+- Network:       http://172.31.41.3:3001
+✓ Ready in 346ms
+Killed
+
+> frontend-nextjs@0.1.0 start
+> next start -p 3001
+
+▲ Next.js 16.2.1
+- Local:         http://localhost:3001
+- Network:       http://172.31.41.3:3001
+✓ Ready in 181ms
+Killed
+
+> frontend-nextjs@0.1.0 start
+> next start -p 3001
+
+▲ Next.js 16.2.1
+- Local:         http://localhost:3001
+- Network:       http://172.31.41.3:3001
+✓ Ready in 252ms
+Killed
+
+> frontend-nextjs@0.1.0 start
+> next start -p 3001
+
+▲ Next.js 16.2.1
+- Local:         http://localhost:3001
+- Network:       http://172.31.41.3:3001
+✓ Ready in 257ms
+Error: Failed to find Server Action "x". This request might be from an older or newer deployment.
+Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
+    at ignore-listed frames
