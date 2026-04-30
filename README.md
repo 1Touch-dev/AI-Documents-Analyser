@@ -437,3 +437,108 @@ Navigate to `/workflows` in the Next.js app for:
 ## License
 
 MIT
+
+---
+
+## Production Features
+
+### Authentication (JWT)
+
+All sensitive endpoints require a valid Bearer token:
+
+```bash
+# Register
+curl -X POST http://localhost:8000/api/auth/register \
+  -d '{"username":"analyst1","password":"Secure1234!"}'
+
+# Login → get token
+TOKEN=$(curl -s -X POST http://localhost:8000/api/auth/login \
+  -d '{"username":"analyst1","password":"Secure1234!"}' | jq -r .access_token)
+
+# Use token
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/auth/me
+```
+
+### RBAC (Role-Based Access Control)
+
+| Role    | Permissions |
+|---------|------------|
+| admin   | Everything including user management |
+| analyst | Workflows, skills, MCP, export, save reports |
+| user    | Same as analyst (legacy default) |
+| viewer  | Read-only: view reports, usage stats, chat |
+
+```bash
+# Admin: change another user's role
+curl -X PATCH "http://localhost:8000/api/admin/users/alice/role?role=analyst" \
+  -H "Authorization: Bearer $ADMIN_TOKEN"
+```
+
+### Rate Limiting
+
+| Endpoint category | Limit |
+|---|---|
+| Chat / query | 60/minute |
+| Workflow runs | 10/minute |
+| MCP tool calls | 20/minute |
+| Skills | 30/minute |
+
+Exceeding limits returns HTTP 429.
+
+### Cost Tracking
+
+Every LLM call is logged to the `llm_usage` table with:
+- provider, model, tokens (prompt + completion), estimated USD cost
+- Accessible via `GET /api/usage/summary`
+
+### Audit Logging
+
+Every sensitive action (login, workflow run, MCP call, skill execution, export)
+is written to `audit_logs` with user, IP, action, status, and context.
+- Accessible via `GET /api/audit/logs`
+
+### Report Persistence
+
+```bash
+# Save a workflow result
+curl -X POST http://localhost:8000/api/reports/save \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"report_type":"financial","title":"Q1 2026","data":{...}}'
+
+# List saved reports
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/reports
+
+# Get a specific report
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/reports/<id>
+```
+
+### MCP Security
+
+- `initialize` and `tools/list` are public
+- `tools/call` requires auth + RBAC role check per tool
+- All MCP inputs are validated against prompt-injection patterns
+- Denied calls are recorded in audit_logs
+
+### Input Validation (Prompt Injection Protection)
+
+All text inputs to workflows, skills, and MCP tools are screened for:
+- Role-switching ("ignore previous instructions")
+- Jailbreak patterns ("DAN mode", "developer mode")
+- Instruction overrides (`<|im_start|>`, `###SYSTEM###`)
+- XSS patterns
+
+Inputs exceeding size limits are truncated.
+
+### Retry + Timeout
+
+LLM calls wrap with:
+- Max 2 retries with exponential back-off (2s, 4s)
+- 90-second timeout per call
+- Graceful fallback response on permanent failure
+
+### Security Environment Variables
+
+```env
+JWT_SECRET=<strong-secret-min-32-chars>
+WEBHOOK_SECRET=<shared-secret-for-n8n>   # optional
+```

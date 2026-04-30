@@ -342,3 +342,75 @@ curl -X POST http://<EC2_IP>:8000/api/mcp/execute \
 3. Body: `{"provider":"openai","model":"auto","context":"<your data>"}`
 4. The response is a structured JSON object ready to use in downstream nodes
 
+
+---
+
+## 10. Production Security Setup
+
+### JWT Configuration
+
+Add to `.env`:
+```env
+SECRET_KEY=<minimum-32-character-random-string>
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=60
+WEBHOOK_SECRET=<shared-secret-for-n8n-integration>
+```
+
+Generate a strong secret:
+```bash
+python3 -c "import secrets; print(secrets.token_hex(32))"
+```
+
+### Create Admin User
+
+```bash
+# Register then promote to admin via psql
+curl -X POST http://localhost:8000/api/auth/register \
+  -d '{"username":"admin","password":"<strong>"}'
+
+PGPASSWORD=<db_pass> psql -U <db_user> -d ai_knowledge_platform -h localhost \
+  -c "UPDATE users SET role='admin' WHERE username='admin';"
+```
+
+### RBAC Role Assignment (Admin API)
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8000/api/auth/login \
+  -d '{"username":"admin","password":"<strong>"}' | jq -r .access_token)
+
+# Promote user to analyst
+curl -X PATCH "http://localhost:8000/api/admin/users/alice/role?role=analyst" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Downgrade to viewer
+curl -X PATCH "http://localhost:8000/api/admin/users/bob/role?role=viewer" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Rate Limit Tuning
+
+Limits are enforced per-IP by slowapi. To adjust:
+```env
+RATE_LIMIT=60/minute   # default global fallback
+```
+Per-endpoint limits (chat=60/min, workflow=10/min, MCP=20/min, skill=30/min)
+are hardcoded in `backend/main.py` as `RL_*` constants.
+
+### Database Tables Added
+
+| Table | Purpose |
+|---|---|
+| `llm_usage` | Per-request token + cost tracking |
+| `saved_reports` | Persisted workflow results |
+| `audit_logs` | Security audit trail |
+| `users.is_active` | Soft-disable users |
+
+### Security Checklist
+
+- [ ] JWT_SECRET set to random 32+ char string
+- [ ] Admin user created and password rotated
+- [ ] All analyst/viewer roles assigned correctly
+- [ ] WEBHOOK_SECRET set if using n8n integration
+- [ ] Backend running behind reverse proxy (nginx) with HTTPS in production
+- [ ] Rate limits reviewed for expected traffic volume

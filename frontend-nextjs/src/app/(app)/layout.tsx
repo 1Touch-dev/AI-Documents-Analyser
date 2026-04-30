@@ -17,6 +17,8 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Workflow,
+  BookMarked,
+  Activity,
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 
@@ -28,6 +30,8 @@ const NAV_ITEMS = [
   { href: "/conversations", label: "Conversations", icon: History },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/workflows", label: "Workflows", icon: Workflow },
+  { href: "/saved-reports", label: "Saved Reports", icon: BookMarked },
+  { href: "/usage", label: "Usage & Audit", icon: Activity },
   { href: "/report-generation", label: "Report Generation", icon: FileOutput },
   { href: "/export-data", label: "Export Data", icon: FileSpreadsheet },
 ];

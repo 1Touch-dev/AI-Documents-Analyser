@@ -43,9 +43,18 @@ from backend.prompt_manager import PromptManager
 from backend.rag_pipeline import RAGPipeline
 from backend.report_generator import ReportGenerator
 from backend.vector_store import get_vector_store
+from backend.auth.rbac import require_permission, require_mcp_tool, get_role_info
+from backend.auth.dependencies import require_auth, optional_auth, require_role
+from backend.services.cost_tracker import log_usage_async, get_usage_summary
+from backend.services.audit_logger import audit_log, get_audit_trail
+from backend.utils.validator import (
+    validate_workflow_input, validate_mcp_arguments, validate_provider,
+    ValidationError as InputValidationError,
+)
+from backend.utils.retry import with_retry, make_workflow_fallback
 from config.settings import settings
 from db.database import get_db, init_db
-from db.models import Document, User
+from db.models import Document, User, LLMUsage, SavedReport, AuditLog
 from services.document_parser import DocumentParser
 from services.currency_service import CurrencyService
 from services.s3_storage import S3StorageService
@@ -56,6 +65,13 @@ logger = logging.getLogger(__name__)
 
 # ── Rate limiter ─────────────────────────────────────────
 limiter = Limiter(key_func=get_remote_address)
+
+# Per-endpoint rate limit strings
+RL_CHAT      = "60/minute"   # chat / query
+RL_WORKFLOW  = "10/minute"   # workflow runs
+RL_MCP       = "20/minute"   # MCP tool calls
+RL_SKILL     = "30/minute"   # skills
+RL_DEFAULT   = settings.rate_limit
 
 # ── Password hashing ────────────────────────────────────
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -464,7 +480,7 @@ async def register(body: UserCreate, db: Session = Depends(get_db)):
 
 
 @app.post("/api/auth/login", response_model=TokenResponse, tags=["Auth"])
-async def login(body: UserLogin, db: Session = Depends(get_db)):
+async def login(request: Request, body: UserLogin, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == body.username).first()
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials.")
@@ -477,7 +493,12 @@ async def login(body: UserLogin, db: Session = Depends(get_db)):
 
     if not password_ok:
         raise HTTPException(status_code=401, detail="Invalid credentials.")
-    token = _create_token({"sub": user.username})
+    token = _create_token({"sub": user.username, "role": user.role})
+    try:
+        audit_log(db, "login", user=user, resource="auth", request=request,
+                  detail={"role": user.role})
+    except Exception:
+        pass
     return TokenResponse(access_token=token)
 
 
@@ -1484,10 +1505,11 @@ async def list_skills():
 
 
 @app.post("/api/skills/run", tags=["Skills"])
-@limiter.limit(settings.rate_limit)
+@limiter.limit(RL_SKILL)
 async def run_skill(
     request: Request,
     body: SkillRunRequest,
+    user: User = Depends(require_auth),
     db: Session = Depends(get_db),
 ):
     """
@@ -1496,6 +1518,7 @@ async def run_skill(
     If no context/document_text is supplied in the input, the skill will
     automatically retrieve relevant context from the vector store.
     """
+    require_permission(user, "run_skill")
     from backend.skills.skill_router import route_skill, SUPPORTED_SKILLS
 
     if body.skill not in SUPPORTED_SKILLS:
@@ -1530,6 +1553,8 @@ async def run_skill(
         except Exception as exc:
             logger.warning("Skills auto-context retrieval failed: %s", exc)
 
+    audit_log(db, "skill_run", user=user, resource=body.skill, request=request,
+              detail={"provider": body.provider, "model": body.model})
     try:
         result = await route_skill(body.skill, input_data, llm, provider=body.provider)
     except ValueError as exc:
@@ -1538,11 +1563,18 @@ async def run_skill(
         logger.exception("Skill execution error for '%s': %s", body.skill, exc)
         raise HTTPException(status_code=502, detail=f"Skill execution failed: {exc}") from exc
 
+    await log_usage_async(
+        db=db, provider=body.provider, model=body.model or "auto",
+        action=f"skill_{body.skill}",
+        prompt_text=str(input_data)[:2000],
+        completion_text=str(result)[:2000],
+        user=user,
+    )
     return {"skill": body.skill, "result": result}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  WORKFLOWS
+#  WORKFLOWS  (auth + RBAC + rate limit + audit + cost tracking + retry)
 # ══════════════════════════════════════════════════════════════════════════════
 
 class WorkflowRunRequest(BaseModel):
@@ -1561,39 +1593,73 @@ async def list_workflows_endpoint():
 
 
 @app.post("/api/workflows/run", tags=["Workflows"])
-async def run_workflow_endpoint(body: WorkflowRunRequest, _: Optional[User] = Depends(get_current_user)):
-    """Execute a named multi-step workflow end-to-end."""
+@limiter.limit(RL_WORKFLOW)
+async def run_workflow_endpoint(
+    request: Request,
+    body: WorkflowRunRequest,
+    user: User = Depends(require_auth),
+    db: Session = Depends(get_db),
+):
+    """Execute a named multi-step workflow. Requires auth. Analyst+ role only."""
+    require_permission(user, "run_workflow")
+
+    # Validate inputs
+    try:
+        sanitised_input = validate_workflow_input(body.input)
+        validate_provider(body.provider)
+    except InputValidationError as exc:
+        audit_log(db, "workflow_run", user=user, resource=body.workflow,
+                  detail={"error": str(exc)}, request=request, status="error")
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
     llm, *_ = _get_services()
     api_keys = {"openai_api_key": body.openai_api_key}
+
     from backend.workflows.workflow_engine import run_workflow
+    audit_log(db, "workflow_run", user=user, resource=body.workflow,
+              detail={"provider": body.provider, "model": body.model}, request=request)
     try:
-        result = await run_workflow(
+        result = await with_retry(
+            run_workflow,
             workflow_name=body.workflow,
-            input_data=body.input,
+            input_data=sanitised_input,
             llm_router=llm,
             provider=body.provider,
             model=body.model,
             api_keys=api_keys,
+            max_retries=2,
+            timeout_s=90.0,
+            fallback=make_workflow_fallback(body.workflow),
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         logger.exception("Workflow '%s' failed: %s", body.workflow, exc)
         raise HTTPException(status_code=502, detail=f"Workflow execution failed: {exc}") from exc
+
+    # Cost tracking (best-effort, using result text as proxy)
+    await log_usage_async(
+        db=db, provider=body.provider, model=result.get("model_used", body.model),
+        action=f"workflow_{body.workflow}",
+        prompt_text=str(sanitised_input)[:2000],
+        completion_text=str(result.get("result", ""))[:3000],
+        user=user,
+    )
     return result
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  MCP EXECUTE
+#  MCP EXECUTE  (auth + RBAC + rate limit + per-tool permission + input validation)
 # ══════════════════════════════════════════════════════════════════════════════
 
 @app.post("/api/mcp/execute", tags=["MCP"])
-async def mcp_execute(request: Request):
+@limiter.limit(RL_MCP)
+async def mcp_execute(request: Request, db: Session = Depends(get_db)):
     """
-    JSON-RPC 2.0 endpoint for MCP tool execution.
+    JSON-RPC 2.0 MCP endpoint.
 
-    Accepts standard MCP requests (initialize / tools/list / tools/call).
-    No auth required — authentication is handled by the calling agent.
+    - initialize / tools/list: public (no auth needed)
+    - tools/call: requires Bearer token + analyst+ role + per-tool permission check
     """
     llm, *_ = _get_services()
     try:
@@ -1603,13 +1669,76 @@ async def mcp_execute(request: Request):
             {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error"}},
             status_code=400,
         )
+
+    method = body.get("method", "")
+    rpc_id = body.get("id")
+
+    # Public methods (no auth required)
+    if method in ("initialize", "tools/list"):
+        from backend.mcp.server import handle_request
+        return JSONResponse(await handle_request(body, llm_router=llm))
+
+    # tools/call — requires auth + RBAC
+    if method == "tools/call":
+        user = optional_auth(request, db)
+        params = body.get("params", {})
+        tool_name = params.get("name") or params.get("tool_name", "")
+
+        if user is None:
+            audit_log(db, "mcp_call", resource=tool_name, request=request, status="denied",
+                      detail={"error": "unauthenticated"})
+            return JSONResponse({
+                "jsonrpc": "2.0", "id": rpc_id,
+                "error": {"code": -32001, "message": "Authentication required for tool execution."}
+            })
+
+        if not require_mcp_tool.__module__:  # always true — just call it guarded
+            pass
+        from backend.auth.rbac import can_use_mcp_tool
+        if not can_use_mcp_tool(user, tool_name):
+            audit_log(db, "mcp_call", user=user, resource=tool_name, request=request, status="denied",
+                      detail={"role": user.role})
+            return JSONResponse({
+                "jsonrpc": "2.0", "id": rpc_id,
+                "error": {"code": -32002, "message": f"Role '{user.role}' cannot call tool '{tool_name}'."}
+            })
+
+        # Validate + sanitise arguments
+        arguments = params.get("arguments") or params.get("input", {})
+        try:
+            arguments = validate_mcp_arguments(tool_name, arguments)
+        except InputValidationError as exc:
+            audit_log(db, "mcp_call", user=user, resource=tool_name, request=request, status="error",
+                      detail={"validation_error": str(exc)})
+            return JSONResponse({
+                "jsonrpc": "2.0", "id": rpc_id,
+                "error": {"code": -32003, "message": f"Input validation failed: {exc}"}
+            })
+
+        body["params"]["arguments"] = arguments
+        audit_log(db, "mcp_call", user=user, resource=tool_name, request=request,
+                  detail={"provider": arguments.get("provider", "openai")})
+
+        from backend.mcp.server import handle_request
+        result = await handle_request(body, llm_router=llm)
+
+        await log_usage_async(
+            db=db, provider=arguments.get("provider", "openai"),
+            model=arguments.get("model", "auto"),
+            action=f"mcp_{tool_name}",
+            prompt_text=str(arguments)[:2000],
+            completion_text=str(result)[:2000],
+            user=user,
+        )
+        return JSONResponse(result)
+
+    # Unknown method
     from backend.mcp.server import handle_request
-    result = await handle_request(body, llm_router=llm)
-    return JSONResponse(result)
+    return JSONResponse(await handle_request(body, llm_router=llm))
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  WEBHOOKS  (n8n / external automation triggers)
+#  WEBHOOKS  (n8n / external automation — lightweight API key check)
 # ══════════════════════════════════════════════════════════════════════════════
 
 class WebhookRequest(BaseModel):
@@ -1618,100 +1747,115 @@ class WebhookRequest(BaseModel):
     document_text: str = ""
     context: str = ""
     openai_api_key: str | None = None
+    webhook_secret: str | None = None  # optional shared secret for n8n
+
+
+def _check_webhook_secret(provided: str | None) -> None:
+    """If WEBHOOK_SECRET is set in settings, enforce it."""
+    expected = getattr(settings, "webhook_secret", None)
+    if expected and expected != provided:
+        raise HTTPException(status_code=403, detail="Invalid webhook secret.")
 
 
 @app.post("/api/webhooks/financial", tags=["Webhooks"])
-async def webhook_financial(body: WebhookRequest):
-    """n8n-ready webhook — triggers full financial workflow and returns JSON."""
+async def webhook_financial(body: WebhookRequest, db: Session = Depends(get_db)):
+    """n8n-ready webhook — financial workflow."""
+    _check_webhook_secret(body.webhook_secret)
     llm, *_ = _get_services()
     from backend.workflows.workflow_engine import run_workflow
     try:
-        result = await run_workflow(
+        result = await with_retry(
+            run_workflow,
             workflow_name="financial",
             input_data={"document_text": body.document_text or body.context},
-            llm_router=llm,
-            provider=body.provider,
-            model=body.model,
+            llm_router=llm, provider=body.provider, model=body.model,
             api_keys={"openai_api_key": body.openai_api_key},
+            max_retries=1, timeout_s=90.0, fallback=make_workflow_fallback("financial"),
         )
     except Exception as exc:
         raise HTTPException(502, detail=str(exc)) from exc
+    audit_log(db, "webhook_trigger", resource="financial", detail={"provider": body.provider})
     return result
 
 
 @app.post("/api/webhooks/consulting", tags=["Webhooks"])
-async def webhook_consulting(body: WebhookRequest):
-    """n8n-ready webhook — triggers full consulting workflow and returns JSON."""
+async def webhook_consulting(body: WebhookRequest, db: Session = Depends(get_db)):
+    """n8n-ready webhook — consulting workflow."""
+    _check_webhook_secret(body.webhook_secret)
     llm, *_ = _get_services()
     from backend.workflows.workflow_engine import run_workflow
     try:
-        result = await run_workflow(
+        result = await with_retry(
+            run_workflow,
             workflow_name="consulting",
             input_data={"context": body.context or body.document_text},
-            llm_router=llm,
-            provider=body.provider,
-            model=body.model,
+            llm_router=llm, provider=body.provider, model=body.model,
             api_keys={"openai_api_key": body.openai_api_key},
+            max_retries=1, timeout_s=90.0, fallback=make_workflow_fallback("consulting"),
         )
     except Exception as exc:
         raise HTTPException(502, detail=str(exc)) from exc
+    audit_log(db, "webhook_trigger", resource="consulting", detail={"provider": body.provider})
     return result
 
 
 @app.post("/api/webhooks/report", tags=["Webhooks"])
-async def webhook_report(body: WebhookRequest):
-    """n8n-ready webhook — triggers full report workflow and returns JSON."""
+async def webhook_report(body: WebhookRequest, db: Session = Depends(get_db)):
+    """n8n-ready webhook — report workflow."""
+    _check_webhook_secret(body.webhook_secret)
     llm, *_ = _get_services()
     from backend.workflows.workflow_engine import run_workflow
     try:
-        result = await run_workflow(
+        result = await with_retry(
+            run_workflow,
             workflow_name="report",
             input_data={"context": body.context or body.document_text},
-            llm_router=llm,
-            provider=body.provider,
-            model=body.model,
+            llm_router=llm, provider=body.provider, model=body.model,
             api_keys={"openai_api_key": body.openai_api_key},
+            max_retries=1, timeout_s=90.0, fallback=make_workflow_fallback("report"),
         )
     except Exception as exc:
         raise HTTPException(502, detail=str(exc)) from exc
+    audit_log(db, "webhook_trigger", resource="report", detail={"provider": body.provider})
     return result
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  EXPORT
+#  EXPORT  (auth + RBAC + audit)
 # ══════════════════════════════════════════════════════════════════════════════
 
 @app.post("/api/export/report", tags=["Export"])
-async def export_report(body: WorkflowRunRequest, _: Optional[User] = Depends(get_current_user)):
-    """
-    Run the report workflow and return the result as JSON or CSV.
-
-    Pass ?format=csv for Tableau-compatible CSV, omit for JSON (default).
-    """
+async def export_report(
+    body: WorkflowRunRequest,
+    request: Request,
+    user: User = Depends(require_auth),
+    db: Session = Depends(get_db),
+):
+    """Run workflow and export result as JSON or CSV. Requires analyst+ role."""
+    require_permission(user, "export")
     from fastapi.responses import PlainTextResponse
     import csv, io
     llm, *_ = _get_services()
     api_keys = {"openai_api_key": body.openai_api_key}
     from backend.workflows.workflow_engine import run_workflow
+    audit_log(db, "export", user=user, resource=body.workflow, request=request,
+              detail={"provider": body.provider, "format": body.input.get("format", "json")})
     try:
-        result = await run_workflow(
+        result = await with_retry(
+            run_workflow,
             workflow_name=body.workflow,
             input_data=body.input,
-            llm_router=llm,
-            provider=body.provider,
-            model=body.model,
-            api_keys=api_keys,
+            llm_router=llm, provider=body.provider, model=body.model, api_keys=api_keys,
+            max_retries=1, timeout_s=90.0, fallback=make_workflow_fallback(body.workflow),
         )
     except Exception as exc:
         raise HTTPException(502, detail=str(exc)) from exc
 
     format_param = body.input.get("format", "json")
     if format_param == "csv":
-        # Flatten the result dict into CSV rows
         output = io.StringIO()
         writer = csv.writer(output)
         writer.writerow(["field", "value"])
-
         def _flatten(obj, prefix=""):
             if isinstance(obj, dict):
                 for k, v in obj.items():
@@ -1721,9 +1865,163 @@ async def export_report(body: WorkflowRunRequest, _: Optional[User] = Depends(ge
                     _flatten(v, f"{prefix}{i}.")
             else:
                 writer.writerow([prefix.rstrip("."), obj])
-
         _flatten(result)
         return PlainTextResponse(output.getvalue(), media_type="text/csv",
                                  headers={"Content-Disposition": "attachment; filename=report.csv"})
-
     return result
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  REPORT PERSISTENCE
+# ══════════════════════════════════════════════════════════════════════════════
+
+class SaveReportRequest(BaseModel):
+    report_type: str = Field(..., description="financial | consulting | report")
+    title: str = Field("", description="Optional display title")
+    data: dict = Field(..., description="Full workflow result data to persist")
+    model_used: str = ""
+    provider: str = "openai"
+
+
+@app.post("/api/reports/save", tags=["Reports"])
+async def save_report(
+    body: SaveReportRequest,
+    request: Request,
+    user: User = Depends(require_auth),
+    db: Session = Depends(get_db),
+):
+    """Persist a workflow result to the database."""
+    require_permission(user, "save_report")
+    record = SavedReport(
+        user_id=user.id,
+        username=user.username,
+        report_type=body.report_type,
+        title=body.title or f"{body.report_type.title()} Report",
+        data=body.data,
+        model_used=body.model_used,
+        provider=body.provider,
+    )
+    db.add(record)
+    db.commit()
+    audit_log(db, "report_save", user=user, resource=body.report_type, request=request)
+    return {"id": str(record.id), "message": "Report saved.", "report_type": body.report_type}
+
+
+@app.get("/api/reports", tags=["Reports"])
+async def list_reports(
+    request: Request,
+    user: User = Depends(require_auth),
+    db: Session = Depends(get_db),
+    limit: int = 50,
+):
+    """List saved reports for the current user (admin sees all)."""
+    require_permission(user, "view_reports")
+    query = db.query(SavedReport).order_by(SavedReport.created_at.desc()).limit(limit)
+    if user.role != "admin":
+        query = db.query(SavedReport).filter(
+            SavedReport.username == user.username
+        ).order_by(SavedReport.created_at.desc()).limit(limit)
+    records = query.all()
+    return {
+        "reports": [
+            {
+                "id": str(r.id),
+                "report_type": r.report_type,
+                "title": r.title,
+                "model_used": r.model_used,
+                "provider": r.provider,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in records
+        ]
+    }
+
+
+@app.get("/api/reports/{report_id}", tags=["Reports"])
+async def get_report(
+    report_id: str,
+    user: User = Depends(require_auth),
+    db: Session = Depends(get_db),
+):
+    """Retrieve a single saved report by ID."""
+    require_permission(user, "view_reports")
+    try:
+        import uuid as _uuid
+        rid = _uuid.UUID(report_id)
+    except ValueError:
+        raise HTTPException(400, "Invalid report ID format.")
+    record = db.query(SavedReport).filter(SavedReport.id == rid).first()
+    if not record:
+        raise HTTPException(404, "Report not found.")
+    if user.role != "admin" and record.username != user.username:
+        raise HTTPException(403, "Access denied.")
+    return {
+        "id": str(record.id),
+        "report_type": record.report_type,
+        "title": record.title,
+        "data": record.data,
+        "model_used": record.model_used,
+        "provider": record.provider,
+        "created_at": record.created_at.isoformat() if record.created_at else None,
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  USAGE + AUDIT  (cost dashboard)
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/usage/summary", tags=["Usage"])
+async def usage_summary(
+    user: User = Depends(require_auth),
+    db: Session = Depends(get_db),
+    days: int = 30,
+):
+    """Return LLM usage + cost summary for the current user (admin sees all)."""
+    require_permission(user, "view_usage")
+    return get_usage_summary(db, user=user, days=days)
+
+
+@app.get("/api/audit/logs", tags=["Audit"])
+async def audit_logs(
+    user: User = Depends(require_auth),
+    db: Session = Depends(get_db),
+    limit: int = 100,
+):
+    """Return audit trail. Admin sees all; others see their own entries."""
+    if user.role != "admin":
+        require_permission(user, "view_usage")
+    return {"logs": get_audit_trail(db, user=user, limit=limit)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  RBAC INFO  (current user's role + permissions)
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/auth/me", tags=["Auth"])
+async def me(user: User = Depends(require_auth)):
+    """Return current user info + role + permissions."""
+    return {
+        "username": user.username,
+        "role": user.role,
+        **get_role_info(user),
+        "created_at": user.created_at.isoformat() if user.created_at else None,
+    }
+
+
+@app.patch("/api/admin/users/{username}/role", tags=["Admin"])
+async def set_user_role(
+    username: str,
+    role: str,
+    user: User = Depends(require_role("admin")),
+    db: Session = Depends(get_db),
+):
+    """Admin-only: change another user's role."""
+    valid_roles = {"admin", "analyst", "viewer", "user"}
+    if role not in valid_roles:
+        raise HTTPException(400, f"Invalid role. Must be one of: {valid_roles}")
+    target = db.query(User).filter(User.username == username).first()
+    if not target:
+        raise HTTPException(404, f"User '{username}' not found.")
+    target.role = role
+    db.commit()
+    return {"username": username, "role": role, "message": "Role updated."}

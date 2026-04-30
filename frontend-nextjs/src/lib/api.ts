@@ -503,3 +503,85 @@ export function generateReport(
     token
   );
 }
+
+// ── Usage + Audit ─────────────────────────────────────────────────────────────
+
+export type UsageSummary = {
+  period_days: number;
+  total_requests: number;
+  total_tokens: number;
+  total_cost_usd: number;
+  by_model: Record<string, { requests: number; tokens: number; cost: number }>;
+};
+
+export function getUsageSummary(days = 30, token?: string) {
+  return request<UsageSummary>(`/usage/summary?days=${days}`, { method: "GET" }, token);
+}
+
+export type AuditEntry = {
+  id: string;
+  username: string | null;
+  action: string;
+  resource: string | null;
+  status: string;
+  ip_address: string | null;
+  timestamp: string;
+  detail: Record<string, unknown>;
+};
+
+export function getAuditLogs(limit = 50, token?: string) {
+  return request<{ logs: AuditEntry[] }>(`/audit/logs?limit=${limit}`, { method: "GET" }, token);
+}
+
+// ── Reports ──────────────────────────────────────────────────────────────────
+
+export type SavedReportMeta = {
+  id: string;
+  report_type: string;
+  title: string;
+  model_used: string | null;
+  provider: string | null;
+  created_at: string;
+};
+
+export type SavedReportFull = SavedReportMeta & { data: Record<string, unknown> };
+
+export function listSavedReports(token?: string) {
+  return request<{ reports: SavedReportMeta[] }>("/reports", { method: "GET" }, token);
+}
+
+export function getSavedReport(id: string, token?: string) {
+  return request<SavedReportFull>(`/reports/${id}`, { method: "GET" }, token);
+}
+
+export function saveReport(
+  payload: {
+    report_type: string;
+    title?: string;
+    data: Record<string, unknown>;
+    model_used?: string;
+    provider?: string;
+  },
+  token?: string
+) {
+  return request<{ id: string; message: string; report_type: string }>(
+    "/reports/save",
+    { method: "POST", body: JSON.stringify(payload) },
+    token
+  );
+}
+
+// ── Auth/me ───────────────────────────────────────────────────────────────────
+
+export type UserProfile = {
+  username: string;
+  role: string;
+  label: string;
+  permissions: string[];
+  mcp_tools: string[];
+  created_at: string;
+};
+
+export function getMe(token?: string) {
+  return request<UserProfile>("/auth/me", { method: "GET" }, token);
+}

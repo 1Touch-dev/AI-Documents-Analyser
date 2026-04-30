@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { listWorkflows, runWorkflow, type WorkflowMeta } from "@/lib/api";
 import { useAuth } from "@/contexts/auth-context";
 import { useAppPreferences } from "@/contexts/app-preferences-context";
-import { CheckCircle, ChevronRight, Clock, Download, Loader2, Play, Zap } from "lucide-react";
+import { CheckCircle, ChevronRight, Clock, Download, Loader2, Play, Save, Zap } from "lucide-react";
+import { saveReport } from "@/lib/api";
 
 // ── Workflow card metadata ────────────────────────────────────────────────────
 const WORKFLOW_ICONS: Record<string, string> = {
@@ -216,6 +217,8 @@ export default function WorkflowsPage() {
   const [workflows, setWorkflows] = useState<WorkflowMeta[]>([]);
   const [selected, setSelected] = useState<string>("financial");
   const [isRunning, setIsRunning] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedId, setSavedId] = useState<string | null>(null);
   const [runResult, setRunResult] = useState<{
     workflow: string;
     steps: string[];
@@ -241,10 +244,30 @@ export default function WorkflowsPage() {
       .catch(() => setWorkflows([]));
   }, [token]);
 
+  async function handleSave() {
+    if (!runResult) return;
+    setIsSaving(true);
+    try {
+      const res = await saveReport({
+        report_type: runResult.workflow,
+        title: `${selectedMeta?.label ?? runResult.workflow} — ${new Date().toLocaleDateString()}`,
+        data: runResult.result,
+        model_used: runResult.model_used,
+        provider: runResult.provider,
+      }, token ?? undefined);
+      setSavedId(res.id);
+    } catch {
+      // silent — user can retry
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   async function handleRun() {
     setIsRunning(true);
     setError(null);
     setRunResult(null);
+    setSavedId(null);
     try {
       const res = await runWorkflow(
         {
@@ -474,8 +497,8 @@ export default function WorkflowsPage() {
               {/* Structured output */}
               <WorkflowResult workflowName={runResult.workflow} result={runResult.result} />
 
-              {/* Export buttons */}
-              <div className="flex gap-2 pt-2 border-t border-white/10">
+              {/* Export + Save buttons */}
+              <div className="flex flex-wrap gap-2 pt-2 border-t border-white/10">
                 <button
                   type="button"
                   onClick={() => downloadJSON(runResult, `${runResult.workflow}-result.json`)}
@@ -489,6 +512,15 @@ export default function WorkflowsPage() {
                   className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-slate-200 hover:bg-white/10"
                 >
                   <Download className="h-3.5 w-3.5" /> Export CSV
+                </button>
+                <button
+                  type="button"
+                  disabled={isSaving || !!savedId}
+                  onClick={handleSave}
+                  className="flex items-center gap-1.5 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-3 py-1.5 text-xs text-indigo-200 hover:bg-indigo-500/20 disabled:opacity-50"
+                >
+                  {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                  {savedId ? "Saved ✓" : "Save Report"}
                 </button>
               </div>
             </div>
