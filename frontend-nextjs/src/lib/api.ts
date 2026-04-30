@@ -320,7 +320,6 @@ export function queryDocuments(
   payload: {
     question: string;
     model?: string;
-    provider?: string;   // "openai" | "bedrock" — any Bedrock model ID accepted
     top_k?: number;
     temperature?: number;
     category?: string | null;
