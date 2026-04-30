@@ -44,15 +44,12 @@ async def run(
 
     # ── Step 1: retrieve documents ─────────────────────────────────────────────
     context = input_data.get("context") or input_data.get("document_text", "")
-    if not context:
-        try:
-            from backend.vector_store import VectorStore
-            vs = VectorStore()
-            results = vs.search("key metrics summary performance report", top_k=15)
-            context = "\n\n".join(r.get("text", "") for r in results)
-        except Exception as e:
-            logger.warning("Could not retrieve from vector store: %s", e)
-            context = "No context provided."
+    if not context.strip():
+        from backend.workflows._retriever import retrieve_context
+        context = await retrieve_context(
+            "performance summary key metrics results KPI report overview",
+            top_k=15,
+        )
     completed_steps.append("retrieve_documents")
     completed_steps.append("collect_metrics")
     completed_steps.append("generate_summary")

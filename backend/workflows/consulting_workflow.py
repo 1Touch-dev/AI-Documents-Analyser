@@ -44,15 +44,12 @@ async def run(
 
     # ── Step 1: retrieve documents ─────────────────────────────────────────────
     context = input_data.get("context") or input_data.get("document_text", "")
-    if not context:
-        try:
-            from backend.vector_store import VectorStore
-            vs = VectorStore()
-            results = vs.search("business strategy strengths risks opportunities", top_k=15)
-            context = "\n\n".join(r.get("text", "") for r in results)
-        except Exception as e:
-            logger.warning("Could not retrieve from vector store: %s", e)
-            context = "No context provided."
+    if not context.strip():
+        from backend.workflows._retriever import retrieve_context
+        context = await retrieve_context(
+            "business strategy strengths weaknesses risks opportunities competitive market",
+            top_k=15,
+        )
     completed_steps.append("retrieve_documents")
 
     # ── Step 2+3: SWOT + strategic actions via skill ───────────────────────────

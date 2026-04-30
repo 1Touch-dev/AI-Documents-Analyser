@@ -45,16 +45,12 @@ async def run(
 
     # ── Step 1: retrieve documents ─────────────────────────────────────────────
     document_text = input_data.get("document_text") or input_data.get("context", "")
-    if not document_text:
-        # Try to pull from vector store if available
-        try:
-            from backend.vector_store import VectorStore
-            vs = VectorStore()
-            results = vs.search("financial revenue expenses profit", top_k=15)
-            document_text = "\n\n".join(r.get("text", "") for r in results)
-        except Exception as e:
-            logger.warning("Could not retrieve from vector store: %s", e)
-            document_text = "No document text provided."
+    if not document_text.strip():
+        from backend.workflows._retriever import retrieve_context
+        document_text = await retrieve_context(
+            "revenue income expenses profit loss financial data budget",
+            top_k=15,
+        )
     completed_steps.append("retrieve_documents")
 
     # ── Step 2: extract financials via skill ───────────────────────────────────
