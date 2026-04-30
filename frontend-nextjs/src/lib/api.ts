@@ -320,6 +320,7 @@ export function queryDocuments(
   payload: {
     question: string;
     model?: string;
+    provider?: string;   // "openai" | "bedrock" — any Bedrock model ID accepted
     top_k?: number;
     temperature?: number;
     category?: string | null;
@@ -403,6 +404,7 @@ export function getAnalyticsContentInsights(token?: string) {
 export function getFinancialDashboard(
   payload: {
     model?: string;
+    provider?: string;
     top_k?: number;
     category?: string | null;
     openai_api_key?: string | null;
@@ -413,6 +415,27 @@ export function getFinancialDashboard(
 ) {
   return request<FinancialDashboardResponse>(
     "/analytics/financial_dashboard",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    token
+  );
+}
+
+export type SkillResult = Record<string, unknown>;
+
+export function runSkill(
+  payload: {
+    skill: "financial_analysis" | "report_generation" | "consulting_insights";
+    input: Record<string, string | number | boolean>;
+    provider?: string;
+    model?: string;
+  },
+  token?: string
+) {
+  return request<{ result: SkillResult; skill: string; model_used?: string }>(
+    "/skills/run",
     {
       method: "POST",
       body: JSON.stringify(payload),

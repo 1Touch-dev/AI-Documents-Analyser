@@ -30,8 +30,10 @@ import {
   getAnalyticsOverview,
   getAnalyticsStorage,
   listDocuments,
+  runSkill,
   type DocumentItem,
   type FinancialDashboardResponse,
+  type SkillResult,
 } from "@/lib/api";
 import { useAuth } from "@/contexts/auth-context";
 import { useAppPreferences } from "@/contexts/app-preferences-context";
@@ -157,6 +159,14 @@ export default function AnalyticsPage() {
   const [financialDashboard, setFinancialDashboard] = useState<FinancialDashboardResponse | null>(null);
   const [isFinancialLoading, setIsFinancialLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Skills Workbench state
+  const [skillProvider, setSkillProvider] = useState("openai");
+  const [skillModel, setSkillModel] = useState("auto");
+  const [skillBedrockCustom, setSkillBedrockCustom] = useState("");
+  const [skillResults, setSkillResults] = useState<Record<string, SkillResult | null>>({});
+  const [skillLoading, setSkillLoading] = useState<Record<string, boolean>>({});
+  const [skillErrors, setSkillErrors] = useState<Record<string, string | null>>({});
 
   useEffect(() => {
     let mounted = true;
@@ -340,6 +350,7 @@ export default function AnalyticsPage() {
       const response = await getFinancialDashboard(
         {
           model: selectedModel || "auto",
+          provider: skillProvider,
           category: selectedCategory || null,
           openai_api_key: openaiApiKey || null,
         },
@@ -350,6 +361,26 @@ export default function AnalyticsPage() {
       setError(e instanceof Error ? e.message : "Failed to extract financial dashboard.");
     } finally {
       setIsFinancialLoading(false);
+    }
+  }
+
+  async function runSkillHandler(skillName: "financial_analysis" | "report_generation" | "consulting_insights") {
+    const effectiveModel = skillProvider === "bedrock" && skillBedrockCustom.trim()
+      ? skillBedrockCustom.trim()
+      : skillModel;
+    setSkillLoading((p) => ({ ...p, [skillName]: true }));
+    setSkillErrors((p) => ({ ...p, [skillName]: null }));
+    setSkillResults((p) => ({ ...p, [skillName]: null }));
+    try {
+      const res = await runSkill(
+        { skill: skillName, input: { context: "Analyze the indexed documents." }, provider: skillProvider, model: effectiveModel },
+        token ?? undefined
+      );
+      setSkillResults((p) => ({ ...p, [skillName]: res.result }));
+    } catch (e) {
+      setSkillErrors((p) => ({ ...p, [skillName]: e instanceof Error ? e.message : "Skill failed." }));
+    } finally {
+      setSkillLoading((p) => ({ ...p, [skillName]: false }));
     }
   }
 
@@ -942,6 +973,118 @@ export default function AnalyticsPage() {
               )}
             </tbody>
           </table>
+        </div>
+      </article>
+
+      {/* ── AI Skills Workbench ─────────────────────────────────────────── */}
+      <article className="rounded-2xl border border-white/15 bg-white/5 p-5">
+        <h3 className="mb-1 text-base font-semibold text-white">AI Skills Workbench</h3>
+        <p className="mb-4 text-xs text-slate-400">
+          Run structured AI workflows against your indexed documents. Select a provider and model, then trigger a skill.
+        </p>
+
+        {/* Provider + Model selector row */}
+        <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <label className="block text-xs text-slate-300">
+            AI Provider
+            <select
+              value={skillProvider}
+              onChange={(e) => { setSkillProvider(e.target.value); setSkillBedrockCustom(""); setSkillModel(e.target.value === "bedrock" ? "amazon.nova-lite-v1:0" : "auto"); }}
+              className="mt-1 w-full rounded-lg border border-white/20 bg-slate-950/60 px-3 py-2 text-sm text-white"
+            >
+              <option value="openai">☁️  OpenAI  (GPT-4o / GPT-4.1)</option>
+              <option value="bedrock">🌩️  AWS Bedrock  (Claude · Nova · Llama)</option>
+            </select>
+          </label>
+
+          {skillProvider === "openai" ? (
+            <label className="block text-xs text-slate-300">
+              Model
+              <select
+                value={skillModel}
+                onChange={(e) => setSkillModel(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-white/20 bg-slate-950/60 px-3 py-2 text-sm text-white"
+              >
+                {["auto", "gpt-4o", "gpt-4.1", "gpt-4.1-mini"].map((m) => (
+                  <option key={m} value={m}>{m === "auto" ? "auto (Recommended)" : m}</option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <label className="block text-xs text-slate-300">
+              Bedrock Model
+              <select
+                value={skillModel}
+                onChange={(e) => { setSkillModel(e.target.value); setSkillBedrockCustom(""); }}
+                className="mt-1 w-full rounded-lg border border-white/20 bg-slate-950/60 px-3 py-2 text-sm text-white"
+              >
+                <option value="amazon.nova-lite-v1:0">Nova Lite · Amazon</option>
+                <option value="amazon.nova-micro-v1:0">Nova Micro · Amazon</option>
+                <option value="amazon.nova-pro-v1:0">Nova Pro · Amazon</option>
+                <option value="us.anthropic.claude-sonnet-4-5-20251203-v1:0">Claude Sonnet 4.6 · Anthropic</option>
+                <option value="us.anthropic.claude-haiku-3-5-20241022-v1:0">Claude Haiku · Anthropic</option>
+                <option value="us.anthropic.claude-opus-4-5-20251101-v1:0">Claude Opus 4.6 · Anthropic</option>
+                <option value="us.anthropic.claude-opus-4-7-20260416-v1:0">Claude Opus 4.7 · Anthropic (latest)</option>
+              </select>
+            </label>
+          )}
+
+          {skillProvider === "bedrock" && (
+            <label className="block text-xs text-slate-300">
+              Custom Bedrock Model ID <span className="text-slate-500">(overrides dropdown)</span>
+              <input
+                type="text"
+                value={skillBedrockCustom}
+                onChange={(e) => setSkillBedrockCustom(e.target.value)}
+                placeholder="e.g. us.anthropic.claude-opus-4-7-20260416-v1:0"
+                className="mt-1 w-full rounded-lg border border-cyan-500/30 bg-slate-950/60 px-3 py-2 text-sm text-cyan-100 placeholder-slate-500"
+              />
+            </label>
+          )}
+        </div>
+
+        {/* Skill buttons */}
+        <div className="grid gap-4 sm:grid-cols-3">
+          {(
+            [
+              { key: "financial_analysis" as const, label: "Financial Analysis", icon: "📊", desc: "Extract revenue, expenses, and key financial insights from documents." },
+              { key: "report_generation" as const, label: "Generate Report", icon: "📝", desc: "Produce a structured business report with metrics and recommendations." },
+              { key: "consulting_insights" as const, label: "Consulting Insights", icon: "💡", desc: "SWOT-style strategic analysis: strengths, risks, and opportunities." },
+            ]
+          ).map(({ key, label, icon, desc }) => (
+            <div key={key} className="flex flex-col rounded-xl border border-white/15 bg-slate-900/40 p-4">
+              <div className="mb-2 flex items-center gap-2">
+                <span className="text-xl">{icon}</span>
+                <span className="text-sm font-semibold text-white">{label}</span>
+              </div>
+              <p className="mb-3 flex-1 text-xs text-slate-400">{desc}</p>
+              <button
+                type="button"
+                disabled={skillLoading[key]}
+                onClick={() => runSkillHandler(key)}
+                className="rounded-lg bg-gradient-to-r from-indigo-500 to-cyan-500 px-3 py-2 text-xs font-medium text-white hover:brightness-110 disabled:opacity-50"
+              >
+                {skillLoading[key] ? "Running…" : `Run ${label}`}
+              </button>
+
+              {skillErrors[key] && (
+                <p className="mt-2 rounded bg-red-500/15 px-2 py-1 text-xs text-red-300">{skillErrors[key]}</p>
+              )}
+
+              {skillResults[key] && (
+                <div className="mt-3 max-h-64 overflow-auto rounded-lg border border-white/10 bg-slate-950/60 p-3 text-xs text-slate-200">
+                  {Object.entries(skillResults[key]!).map(([k, v]) => (
+                    <div key={k} className="mb-2">
+                      <span className="font-semibold capitalize text-cyan-300">{k.replace(/_/g, " ")}:</span>{" "}
+                      <span className="text-slate-200">
+                        {typeof v === "object" ? JSON.stringify(v, null, 2) : String(v)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       </article>
     </section>

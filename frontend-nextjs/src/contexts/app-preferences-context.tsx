@@ -14,7 +14,9 @@ export const SUPPORTED_CURRENCY_CODES = [
 export type CurrencyCode = (typeof SUPPORTED_CURRENCY_CODES)[number];
 
 type AppPreferences = {
+  selectedProvider: string;   // "openai" | "bedrock"
   selectedModel: string;
+  bedrockCustomModel: string; // free-text override for any Bedrock model ID
   selectedCategory: string;
   selectedPromptTemplate: string;
   openaiApiKey: string;
@@ -25,7 +27,9 @@ type AppPreferences = {
 };
 
 type AppPreferencesContextValue = AppPreferences & {
+  setSelectedProvider: (value: string) => void;
   setSelectedModel: (value: string) => void;
+  setBedrockCustomModel: (value: string) => void;
   setSelectedCategory: (value: string) => void;
   setSelectedPromptTemplate: (value: string) => void;
   setOpenaiApiKey: (value: string) => void;
@@ -45,7 +49,9 @@ function isValidCurrency(code: unknown): code is string {
 
 function loadInitial(): AppPreferences {
   const defaults: AppPreferences = {
+    selectedProvider: "openai",
     selectedModel: "auto",
+    bedrockCustomModel: "",
     selectedCategory: "general",
     selectedPromptTemplate: "",
     openaiApiKey: "",
@@ -62,7 +68,9 @@ function loadInitial(): AppPreferences {
     if (!raw) return defaults;
     const parsed = JSON.parse(raw) as Partial<AppPreferences>;
     return {
+      selectedProvider: parsed.selectedProvider || "openai",
       selectedModel: parsed.selectedModel || "auto",
+      bedrockCustomModel: parsed.bedrockCustomModel || "",
       selectedCategory: parsed.selectedCategory || "general",
       selectedPromptTemplate: parsed.selectedPromptTemplate || "",
       openaiApiKey: parsed.openaiApiKey || "",
@@ -91,7 +99,9 @@ export function AppPreferencesProvider({ children }: { children: React.ReactNode
   const value = useMemo<AppPreferencesContextValue>(
     () => ({
       ...prefs,
+      setSelectedProvider: (selectedProvider) => persist({ ...prefs, selectedProvider }),
       setSelectedModel: (selectedModel) => persist({ ...prefs, selectedModel }),
+      setBedrockCustomModel: (bedrockCustomModel) => persist({ ...prefs, bedrockCustomModel }),
       setSelectedCategory: (selectedCategory) => persist({ ...prefs, selectedCategory }),
       setSelectedPromptTemplate: (selectedPromptTemplate) =>
         persist({ ...prefs, selectedPromptTemplate }),
