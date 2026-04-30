@@ -394,6 +394,11 @@ class FinancialDashboardRequest(BaseModel):
     gemini_api_key: str | None = None
 
 
+class SkillRunRequest(BaseModel):
+    skill: str = Field(..., description="Skill name: financial_analysis | report_generation | consulting_insights")
+    input: dict[str, Any] = Field(default_factory=dict, description="Skill input payload")
+
+
 # ══════════════════════════════════════════════════════════
 #  Auth helpers
 # ══════════════════════════════════════════════════════════
@@ -1422,3 +1427,86 @@ async def detect_currency():
 @app.get("/api/health", tags=["Utility"])
 async def health_check():
     return {"status": "healthy", "app": settings.app_name}
+
+
+# ══════════════════════════════════════════════════════════
+#  Skills endpoints
+# ══════════════════════════════════════════════════════════
+
+@app.get("/api/skills", tags=["Skills"])
+async def list_skills():
+    """List all available skills with descriptions."""
+    return {
+        "skills": [
+            {
+                "name": "financial_analysis",
+                "description": "Extract structured revenue, expense, and insight data from document text.",
+                "input_fields": ["document_text or context", "model (optional)", "openai_api_key (optional)"],
+            },
+            {
+                "name": "report_generation",
+                "description": "Generate a structured business report (summary, metrics, recommendations) from context.",
+                "input_fields": ["context or document_text", "model (optional)", "openai_api_key (optional)"],
+            },
+            {
+                "name": "consulting_insights",
+                "description": "Apply strategic consulting frameworks (SWOT + priorities) to document context.",
+                "input_fields": ["context or document_text", "model (optional)", "openai_api_key (optional)"],
+            },
+        ]
+    }
+
+
+@app.post("/api/skills/run", tags=["Skills"])
+@limiter.limit(settings.rate_limit)
+async def run_skill(
+    request: Request,
+    body: SkillRunRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Run a named skill against provided input data.
+
+    If no context/document_text is supplied in the input, the skill will
+    automatically retrieve relevant context from the vector store.
+    """
+    from backend.skills.skill_router import route_skill, SUPPORTED_SKILLS
+
+    if body.skill not in SUPPORTED_SKILLS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown skill '{body.skill}'. Supported: {sorted(SUPPORTED_SKILLS)}",
+        )
+
+    llm, *_ = _get_services()
+    input_data = dict(body.input)
+
+    # Auto-fetch context from vector store when caller does not supply text
+    if not input_data.get("context") and not input_data.get("document_text"):
+        skill_queries = {
+            "financial_analysis": "revenue expenses financial data profit loss",
+            "report_generation": "business performance summary key metrics results",
+            "consulting_insights": "strategy risks opportunities strengths competitive",
+        }
+        query_text = skill_queries.get(body.skill, body.skill)
+        try:
+            embedder = get_embedding_service()
+            vector_store = get_vector_store(dimension=embedder.dimension)
+            query_emb = embedder.embed_query(query_text)
+            results = vector_store.search(query_emb, top_k=10)
+            if results:
+                input_data["context"] = "\n\n---\n\n".join(
+                    r.get("document", "")[:1500] for r in results
+                )
+        except Exception as exc:
+            logger.warning("Skills auto-context retrieval failed: %s", exc)
+
+    try:
+        result = await route_skill(body.skill, input_data, llm)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Skill execution error for '%s': %s", body.skill, exc)
+        raise HTTPException(status_code=502, detail=f"Skill execution failed: {exc}") from exc
+
+    return {"skill": body.skill, "result": result}

@@ -523,6 +523,181 @@ with table_col2:
     st.dataframe(stats_df, use_container_width=True, hide_index=True)
 
 # ══════════════════════════════════════════════════════════
+#  Skills Section
+# ══════════════════════════════════════════════════════════
+
+st.markdown("---")
+st.markdown("## 🧠 AI Skills Workbench")
+st.markdown(
+    "Run structured AI workflows against your indexed documents. "
+    "Each skill retrieves relevant context automatically from the knowledge base."
+)
+
+BACKEND_URL = "http://localhost:8000"
+
+def _run_skill(skill_name: str, extra_input: dict | None = None) -> dict | None:
+    payload = {"skill": skill_name, "input": extra_input or {}}
+    try:
+        resp = requests.post(f"{BACKEND_URL}/api/skills/run", json=payload, timeout=60)
+        resp.raise_for_status()
+        return resp.json().get("result", {})
+    except requests.exceptions.ConnectionError:
+        st.error("Cannot reach backend. Is the FastAPI server running on port 8000?")
+    except requests.exceptions.HTTPError as e:
+        st.error(f"Skill error: {e.response.text}")
+    except Exception as e:
+        st.error(f"Unexpected error: {e}")
+    return None
+
+
+skill_col1, skill_col2, skill_col3 = st.columns(3)
+
+# ── Financial Analysis ────────────────────────────────────
+with skill_col1:
+    st.markdown(
+        """
+        <div class="metric-card">
+            <h3 style="color:#1f2937;">💰 Financial Analysis</h3>
+            <p style="color:#6b7280;font-size:14px;">
+                Extracts revenue breakdown, expense breakdown, key financial
+                insights and risk flags from your documents.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.write("")
+    if st.button("Run Financial Analysis", key="btn_financial", use_container_width=True):
+        with st.spinner("Analysing financials…"):
+            result = _run_skill("financial_analysis")
+        if result:
+            st.success(f"Done — model: `{result.get('model_used', 'n/a')}`")
+            st.markdown("**Summary**")
+            st.info(result.get("summary", "—"))
+
+            rev = result.get("revenue_breakdown", [])
+            if rev:
+                st.markdown("**Revenue Breakdown**")
+                st.dataframe(rev, use_container_width=True)
+
+            exp = result.get("expense_breakdown", [])
+            if exp:
+                st.markdown("**Expense Breakdown**")
+                st.dataframe(exp, use_container_width=True)
+
+            insights = result.get("key_insights", [])
+            if insights:
+                st.markdown("**Key Insights**")
+                for ins in insights:
+                    st.markdown(f"- {ins}")
+
+            risks = result.get("risk_flags", [])
+            if risks:
+                st.markdown("**Risk Flags**")
+                for r in risks:
+                    st.warning(r)
+
+            with st.expander("Full JSON response"):
+                st.json(result)
+
+# ── Report Generation ─────────────────────────────────────
+with skill_col2:
+    st.markdown(
+        """
+        <div class="metric-card" style="border-left-color:#10b981;">
+            <h3 style="color:#1f2937;">📄 Report Generation</h3>
+            <p style="color:#6b7280;font-size:14px;">
+                Generates a structured business report with executive summary,
+                key metrics, findings and recommendations.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.write("")
+    if st.button("Generate Report", key="btn_report", use_container_width=True):
+        with st.spinner("Generating report…"):
+            result = _run_skill("report_generation")
+        if result:
+            st.success(f"Done — model: `{result.get('model_used', 'n/a')}`")
+            st.markdown(f"### {result.get('title', 'Business Report')}")
+            st.markdown("**Executive Summary**")
+            st.info(result.get("executive_summary", "—"))
+
+            metrics = result.get("key_metrics", [])
+            if metrics:
+                st.markdown("**Key Metrics**")
+                st.dataframe(metrics, use_container_width=True)
+
+            findings = result.get("findings", [])
+            if findings:
+                st.markdown("**Findings**")
+                for f in findings:
+                    st.markdown(f"- {f}")
+
+            recs = result.get("recommendations", [])
+            if recs:
+                st.markdown("**Recommendations**")
+                for rec in recs:
+                    st.markdown(f"- {rec}")
+
+            conclusion = result.get("conclusion", "")
+            if conclusion:
+                st.markdown("**Conclusion**")
+                st.info(conclusion)
+
+            with st.expander("Full JSON response"):
+                st.json(result)
+
+# ── Consulting Insights ───────────────────────────────────
+with skill_col3:
+    st.markdown(
+        """
+        <div class="metric-card" style="border-left-color:#f59e0b;">
+            <h3 style="color:#1f2937;">🎯 Consulting Insights</h3>
+            <p style="color:#6b7280;font-size:14px;">
+                Applies a strategic consulting framework (SWOT + priorities)
+                to surface strengths, risks and actionable opportunities.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.write("")
+    if st.button("Get Consulting Insights", key="btn_consulting", use_container_width=True):
+        with st.spinner("Generating consulting insights…"):
+            result = _run_skill("consulting_insights")
+        if result:
+            st.success(f"Done — model: `{result.get('model_used', 'n/a')}`")
+            st.markdown("**Overall Assessment**")
+            st.info(result.get("overall_assessment", "—"))
+
+            for section, icon in [
+                ("strengths", "✅"),
+                ("weaknesses", "⚠️"),
+                ("opportunities", "🚀"),
+                ("risks", "🔴"),
+            ]:
+                items = result.get(section, [])
+                if items:
+                    st.markdown(f"**{icon} {section.capitalize()}**")
+                    for item in items:
+                        st.markdown(f"- {item}")
+
+            priorities = result.get("strategic_priorities", [])
+            if priorities:
+                st.markdown("**Strategic Priorities**")
+                for p in priorities:
+                    with st.expander(p.get("priority", "Priority")):
+                        st.markdown(f"**Rationale:** {p.get('rationale', '')}")
+                        for action in p.get("suggested_actions", []):
+                            st.markdown(f"- {action}")
+
+            with st.expander("Full JSON response"):
+                st.json(result)
+
+
+# ══════════════════════════════════════════════════════════
 #  Footer
 # ══════════════════════════════════════════════════════════
 
