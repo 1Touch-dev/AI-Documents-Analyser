@@ -1,117 +1,113 @@
 """
-Consulting Insights Skill – applies a McKinsey/BCG-style strategic framework
-to document context and returns structured consulting output via GPT.
+Consulting Insights Skill — strict structured SWOT output.
+
+Always returns a validated dict matching CONSULTING_OUTPUT_SCHEMA.
 """
 
 from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+import re
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = (
-    "You are a management consultant with expertise in business strategy. "
-    "Analyse the provided context and deliver structured, actionable consulting insights. "
-    "Return only valid JSON — no markdown fences, no commentary."
-)
+CONSULTING_OUTPUT_SCHEMA = {
+    "strengths": [],
+    "weaknesses": [],
+    "opportunities": [],
+    "threats": [],
+    "strategic_actions": [],
+}
+
+SYSTEM_PROMPT = """You are a senior business consultant AI.
+Perform a SWOT analysis and strategic assessment. Return ONLY valid JSON matching this exact schema.
+Do NOT include any explanation, markdown, or text outside the JSON object.
+
+Schema:
+{
+  "strengths": ["<string>", ...],
+  "weaknesses": ["<string>", ...],
+  "opportunities": ["<string>", ...],
+  "threats": ["<string>", ...],
+  "strategic_actions": ["<actionable recommendation>", ...]
+}
+
+Rules:
+- Each array must have at least 3 items.
+- strategic_actions must be specific, actionable next steps.
+- Return ONLY the JSON object. No markdown fences, no commentary.
+"""
 
 
-def _build_prompt(context: str) -> str:
-    schema = {
-        "strengths": ["Competitive advantage or positive factor"],
-        "weaknesses": ["Internal gap or limitation"],
-        "opportunities": ["Market or strategic opportunity to pursue"],
-        "risks": ["Threat or downside risk to monitor"],
-        "strategic_priorities": [
-            {
-                "priority": "Priority title",
-                "rationale": "Why this matters",
-                "suggested_actions": ["Action step 1"],
-            }
-        ],
-        "overall_assessment": "One-paragraph strategic assessment",
-    }
-    return (
-        f"Provide consulting-style insights as JSON strictly matching this schema:\n\n"
-        f"{json.dumps(schema, indent=2)}\n\n"
-        f"Context:\n{context[:6000]}"
-    )
+def _extract_json(text: str) -> dict:
+    text = text.strip()
+    text = re.sub(r"^```(?:json)?\s*", "", text)
+    text = re.sub(r"\s*```$", "", text)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        match = re.search(r"\{.*\}", text, re.DOTALL)
+        if match:
+            return json.loads(match.group())
+        raise ValueError(f"LLM returned non-JSON output: {text[:200]}")
+
+
+def _merge_with_schema(data: dict) -> dict:
+    import copy
+    result = copy.deepcopy(CONSULTING_OUTPUT_SCHEMA)
+    for field in ("strengths", "weaknesses", "opportunities", "threats", "strategic_actions"):
+        if field in data and isinstance(data[field], list):
+            result[field] = [str(x) for x in data[field]]
+    return result
 
 
 async def generate_consulting_insights(
     context: str,
-    llm_router: Any,
-    model: str = "auto",
-    api_keys: dict[str, str | None] | None = None,
+    llm_router,
+    model: str = "gpt-4o",
+    api_keys: dict | None = None,
     provider: str = "openai",
-) -> dict[str, Any]:
+) -> dict:
     """
-    Provide consulting-style strategic insights from document context.
-
-    Returns a dict with keys:
-      - strengths              (list of strings)
-      - weaknesses             (list of strings)
-      - opportunities          (list of strings)
-      - risks                  (list of strings)
-      - strategic_priorities   (list of {priority, rationale, suggested_actions})
-      - overall_assessment     (string)
+    Generate SWOT-style consulting insights.
+    Returns strict JSON conforming to CONSULTING_OUTPUT_SCHEMA.
     """
-    if not context or not context.strip():
-        return _empty_result("No context provided.")
-
     from backend.llm_router import _is_bedrock_provider
-    from config.settings import settings as _settings
-    resolved_model = (
-        (model or "").strip() or _settings.bedrock_default_model
-        if _is_bedrock_provider(provider)
-        else llm_router.resolve_model(model, "analyze strategy recommend comprehensive", api_keys)
+    if _is_bedrock_provider(provider):
+        from config.settings import settings
+        resolved_model = model or settings.bedrock_default_model
+    else:
+        resolved_model = model or "gpt-4o"
+
+    prompt = f"""Perform a comprehensive SWOT analysis and strategic assessment based on the following context.
+
+CONTEXT:
+{context[:6000]}
+
+Return ONLY the JSON object matching the schema. No markdown, no explanation."""
+
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": prompt},
+    ]
+
+    raw = await llm_router.generate(
+        model_name=resolved_model,
+        messages=messages,
+        temperature=0.3,
+        max_tokens=2500,
+        api_keys=api_keys,
+        provider=provider,
     )
-    prompt = _build_prompt(context)
 
     try:
-        raw = await llm_router.generate(
-            model_name=resolved_model,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": prompt},
-            ],
-            temperature=0.3,
-            max_tokens=2048,
-            api_keys=api_keys,
-            provider=provider,
-        )
-        result = _parse_json(raw)
-        result["model_used"] = resolved_model
-        result["skill"] = "consulting_insights"
-        return result
+        data = _extract_json(raw)
+        result = _merge_with_schema(data)
     except Exception as exc:
-        logger.warning("consulting_insights skill failed: %s", exc)
-        fallback = _empty_result(f"Consulting analysis failed: {exc}")
-        fallback["model_used"] = resolved_model
-        return fallback
+        logger.warning("Consulting insights JSON parse failed (%s) — returning defaults.", exc)
+        result = _merge_with_schema({})
 
-
-def _parse_json(raw: str) -> dict[str, Any]:
-    text = raw.strip()
-    if text.startswith("```"):
-        lines = [ln for ln in text.splitlines() if not ln.strip().startswith("```")]
-        text = "\n".join(lines).strip()
-    start, end = text.find("{"), text.rfind("}")
-    if start == -1 or end == -1:
-        raise ValueError("No JSON object in model output.")
-    return json.loads(text[start: end + 1])
-
-
-def _empty_result(reason: str) -> dict[str, Any]:
-    return {
-        "skill": "consulting_insights",
-        "strengths": [],
-        "weaknesses": [reason],
-        "opportunities": [],
-        "risks": [reason],
-        "strategic_priorities": [],
-        "overall_assessment": reason,
-        "model_used": "n/a",
-    }
+    result["model_used"] = resolved_model
+    result["skill"] = "consulting_insights"
+    return result

@@ -1,126 +1,137 @@
 """
-Financial Analysis Skill – extracts structured revenue, expense, and insight
-data from document text using GPT.
+Financial Analysis Skill — strict structured output.
+
+Always returns a validated dict matching FINANCIAL_OUTPUT_SCHEMA.
+Never returns free text — the LLM is instructed to produce pure JSON.
 """
 
 from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+import re
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = (
-    "You are a senior financial analyst. Extract and structure financial information "
-    "from the provided document text. Return only valid JSON — no markdown fences, "
-    "no commentary."
-)
-
-OUTPUT_SCHEMA = {
-    "revenue_breakdown": {
-        "description": "Revenue items with label and amount (numbers only, 0 if unknown)",
-        "example": [{"label": "Product Sales", "amount": 0}],
+FINANCIAL_OUTPUT_SCHEMA = {
+    "revenue": {
+        "fnb": 0,
+        "sponsorship": 0,
+        "tickets": 0,
+        "retail": 0,
+        "player_sales": 0,
     },
-    "expense_breakdown": {
-        "description": "Expense items with label and amount",
-        "example": [{"label": "Operating Costs", "amount": 0}],
+    "expenses": {
+        "player_salary": 0,
+        "coach_salary": 0,
+        "travel": 0,
+        "stadium": 0,
+        "retail": 0,
+        "fnb": 0,
+        "back_office": 0,
+        "misc": 0,
     },
-    "key_insights": {
-        "description": "3-5 bullet-point insights about financial health",
-        "example": ["Revenue exceeds expenses by 20%"],
-    },
-    "risk_flags": {
-        "description": "Any financial risks or anomalies detected",
-        "example": ["High debt-to-equity ratio"],
-    },
-    "summary": {
-        "description": "One-paragraph financial summary",
-        "example": "The organisation shows stable revenue with controlled expenditure.",
-    },
+    "insights": [],
+    "risks": [],
+    "opportunities": [],
 }
 
+SYSTEM_PROMPT = """You are a financial analysis AI.
+Extract financial data from the document and return ONLY valid JSON matching this exact schema.
+Do NOT include any explanation, markdown, or text outside the JSON object.
 
-def _build_prompt(document_text: str) -> str:
-    schema_str = json.dumps(OUTPUT_SCHEMA, indent=2)
-    return (
-        f"Analyse the following document and return a JSON object that strictly follows "
-        f"this schema (use 0 for unknown numeric values, empty list [] for unknown lists):\n\n"
-        f"{schema_str}\n\n"
-        f"Document text:\n{document_text[:6000]}"
-    )
+Schema:
+{
+  "revenue": {"fnb": <number>, "sponsorship": <number>, "tickets": <number>, "retail": <number>, "player_sales": <number>},
+  "expenses": {"player_salary": <number>, "coach_salary": <number>, "travel": <number>, "stadium": <number>, "retail": <number>, "fnb": <number>, "back_office": <number>, "misc": <number>},
+  "insights": ["<string>", ...],
+  "risks": ["<string>", ...],
+  "opportunities": ["<string>", ...]
+}
+
+Rules:
+- All monetary values must be numbers (not strings). Use 0 if not mentioned.
+- insights, risks, opportunities must each have at least 2 items.
+- Return ONLY the JSON object. No markdown fences, no commentary.
+"""
+
+
+def _extract_json(text: str) -> dict:
+    """Extract JSON from LLM output, stripping any markdown fences."""
+    text = text.strip()
+    # Strip markdown code fences if present
+    text = re.sub(r"^```(?:json)?\s*", "", text)
+    text = re.sub(r"\s*```$", "", text)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        # Try to find a JSON object anywhere in the text
+        match = re.search(r"\{.*\}", text, re.DOTALL)
+        if match:
+            return json.loads(match.group())
+        raise ValueError(f"LLM returned non-JSON output: {text[:200]}")
+
+
+def _merge_with_schema(data: dict) -> dict:
+    """Merge LLM output with default schema, ensuring all keys exist."""
+    import copy
+    result = copy.deepcopy(FINANCIAL_OUTPUT_SCHEMA)
+    if "revenue" in data and isinstance(data["revenue"], dict):
+        result["revenue"].update({k: v for k, v in data["revenue"].items() if isinstance(v, (int, float))})
+    if "expenses" in data and isinstance(data["expenses"], dict):
+        result["expenses"].update({k: v for k, v in data["expenses"].items() if isinstance(v, (int, float))})
+    for field in ("insights", "risks", "opportunities"):
+        if field in data and isinstance(data[field], list):
+            result[field] = [str(x) for x in data[field]]
+    return result
 
 
 async def analyze_financials(
     document_text: str,
-    llm_router: Any,
-    model: str = "auto",
-    api_keys: dict[str, str | None] | None = None,
+    llm_router,
+    model: str = "gpt-4o",
+    api_keys: dict | None = None,
     provider: str = "openai",
-) -> dict[str, Any]:
+) -> dict:
     """
-    Extract structured financial insights from document text.
-
-    Returns a dict with keys:
-      - revenue_breakdown  (list of {label, amount})
-      - expense_breakdown  (list of {label, amount})
-      - key_insights       (list of strings)
-      - risk_flags         (list of strings)
-      - summary            (string)
+    Run structured financial analysis against document text.
+    Returns strict JSON conforming to FINANCIAL_OUTPUT_SCHEMA.
     """
-    if not document_text or not document_text.strip():
-        return _empty_result("No document text provided.")
-
     from backend.llm_router import _is_bedrock_provider
-    from config.settings import settings as _settings
-    resolved_model = (
-        (model or "").strip() or _settings.bedrock_default_model
-        if _is_bedrock_provider(provider)
-        else llm_router.resolve_model(model, "financial analysis", api_keys)
+    if _is_bedrock_provider(provider):
+        from config.settings import settings
+        resolved_model = model or settings.bedrock_default_model
+    else:
+        resolved_model = model or "gpt-4o"
+
+    prompt = f"""Analyse the following document and extract all financial data.
+
+DOCUMENT:
+{document_text[:6000]}
+
+Return ONLY the JSON object matching the schema. No markdown, no explanation."""
+
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": prompt},
+    ]
+
+    raw = await llm_router.generate(
+        model_name=resolved_model,
+        messages=messages,
+        temperature=0.1,
+        max_tokens=2048,
+        api_keys=api_keys,
+        provider=provider,
     )
-    prompt = _build_prompt(document_text)
 
     try:
-        raw = await llm_router.generate(
-            model_name=resolved_model,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": prompt},
-            ],
-            temperature=0.1,
-            max_tokens=2048,
-            api_keys=api_keys,
-            provider=provider,
-        )
-        result = _parse_json(raw)
-        result["model_used"] = resolved_model
-        result["skill"] = "financial_analysis"
-        return result
+        data = _extract_json(raw)
+        result = _merge_with_schema(data)
     except Exception as exc:
-        logger.warning("financial_analysis skill failed: %s", exc)
-        fallback = _empty_result(f"Analysis failed: {exc}")
-        fallback["model_used"] = resolved_model
-        return fallback
+        logger.warning("Financial analysis JSON parse failed (%s) — returning defaults.", exc)
+        result = _merge_with_schema({})
 
-
-def _parse_json(raw: str) -> dict[str, Any]:
-    text = raw.strip()
-    if text.startswith("```"):
-        lines = [ln for ln in text.splitlines() if not ln.strip().startswith("```")]
-        text = "\n".join(lines).strip()
-    start, end = text.find("{"), text.rfind("}")
-    if start == -1 or end == -1:
-        raise ValueError("No JSON object in model output.")
-    return json.loads(text[start: end + 1])
-
-
-def _empty_result(reason: str) -> dict[str, Any]:
-    return {
-        "skill": "financial_analysis",
-        "revenue_breakdown": [],
-        "expense_breakdown": [],
-        "key_insights": [reason],
-        "risk_flags": [],
-        "summary": reason,
-        "model_used": "n/a",
-    }
+    result["model_used"] = resolved_model
+    result["skill"] = "financial_analysis"
+    return result

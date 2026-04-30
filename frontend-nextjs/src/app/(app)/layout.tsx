@@ -16,6 +16,7 @@ import {
   MessageCircle,
   PanelLeftClose,
   PanelLeftOpen,
+  Workflow,
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 
@@ -26,6 +27,7 @@ const NAV_ITEMS = [
   { href: "/prompts", label: "Prompts", icon: FileText },
   { href: "/conversations", label: "Conversations", icon: History },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/workflows", label: "Workflows", icon: Workflow },
   { href: "/report-generation", label: "Report Generation", icon: FileOutput },
   { href: "/export-data", label: "Export Data", icon: FileSpreadsheet },
 ];

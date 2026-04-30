@@ -302,82 +302,135 @@ BEDROCK_DEFAULT_MODEL=amazon.nova-lite-v1:0   # Default when no model specified
 
 ---
 
-## Skills System
+## Enterprise Features
 
-The Skills System adds a **structured workflow layer** on top of the base RAG
-and analytics stack.  Skills accept JSON input, call GPT, and return
-deterministic JSON output — enabling repeatable, auditable AI workflows.
+### Skills System
 
-### Available Skills
+Each skill enforces **strict JSON output schemas** — no free-text responses.
+The LLM is instructed to return a pure JSON object; the skill layer validates
+and merges the response against a known schema before returning it.
 
-| Skill | Endpoint | Description |
+| Skill | Endpoint | Strict Output Schema |
 |---|---|---|
-| `financial_analysis` | `POST /api/skills/run` | Extracts revenue breakdown, expense breakdown, key insights and risk flags from documents |
-| `report_generation` | `POST /api/skills/run` | Generates a full business report: executive summary, metrics, findings, recommendations |
-| `consulting_insights` | `POST /api/skills/run` | Applies a SWOT + strategic priorities framework to surface opportunities and risks |
-
-### How to Call a Skill
+| `financial_analysis` | `POST /api/skills/run` | `{revenue:{}, expenses:{}, insights:[], risks:[], opportunities:[]}` |
+| `report_generation` | `POST /api/skills/run` | `{title, executive_summary, key_metrics:{}, analysis:[], recommendations:[]}` |
+| `consulting_insights` | `POST /api/skills/run` | `{strengths:[], weaknesses:[], opportunities:[], threats:[], strategic_actions:[]}` |
 
 ```bash
 curl -X POST http://localhost:8000/api/skills/run \
   -H "Content-Type: application/json" \
-  -d '{
-    "skill": "financial_analysis",
-    "input": {
-      "document_text": "Revenue this quarter was R$4.2M, up 12% year-on-year..."
-    }
-  }'
+  -d '{"skill":"financial_analysis","input":{"document_text":"..."},"provider":"openai"}'
 ```
 
-If you omit `document_text` / `context`, the skill automatically retrieves
-relevant context from the vector store (indexed documents).
+---
+
+### Workflow Engine
+
+Multi-step pipelines that chain document retrieval → skill execution → output:
+
+| Workflow | Endpoint | Steps |
+|---|---|---|
+| `financial` | `POST /api/workflows/run` | retrieve_documents → extract_financials → calculate_totals → generate_insights |
+| `consulting` | `POST /api/workflows/run` | retrieve_documents → swot_analysis → strategic_planning → compile_output |
+| `report` | `POST /api/workflows/run` | retrieve_documents → collect_metrics → generate_summary → compile_report |
+
+```bash
+# List available workflows
+curl http://localhost:8000/api/workflows/list
+
+# Run a workflow
+curl -X POST http://localhost:8000/api/workflows/run \
+  -H "Content-Type: application/json" \
+  -d '{"workflow":"financial","provider":"openai","model":"gpt-4o","input":{}}'
+```
+
+---
+
+### MCP Server (JSON-RPC 2.0)
+
+A real MCP server is exposed at `POST /api/mcp/execute`. Supports:
+- `initialize` — capability negotiation
+- `tools/list` — enumerate all 4 tools
+- `tools/call` — execute any tool with arguments
+
+```bash
+# List tools via MCP
+curl -X POST http://localhost:8000/api/mcp/execute \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+
+# Execute a tool
+curl -X POST http://localhost:8000/api/mcp/execute \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"financial_analysis","arguments":{"document_text":"Revenue: $1M","provider":"openai"}}}'
+```
+
+Available MCP tools: `financial_analysis`, `generate_report`, `consulting_insights`, `run_workflow`
+
+---
+
+### n8n Webhook Endpoints
+
+No-auth external triggers for automation pipelines:
+
+| Webhook | URL |
+|---|---|
+| Financial | `POST /api/webhooks/financial` |
+| Consulting | `POST /api/webhooks/consulting` |
+| Report | `POST /api/webhooks/report` |
+
+Body: `{"provider":"openai","model":"auto","document_text":"...","context":"..."}`
+
+---
+
+### Export
+
+```bash
+# Export workflow result as JSON (default)
+curl -X POST http://localhost:8000/api/export/report \
+  -d '{"workflow":"report","provider":"openai","model":"gpt-4o","input":{}}'
+
+# Export as CSV (Tableau-compatible)
+curl -X POST http://localhost:8000/api/export/report \
+  -d '{"workflow":"financial","input":{"format":"csv"}}'
+```
+
+---
 
 ### File Structure
 
 ```
 backend/
   skills/
-    __init__.py
-    financial_analysis.py   ← Revenue / expense extraction skill
-    report_generation.py    ← Business report generation skill
-    consulting_insights.py  ← SWOT + strategic priorities skill
-    skill_router.py         ← Dispatches requests to the correct skill
+    financial_analysis.py    ← Strict JSON schema: revenue/expenses/insights
+    report_generation.py     ← Strict JSON schema: title/summary/metrics/recs
+    consulting_insights.py   ← Strict JSON schema: SWOT + strategic_actions
+    skill_router.py
+
+  workflows/
+    workflow_engine.py       ← run_workflow(), list_workflows(), WORKFLOW_REGISTRY
+    financial_workflow.py    ← 4-step financial pipeline
+    consulting_workflow.py   ← 4-step SWOT pipeline
+    report_workflow.py       ← 4-step report pipeline
 
   mcp/
-    __init__.py
-    skills_mcp.py           ← MCP server stub (stdio, JSON-RPC 2.0)
-    README.md               ← MCP integration guide
+    server.py                ← Real JSON-RPC 2.0 MCP server
+    skills_mcp.py            ← stdio MCP server (for Claude Desktop / Cursor)
+    README.md
+
+frontend-nextjs/src/app/(app)/
+  workflows/page.tsx         ← Workflows page with selector, viz, export
+  analytics/page.tsx         ← Skills Workbench section
 ```
 
-### MCP Integration
+### Frontend — Workflows Page
 
-Skills are architected as **MCP-ready callable units**.  The
-`backend/mcp/skills_mcp.py` module implements a Model Context Protocol
-server that exposes all three skills as discoverable tools.
-
-To run the MCP server (connects to a live FastAPI instance):
-
-```bash
-python -m backend.mcp.skills_mcp
-```
-
-This enables integration with:
-- **Claude Desktop** (via `mcp` config)
-- **Cursor Background Agents** (tool calling)
-- **n8n** (MCP node or HTTP Request node)
-- Any agent platform that supports MCP tool discovery
-
-### Frontend
-
-The **Analytics Dashboard** (`frontend/pages/1_📊_Analytics_Dashboard.py`)
-includes a **Skills Workbench** section with three one-click buttons:
-
-- **Run Financial Analysis**
-- **Generate Report**
-- **Get Consulting Insights**
-
-Each button calls `/api/skills/run`, renders the structured result inline,
-and provides a JSON viewer for the full response.
+Navigate to `/workflows` in the Next.js app for:
+- Visual workflow selector with step previews
+- Provider + model configuration (OpenAI / Bedrock)
+- Real-time execution with step progress display
+- Structured result visualisation (tables, cards, sections)
+- One-click JSON and CSV export
 
 ---
 

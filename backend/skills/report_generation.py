@@ -1,111 +1,120 @@
 """
-Report Generation Skill – produces a structured business report from
-document context using GPT.
+Report Generation Skill — strict structured output.
+
+Always returns a validated dict matching REPORT_OUTPUT_SCHEMA.
 """
 
 from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+import re
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = (
-    "You are a senior business analyst. Generate a structured, professional business "
-    "report from the provided context. Return only valid JSON — no markdown fences, "
-    "no commentary."
-)
+REPORT_OUTPUT_SCHEMA = {
+    "title": "",
+    "executive_summary": "",
+    "key_metrics": {},
+    "analysis": [],
+    "recommendations": [],
+}
+
+SYSTEM_PROMPT = """You are a business report generation AI.
+Generate a structured business report and return ONLY valid JSON matching this exact schema.
+Do NOT include any explanation, markdown, or text outside the JSON object.
+
+Schema:
+{
+  "title": "<report title string>",
+  "executive_summary": "<2-4 sentence summary string>",
+  "key_metrics": {"<metric_name>": "<value>", ...},
+  "analysis": ["<finding string>", ...],
+  "recommendations": ["<action string>", ...]
+}
+
+Rules:
+- title must be a descriptive string.
+- executive_summary must be 2-4 sentences.
+- key_metrics must have at least 3 entries.
+- analysis must have at least 3 items.
+- recommendations must have at least 3 items.
+- Return ONLY the JSON object. No markdown fences, no commentary.
+"""
 
 
-def _build_prompt(context: str) -> str:
-    schema = {
-        "title": "Report title",
-        "executive_summary": "1-2 paragraph executive summary",
-        "key_metrics": [{"metric": "Name", "value": "Value", "note": "Optional note"}],
-        "findings": ["Key finding 1", "Key finding 2"],
-        "recommendations": ["Action item 1", "Action item 2"],
-        "conclusion": "Closing paragraph summarising next steps",
-    }
-    return (
-        f"Generate a structured business report as JSON strictly matching this schema:\n\n"
-        f"{json.dumps(schema, indent=2)}\n\n"
-        f"Context:\n{context[:6000]}"
-    )
+def _extract_json(text: str) -> dict:
+    text = text.strip()
+    text = re.sub(r"^```(?:json)?\s*", "", text)
+    text = re.sub(r"\s*```$", "", text)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        match = re.search(r"\{.*\}", text, re.DOTALL)
+        if match:
+            return json.loads(match.group())
+        raise ValueError(f"LLM returned non-JSON output: {text[:200]}")
+
+
+def _merge_with_schema(data: dict) -> dict:
+    import copy
+    result = copy.deepcopy(REPORT_OUTPUT_SCHEMA)
+    result["title"] = str(data.get("title", "Business Report"))
+    result["executive_summary"] = str(data.get("executive_summary", ""))
+    if "key_metrics" in data and isinstance(data["key_metrics"], dict):
+        result["key_metrics"] = {str(k): str(v) for k, v in data["key_metrics"].items()}
+    for field in ("analysis", "recommendations"):
+        if field in data and isinstance(data[field], list):
+            result[field] = [str(x) for x in data[field]]
+    return result
 
 
 async def generate_report(
     context: str,
-    llm_router: Any,
-    model: str = "auto",
-    api_keys: dict[str, str | None] | None = None,
+    llm_router,
+    model: str = "gpt-4o",
+    api_keys: dict | None = None,
     provider: str = "openai",
-) -> dict[str, Any]:
+) -> dict:
     """
-    Generate a structured business report from document context.
-
-    Returns a dict with keys:
-      - title
-      - executive_summary
-      - key_metrics       (list of {metric, value, note})
-      - findings          (list of strings)
-      - recommendations   (list of strings)
-      - conclusion
+    Generate a structured business report.
+    Returns strict JSON conforming to REPORT_OUTPUT_SCHEMA.
     """
-    if not context or not context.strip():
-        return _empty_result("No context provided.")
-
     from backend.llm_router import _is_bedrock_provider
-    from config.settings import settings as _settings
-    resolved_model = (
-        (model or "").strip() or _settings.bedrock_default_model
-        if _is_bedrock_provider(provider)
-        else llm_router.resolve_model(model, "generate report comprehensive", api_keys)
+    if _is_bedrock_provider(provider):
+        from config.settings import settings
+        resolved_model = model or settings.bedrock_default_model
+    else:
+        resolved_model = model or "gpt-4o"
+
+    prompt = f"""Generate a comprehensive business report based on the following context.
+
+CONTEXT:
+{context[:6000]}
+
+Return ONLY the JSON object matching the schema. No markdown, no explanation."""
+
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": prompt},
+    ]
+
+    raw = await llm_router.generate(
+        model_name=resolved_model,
+        messages=messages,
+        temperature=0.3,
+        max_tokens=3000,
+        api_keys=api_keys,
+        provider=provider,
     )
-    prompt = _build_prompt(context)
 
     try:
-        raw = await llm_router.generate(
-            model_name=resolved_model,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": prompt},
-            ],
-            temperature=0.2,
-            max_tokens=2048,
-            api_keys=api_keys,
-            provider=provider,
-        )
-        result = _parse_json(raw)
-        result["model_used"] = resolved_model
-        result["skill"] = "report_generation"
-        return result
+        data = _extract_json(raw)
+        result = _merge_with_schema(data)
     except Exception as exc:
-        logger.warning("report_generation skill failed: %s", exc)
-        fallback = _empty_result(f"Report generation failed: {exc}")
-        fallback["model_used"] = resolved_model
-        return fallback
+        logger.warning("Report generation JSON parse failed (%s) — returning defaults.", exc)
+        result = _merge_with_schema({})
 
-
-def _parse_json(raw: str) -> dict[str, Any]:
-    text = raw.strip()
-    if text.startswith("```"):
-        lines = [ln for ln in text.splitlines() if not ln.strip().startswith("```")]
-        text = "\n".join(lines).strip()
-    start, end = text.find("{"), text.rfind("}")
-    if start == -1 or end == -1:
-        raise ValueError("No JSON object in model output.")
-    return json.loads(text[start: end + 1])
-
-
-def _empty_result(reason: str) -> dict[str, Any]:
-    return {
-        "skill": "report_generation",
-        "title": "Report Unavailable",
-        "executive_summary": reason,
-        "key_metrics": [],
-        "findings": [reason],
-        "recommendations": [],
-        "conclusion": reason,
-        "model_used": "n/a",
-    }
+    result["model_used"] = resolved_model
+    result["skill"] = "report_generation"
+    return result

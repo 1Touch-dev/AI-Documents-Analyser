@@ -538,3 +538,92 @@ curl http://54.175.54.77:8000/api/models
 - [ ] All existing `/api/query` calls without `provider` field still work (defaults to "openai")
 - [ ] Currency rate source is fawazahmed0 (not static)
 - [ ] Skills system works for both providers without breaking changes
+
+---
+
+## Enterprise Workflows Tests
+
+### Workflow Page (`/workflows`)
+
+- [ ] Navigate to `/workflows` — page loads with 3 workflow cards (Financial, Consulting, Report)
+- [ ] Each card shows step breadcrumbs when selected
+- [ ] Provider dropdown switches between OpenAI and AWS Bedrock
+- [ ] Bedrock model dropdown shows 7 options; custom model ID field appears
+- [ ] "Active model" badge updates when provider/model changes
+- [ ] Click **Run Financial Analysis** → loading spinner shows step names animating
+- [ ] Result panel shows: totals strip (4 KPI cards), revenue table, expense table, insights/risks/opportunities columns
+- [ ] Click **Run Consulting Analysis** → result shows SWOT grid (5 coloured sections)
+- [ ] Click **Run Report Generation** → result shows title, summary, metrics chips, analysis + recommendations
+- [ ] **Export JSON** button downloads a `.json` file
+- [ ] **Export CSV** button downloads a `.csv` file (Tableau-compatible)
+
+### Workflow API Tests
+
+```bash
+# List workflows
+curl http://localhost:8000/api/workflows/list
+
+# Run financial workflow (OpenAI)
+curl -X POST http://localhost:8000/api/workflows/run \
+  -H "Content-Type: application/json" \
+  -d '{"workflow":"financial","provider":"openai","model":"auto","input":{}}'
+
+# Run consulting workflow (Bedrock)
+curl -X POST http://localhost:8000/api/workflows/run \
+  -H "Content-Type: application/json" \
+  -d '{"workflow":"consulting","provider":"bedrock","model":"amazon.nova-lite-v1:0","input":{}}'
+```
+
+### MCP Tests
+
+```bash
+# Initialize
+curl -X POST http://localhost:8000/api/mcp/execute \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
+# Expected: serverInfo.name = "ai-knowledge-platform-mcp"
+
+# List tools
+curl -X POST http://localhost:8000/api/mcp/execute \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
+# Expected: 4 tools: financial_analysis, generate_report, consulting_insights, run_workflow
+
+# Call a tool
+curl -X POST http://localhost:8000/api/mcp/execute \
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"consulting_insights","arguments":{"context":"Stadium A&B operations 2024"}}}'
+```
+
+### Webhook Tests (n8n)
+
+```bash
+curl -X POST http://localhost:8000/api/webhooks/financial \
+  -H "Content-Type: application/json" \
+  -d '{"provider":"openai","model":"auto","context":"Stadium revenue data"}'
+# Expected: full financial workflow result JSON
+
+curl -X POST http://localhost:8000/api/webhooks/report \
+  -d '{"provider":"bedrock","model":"amazon.nova-lite-v1:0","context":"Q1 performance data"}'
+```
+
+### Export Tests
+
+```bash
+# JSON export
+curl -X POST http://localhost:8000/api/export/report \
+  -H "Content-Type: application/json" \
+  -d '{"workflow":"financial","provider":"openai","model":"auto","input":{}}'
+
+# CSV export
+curl -X POST http://localhost:8000/api/export/report \
+  -d '{"workflow":"report","provider":"openai","model":"auto","input":{"format":"csv"}}'
+# Expected: text/csv response with field,value rows
+```
+
+### Regression Checks
+
+- [ ] `/api/query` still works (chat not broken)
+- [ ] `/api/skills/run` still works with all 3 skills
+- [ ] `/api/analytics/financial_dashboard` still works
+- [ ] Bedrock queries still work end-to-end
+- [ ] OpenAI queries still work end-to-end
+

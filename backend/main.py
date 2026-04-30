@@ -1539,3 +1539,191 @@ async def run_skill(
         raise HTTPException(status_code=502, detail=f"Skill execution failed: {exc}") from exc
 
     return {"skill": body.skill, "result": result}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  WORKFLOWS
+# ══════════════════════════════════════════════════════════════════════════════
+
+class WorkflowRunRequest(BaseModel):
+    workflow: str = Field(..., description="Workflow name: financial | consulting | report")
+    input: dict = Field(default_factory=dict, description="Input data (document_text, context, etc.)")
+    provider: str = Field("openai", description="LLM provider: openai | bedrock")
+    model: str = Field("auto", description="Model name/ID")
+    openai_api_key: str | None = None
+
+
+@app.get("/api/workflows/list", tags=["Workflows"])
+async def list_workflows_endpoint():
+    """Return all registered workflows with their steps and output schemas."""
+    from backend.workflows.workflow_engine import list_workflows
+    return {"workflows": list_workflows()}
+
+
+@app.post("/api/workflows/run", tags=["Workflows"])
+async def run_workflow_endpoint(body: WorkflowRunRequest, _: Optional[User] = Depends(get_current_user)):
+    """Execute a named multi-step workflow end-to-end."""
+    llm, *_ = _get_services()
+    api_keys = {"openai_api_key": body.openai_api_key}
+    from backend.workflows.workflow_engine import run_workflow
+    try:
+        result = await run_workflow(
+            workflow_name=body.workflow,
+            input_data=body.input,
+            llm_router=llm,
+            provider=body.provider,
+            model=body.model,
+            api_keys=api_keys,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Workflow '%s' failed: %s", body.workflow, exc)
+        raise HTTPException(status_code=502, detail=f"Workflow execution failed: {exc}") from exc
+    return result
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  MCP EXECUTE
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.post("/api/mcp/execute", tags=["MCP"])
+async def mcp_execute(request: Request):
+    """
+    JSON-RPC 2.0 endpoint for MCP tool execution.
+
+    Accepts standard MCP requests (initialize / tools/list / tools/call).
+    No auth required — authentication is handled by the calling agent.
+    """
+    llm, *_ = _get_services()
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(
+            {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error"}},
+            status_code=400,
+        )
+    from backend.mcp.server import handle_request
+    result = await handle_request(body, llm_router=llm)
+    return JSONResponse(result)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  WEBHOOKS  (n8n / external automation triggers)
+# ══════════════════════════════════════════════════════════════════════════════
+
+class WebhookRequest(BaseModel):
+    provider: str = "openai"
+    model: str = "auto"
+    document_text: str = ""
+    context: str = ""
+    openai_api_key: str | None = None
+
+
+@app.post("/api/webhooks/financial", tags=["Webhooks"])
+async def webhook_financial(body: WebhookRequest):
+    """n8n-ready webhook — triggers full financial workflow and returns JSON."""
+    llm, *_ = _get_services()
+    from backend.workflows.workflow_engine import run_workflow
+    try:
+        result = await run_workflow(
+            workflow_name="financial",
+            input_data={"document_text": body.document_text or body.context},
+            llm_router=llm,
+            provider=body.provider,
+            model=body.model,
+            api_keys={"openai_api_key": body.openai_api_key},
+        )
+    except Exception as exc:
+        raise HTTPException(502, detail=str(exc)) from exc
+    return result
+
+
+@app.post("/api/webhooks/consulting", tags=["Webhooks"])
+async def webhook_consulting(body: WebhookRequest):
+    """n8n-ready webhook — triggers full consulting workflow and returns JSON."""
+    llm, *_ = _get_services()
+    from backend.workflows.workflow_engine import run_workflow
+    try:
+        result = await run_workflow(
+            workflow_name="consulting",
+            input_data={"context": body.context or body.document_text},
+            llm_router=llm,
+            provider=body.provider,
+            model=body.model,
+            api_keys={"openai_api_key": body.openai_api_key},
+        )
+    except Exception as exc:
+        raise HTTPException(502, detail=str(exc)) from exc
+    return result
+
+
+@app.post("/api/webhooks/report", tags=["Webhooks"])
+async def webhook_report(body: WebhookRequest):
+    """n8n-ready webhook — triggers full report workflow and returns JSON."""
+    llm, *_ = _get_services()
+    from backend.workflows.workflow_engine import run_workflow
+    try:
+        result = await run_workflow(
+            workflow_name="report",
+            input_data={"context": body.context or body.document_text},
+            llm_router=llm,
+            provider=body.provider,
+            model=body.model,
+            api_keys={"openai_api_key": body.openai_api_key},
+        )
+    except Exception as exc:
+        raise HTTPException(502, detail=str(exc)) from exc
+    return result
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  EXPORT
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.post("/api/export/report", tags=["Export"])
+async def export_report(body: WorkflowRunRequest, _: Optional[User] = Depends(get_current_user)):
+    """
+    Run the report workflow and return the result as JSON or CSV.
+
+    Pass ?format=csv for Tableau-compatible CSV, omit for JSON (default).
+    """
+    from fastapi.responses import PlainTextResponse
+    import csv, io
+    llm, *_ = _get_services()
+    api_keys = {"openai_api_key": body.openai_api_key}
+    from backend.workflows.workflow_engine import run_workflow
+    try:
+        result = await run_workflow(
+            workflow_name=body.workflow,
+            input_data=body.input,
+            llm_router=llm,
+            provider=body.provider,
+            model=body.model,
+            api_keys=api_keys,
+        )
+    except Exception as exc:
+        raise HTTPException(502, detail=str(exc)) from exc
+
+    format_param = body.input.get("format", "json")
+    if format_param == "csv":
+        # Flatten the result dict into CSV rows
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["field", "value"])
+
+        def _flatten(obj, prefix=""):
+            if isinstance(obj, dict):
+                for k, v in obj.items():
+                    _flatten(v, f"{prefix}{k}.")
+            elif isinstance(obj, list):
+                for i, v in enumerate(obj):
+                    _flatten(v, f"{prefix}{i}.")
+            else:
+                writer.writerow([prefix.rstrip("."), obj])
+
+        _flatten(result)
+        return PlainTextResponse(output.getvalue(), media_type="text/csv",
+                                 headers={"Content-Disposition": "attachment; filename=report.csv"})
+
+    return result

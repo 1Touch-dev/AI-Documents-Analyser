@@ -290,3 +290,55 @@ pkill -f "next.*3001" || true
 ```
 
 > **No local LLM required.** All generation runs through the OpenAI GPT API.
+
+---
+
+## 9. Enterprise Workflows & MCP
+
+### Workflow Endpoints
+
+After deployment, workflows are available at:
+
+```bash
+# List all workflows
+GET http://<EC2_IP>:8000/api/workflows/list
+
+# Run a workflow (requires auth token)
+POST http://<EC2_IP>:8000/api/workflows/run
+{
+  "workflow": "financial",   # financial | consulting | report
+  "provider": "openai",      # openai | bedrock
+  "model": "auto",
+  "input": {}
+}
+
+# n8n webhooks (no auth required)
+POST http://<EC2_IP>:8000/api/webhooks/financial
+POST http://<EC2_IP>:8000/api/webhooks/consulting
+POST http://<EC2_IP>:8000/api/webhooks/report
+
+# Export result as JSON or CSV
+POST http://<EC2_IP>:8000/api/export/report
+{"workflow":"financial","input":{"format":"csv"}}
+```
+
+### MCP Server
+
+```bash
+# Test MCP handshake
+curl -X POST http://<EC2_IP>:8000/api/mcp/execute \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
+
+# List available MCP tools
+curl -X POST http://<EC2_IP>:8000/api/mcp/execute \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
+```
+
+### n8n Integration
+
+1. In n8n, add an **HTTP Request** node
+2. Set method to `POST`, URL to `http://<EC2_IP>:8000/api/webhooks/financial`
+3. Body: `{"provider":"openai","model":"auto","context":"<your data>"}`
+4. The response is a structured JSON object ready to use in downstream nodes
+

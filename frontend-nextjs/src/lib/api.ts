@@ -425,6 +425,42 @@ export function getFinancialDashboard(
 
 export type SkillResult = Record<string, unknown>;
 
+export type WorkflowMeta = {
+  name: string;
+  label: string;
+  description: string;
+  steps: string[];
+  output_schema: Record<string, unknown>;
+};
+
+export function listWorkflows(token?: string) {
+  return request<{ workflows: WorkflowMeta[] }>("/workflows/list", { method: "GET" }, token);
+}
+
+export function runWorkflow(
+  payload: {
+    workflow: string;
+    input?: Record<string, unknown>;
+    provider?: string;
+    model?: string;
+    openai_api_key?: string | null;
+  },
+  token?: string
+) {
+  return request<{
+    workflow: string;
+    steps: string[];
+    result: Record<string, unknown>;
+    model_used: string;
+    provider: string;
+    duration_ms: number;
+  }>(
+    "/workflows/run",
+    { method: "POST", body: JSON.stringify(payload) },
+    token
+  );
+}
+
 export function runSkill(
   payload: {
     skill: "financial_analysis" | "report_generation" | "consulting_insights";
