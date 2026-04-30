@@ -740,10 +740,19 @@ async def query_documents(
             )
         except Exception as exc:
             logger.exception("Query generation failed: %s", exc)
-            raise HTTPException(
-                status_code=502,
-                detail="Query generation failed. Please verify OPENAI_API_KEY and outbound API access.",
-            ) from exc
+            from backend.llm_router import _is_bedrock_provider
+            if _is_bedrock_provider(body.provider):
+                detail = (
+                    f"Query generation failed (Bedrock provider): {exc}. "
+                    "Verify AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION in .env "
+                    "and that the model is enabled in your AWS account."
+                )
+            else:
+                detail = (
+                    f"Query generation failed (OpenAI provider): {exc}. "
+                    "Verify OPENAI_API_KEY in .env or enter it in Chat Settings → API Keys."
+                )
+            raise HTTPException(status_code=502, detail=detail) from exc
 
         # Cache the result for 1 hour
         if use_cache:

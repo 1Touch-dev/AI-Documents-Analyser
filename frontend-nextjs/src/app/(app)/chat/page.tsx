@@ -558,7 +558,7 @@ export default function ChatPage() {
                     >
                       {tab === "upload" ? "Upload Documents"
                         : tab === "query" ? "Query Controls"
-                        : "OpenAI API"}
+                        : "API Keys"}
                     </button>
                   ))}
                 </div>
@@ -736,20 +736,39 @@ export default function ChatPage() {
 
                 {/* API key tab */}
                 {controlTab === "keys" && (
-                  <div className="space-y-3">
-                    <h4 className="text-sm font-semibold text-white">OpenAI API Key</h4>
-                    <p className="text-xs text-slate-300">
-                      All generation uses GPT API (cloud models only — no local model required).
-                      Paste your key here if the server has no global key configured.
-                    </p>
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-sm font-semibold text-white">API Keys</h4>
+                      <p className="mt-1 text-xs text-slate-400">
+                        Both OpenAI and AWS Bedrock keys are pre-configured on the server from{" "}
+                        <code className="rounded bg-white/10 px-1 py-0.5 font-mono text-[11px] text-cyan-300">.env</code>.
+                        Leave these fields blank to use the server keys. Fill them in only if you want to
+                        override with your own credentials for this session.
+                      </p>
+                    </div>
+
+                    {/* Server key status pills */}
+                    <div className="flex flex-wrap gap-2">
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-300">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+                        OpenAI key: server-configured
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-300">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+                        AWS Bedrock: server-configured
+                      </span>
+                    </div>
+
+                    {/* OpenAI override */}
                     <label className="block text-xs text-slate-300">
-                      OpenAI API Key
+                      Override OpenAI API Key
+                      <span className="ml-1 text-slate-500">(optional — leave blank to use server key)</span>
                       <input
                         type="password"
                         value={openaiApiKey}
                         onChange={(e) => setOpenaiApiKey(e.target.value)}
-                        placeholder="sk-…"
-                        className="mt-1 w-full rounded-lg border border-white/20 bg-slate-950/60 px-3 py-2 text-sm text-white"
+                        placeholder="sk-… (leave blank to use server key)"
+                        className="mt-1 w-full rounded-lg border border-white/20 bg-slate-950/60 px-3 py-2 text-sm text-white placeholder-slate-500"
                       />
                     </label>
                   </div>

@@ -77,11 +77,24 @@ class BedrockService:
     """
 
     def __init__(self) -> None:
+        # Prefer values from pydantic settings (reads .env file).
+        # Fall back to raw os.getenv for environments where settings aren't
+        # importable (e.g. standalone scripts).
+        try:
+            from config.settings import settings as _s
+            key_id = _s.aws_access_key_id or os.getenv("AWS_ACCESS_KEY_ID") or ""
+            secret  = _s.aws_secret_access_key or os.getenv("AWS_SECRET_ACCESS_KEY") or ""
+            region  = _s.aws_region or os.getenv("AWS_REGION", "us-east-1")
+        except Exception:
+            key_id = os.getenv("AWS_ACCESS_KEY_ID") or ""
+            secret  = os.getenv("AWS_SECRET_ACCESS_KEY") or ""
+            region  = os.getenv("AWS_REGION", "us-east-1")
+
         self.client = boto3.client(
             service_name="bedrock-runtime",
-            region_name=os.getenv("AWS_REGION", "us-east-1"),
-            aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-            aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+            region_name=region,
+            aws_access_key_id=key_id or None,
+            aws_secret_access_key=secret or None,
         )
 
     # ── Core synchronous generate (exact requested pattern) ──────────────────
