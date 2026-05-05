@@ -29,6 +29,9 @@ const NAV_ITEMS = [
   { href: "/workflows", label: "Business Analysis", icon: Workflow },
   { href: "/documents", label: "Documents", icon: Files },
   { href: "/reports", label: "Report Vault", icon: BookMarked },
+  { href: "/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/prompts", label: "Prompts", icon: FileText },
+  { href: "/conversations", label: "Conversations", icon: History },
   { href: "/usage", label: "Usage & Audit", icon: Activity },
 ];
 

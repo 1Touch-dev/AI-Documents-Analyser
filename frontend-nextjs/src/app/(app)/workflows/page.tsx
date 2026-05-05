@@ -24,7 +24,8 @@ import {
   Target,
   TrendingUp,
   X,
-  Settings2
+  Settings2,
+  FileText as FileIcon
 } from "lucide-react";
 
 export default function WorkflowsPage() {
@@ -139,7 +140,29 @@ export default function WorkflowsPage() {
         </div>
       </div>
 
-      {/* KPI Customization */}
+      {/* Workflow Templates (Restored) */}
+      {!analysisResult && !isAnalyzing && (
+        <div className="grid gap-6 md:grid-cols-3">
+          {[
+            { id: "financial", name: "Financial Health", desc: "Detailed revenue/expense audit", icon: TrendingUp, color: "emerald" },
+            { id: "consulting", name: "Strategic SWOT", desc: "Consulting-grade strategic analysis", icon: Lightbulb, color: "cyan" },
+            { id: "report", name: "Executive Summary", desc: "High-level management report", icon: FileIcon, color: "indigo" }
+          ].map(wf => (
+            <button
+              key={wf.id}
+              onClick={() => { setQuery(`Run ${wf.id} analysis`); handleAnalyze(); }}
+              className="group relative rounded-[2rem] border border-white/10 bg-white/5 p-6 text-left transition hover:border-indigo-500/50 hover:bg-indigo-500/5"
+            >
+              <div className={`mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-${wf.color}-500/10 text-${wf.color}-400 group-hover:scale-110 transition`}>
+                <wf.icon className="h-6 w-6" />
+              </div>
+              <h3 className="font-bold text-white">{wf.name}</h3>
+              <p className="mt-1 text-xs text-slate-500">{wf.desc}</p>
+              <ArrowRight className="absolute bottom-6 right-6 h-5 w-5 text-slate-700 transition group-hover:text-indigo-400 group-hover:translate-x-1" />
+            </button>
+          ))}
+        </div>
+      )}
       <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/5 backdrop-blur-md">
         <button 
           onClick={() => setShowKPIs(!showKPIs)}

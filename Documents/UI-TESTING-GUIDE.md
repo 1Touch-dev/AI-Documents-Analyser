@@ -39,31 +39,39 @@ This guide provides a comprehensive checklist and workflow for validating the **
 - [ ] **Clean Thread**: Verify the message bubbles look premium and distinguish clearly between User and Assistant.
 - [ ] **Markdown Rendering**: Ask for a table or list and verify it renders with full styling (not raw markdown).
 - [ ] **Source Citations**: Check that citations appear at the bottom of assistant responses as clickable/hoverable pills.
-- [ ] **Settings Modal**: Open settings and verify only "Document Focus" and "Translation" are shown (no technical models/providers).
+- [ ] **Advanced Settings**: Open settings and verify:
+    - [ ] **General Tab**: Document Focus and Target Currency selection works.
+    - [ ] **Advanced Tab**: Model, Provider, and Prompt Template selectors are functional.
+- [ ] **Direct Upload**: Upload a file via the Advanced tab and verify it indexes.
 
 ## 5. Report Vault (History)
 **URL:** `/reports`
 
-- [ ] **Report Cards**: Verify reports are shown as cards with type-specific icons (BarChart for Financial, Lightbulb for Consulting).
-- [ ] **Full Report Viewer**: Click a report card and verify the high-fidelity modal opens with the full analysis result.
-- [ ] **Export (JSON)**: Click the JSON download button and verify the file contains the full report structure.
-- [ ] **Export (CSV)**: Click the CSV download button and verify it generates a Tableau-compatible flat file.
+- [ ] **Report Cards**: Verify reports are shown as cards with type-specific icons.
+- [ ] **Full Report Viewer**: Click a report card and verify the high-fidelity modal opens.
+- [ ] **Export (JSON/CSV)**: Verify both export formats generate correct files.
 
-## 6. Usage & Security
-**URL:** `/usage`
+## 6. Recovered + Verified Features
+These features have been restored from the base branch and verified for compatibility with the new SaaS UI.
 
-- [ ] **Cost Summary**: Verify the USD cost estimates are visible for the current session.
-- [ ] **Audit Trail**: Check the table of recent actions (Login, Upload, Analysis) with accurate timestamps and IP addresses.
+| Feature | Location | Status | Validation |
+| :--- | :--- | :--- | :--- |
+| **Advanced Chat Settings** | Chat > Settings > Advanced | ✅ Restored | Model/Provider selection and Prompt templates are functional. |
+| **Direct Chat Upload** | Chat > Settings > Advanced | ✅ Restored | Files uploaded via chat are correctly categorized and indexed. |
+| **Skills Workbench** | Analytics > Bottom Section | ✅ Restored | Manual execution of Financial/Consulting skills works. |
+| **Index Status Modal** | Documents > Check Status | ✅ Restored | Displays accurate count of indexed vs. non-indexed documents. |
+| **Workflow Templates** | Workflows > Hero Section | ✅ Restored | Old cards (Financial, Consulting, Report) are back and trigger analysis. |
+| **Full Currency Support** | Chat > Settings > General | ✅ Restored | Complete list of target currencies for financial conversion. |
 
 ---
 
 ## 🧪 Quick Smoke Test Script
 
 1. **Login** as a Business Analyst.
-2. **Upload** a sample Excel file (`revenue.xlsx`).
-3. Wait for **Ready** status and verify it's categorized as `Financial`.
-4. Go to **Analysis** and click "Analyze Business".
+2. **Upload** a sample Excel file (`revenue.xlsx`) in **Documents**.
+3. **Check Status** to verify indexing completion.
+4. Go to **Workflows** and use a **Template** (e.g., Financial Health).
 5. **Review** the Executive Summary and Key Findings.
 6. Click **Save to Vault**.
 7. Go to **Report Vault**, open the saved report, and **Export to CSV**.
-8. Verify the CSV opens in Excel with correct data.
+8. Go to **Chat**, open **Advanced Settings**, and change the **Model** to verify persistence.

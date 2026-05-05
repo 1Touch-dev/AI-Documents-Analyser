@@ -58,6 +58,15 @@ docker compose up --build -d
 
 ---
 
+## 🔧 Recovered + Verified Features
+The following features have been restored for parity with the core technical baseline:
+- **Skills Workbench**: Manual execution of specialized AI tasks (Financial, Consulting).
+- **Advanced Chat Control**: Deep selection of Models (GPT/Bedrock), Providers, and Prompt Templates.
+- **Index Lifecycle Tracking**: Real-time modal for document indexing status and vector store health.
+- **Workflow Templates**: One-click access to legacy Financial and Consulting pipelines.
+
+---
+
 ## 📄 Documentation
 - 🚀 **[Deployment Manual](Documents/deployment%20manual.md)**: Installation & Cloud setup.
 - 📖 **[User Manual](Documents/user%20manual.md)**: How to use the business features.

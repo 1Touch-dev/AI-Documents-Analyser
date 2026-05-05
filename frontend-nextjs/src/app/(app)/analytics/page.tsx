@@ -5,6 +5,7 @@ import {
   getAnalyticsContentInsights,
   getFinancialDashboard,
   getAnalyticsOverview,
+  runSkill,
 } from "@/lib/api";
 import { useAuth } from "@/contexts/auth-context";
 import { 
@@ -231,6 +232,46 @@ export default function AnalyticsPage() {
           </div>
         </div>
       </div>
+      {/* Skills Workbench (Restored) */}
+      <div className="rounded-[2.5rem] border border-white/10 bg-white/5 p-8 backdrop-blur-xl">
+        <div className="mb-6 flex items-center gap-3">
+          <Briefcase className="h-6 w-6 text-indigo-400" />
+          <h3 className="text-lg font-bold text-white">Skills Workbench</h3>
+        </div>
+        
+        <div className="grid gap-6 lg:grid-cols-3">
+          {[
+            { id: "financial_analysis", name: "Financial Extraction", desc: "Extract structured revenue/expense data", color: "emerald" },
+            { id: "consulting_insights", name: "Consulting SWOT", desc: "Generate strategic analysis and actions", color: "cyan" },
+            { id: "report_generation", name: "Report Compiler", desc: "Aggregate findings into a full report", color: "indigo" }
+          ].map(skill => (
+            <div key={skill.id} className="group relative rounded-3xl border border-white/10 bg-white/5 p-6 transition hover:border-indigo-500/30 hover:bg-indigo-500/5">
+              <div className={`mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-${skill.color}-500/10 text-${skill.color}-400`}>
+                <Sparkles className="h-6 w-6" />
+              </div>
+              <h4 className="text-sm font-bold text-white">{skill.name}</h4>
+              <p className="mt-1 text-xs text-slate-500 leading-relaxed">{skill.desc}</p>
+              <button 
+                onClick={() => handleRunSkill(skill.id as any)}
+                className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-white/5 py-2.5 text-xs font-bold text-slate-300 transition hover:bg-indigo-500 hover:text-white"
+              >
+                Execute Skill
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
+
+  async function handleRunSkill(skillId: "financial_analysis" | "consulting_insights" | "report_generation") {
+    if (!token) return;
+    try {
+      // In a real scenario, we might show a modal for input, but here we just run it with default context
+      const res = await runSkill({ skill: skillId, input: { context: "General analysis" } }, token);
+      alert(`Skill ${skillId} completed successfully! Check the Report Vault for results.`);
+    } catch (e) {
+      alert("Failed to execute skill.");
+    }
+  }
 }

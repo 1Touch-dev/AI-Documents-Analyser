@@ -43173,3 +43173,431 @@ INFO:sqlalchemy.engine.Engine:[cached since 6857s ago] {}
 2026-05-05 08:15:19,650 INFO sqlalchemy.engine.Engine ROLLBACK
 INFO:sqlalchemy.engine.Engine:ROLLBACK
 INFO:     ::ffff:49.37.160.223:0 - "GET /api/documents?limit=200 HTTP/1.1" 200 OK
+2026-05-05 08:20:50,493 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+INFO:sqlalchemy.engine.Engine:BEGIN (implicit)
+2026-05-05 08:20:50,494 INFO sqlalchemy.engine.Engine SELECT documents.id AS documents_id, documents.title AS documents_title, documents.category AS documents_category, documents.uploaded_by AS documents_uploaded_by, documents.timestamp AS documents_timestamp, documents.source_path AS documents_source_path, documents.file_type AS documents_file_type, documents.file_size AS documents_file_size, documents.chunk_count AS documents_chunk_count, documents.status AS documents_status, documents.content_hash AS documents_content_hash 
+FROM documents ORDER BY documents.timestamp DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+INFO:sqlalchemy.engine.Engine:SELECT documents.id AS documents_id, documents.title AS documents_title, documents.category AS documents_category, documents.uploaded_by AS documents_uploaded_by, documents.timestamp AS documents_timestamp, documents.source_path AS documents_source_path, documents.file_type AS documents_file_type, documents.file_size AS documents_file_size, documents.chunk_count AS documents_chunk_count, documents.status AS documents_status, documents.content_hash AS documents_content_hash 
+FROM documents ORDER BY documents.timestamp DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-05-05 08:20:50,494 INFO sqlalchemy.engine.Engine [cached since 7187s ago] {'param_1': 200, 'param_2': 0}
+INFO:sqlalchemy.engine.Engine:[cached since 7187s ago] {'param_1': 200, 'param_2': 0}
+2026-05-05 08:20:50,496 INFO sqlalchemy.engine.Engine SELECT count(*) AS count_1 
+FROM (SELECT documents.id AS documents_id, documents.title AS documents_title, documents.category AS documents_category, documents.uploaded_by AS documents_uploaded_by, documents.timestamp AS documents_timestamp, documents.source_path AS documents_source_path, documents.file_type AS documents_file_type, documents.file_size AS documents_file_size, documents.chunk_count AS documents_chunk_count, documents.status AS documents_status, documents.content_hash AS documents_content_hash 
+FROM documents) AS anon_1
+INFO:sqlalchemy.engine.Engine:SELECT count(*) AS count_1 
+FROM (SELECT documents.id AS documents_id, documents.title AS documents_title, documents.category AS documents_category, documents.uploaded_by AS documents_uploaded_by, documents.timestamp AS documents_timestamp, documents.source_path AS documents_source_path, documents.file_type AS documents_file_type, documents.file_size AS documents_file_size, documents.chunk_count AS documents_chunk_count, documents.status AS documents_status, documents.content_hash AS documents_content_hash 
+FROM documents) AS anon_1
+2026-05-05 08:20:50,497 INFO sqlalchemy.engine.Engine [cached since 7187s ago] {}
+INFO:sqlalchemy.engine.Engine:[cached since 7187s ago] {}
+2026-05-05 08:20:50,499 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:sqlalchemy.engine.Engine:ROLLBACK
+INFO:     ::ffff:49.37.160.223:0 - "GET /api/documents?limit=200 HTTP/1.1" 200 OK
+2026-05-05 08:21:42,181 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+INFO:sqlalchemy.engine.Engine:BEGIN (implicit)
+2026-05-05 08:21:42,182 INFO sqlalchemy.engine.Engine SELECT users.id AS users_id, users.username AS users_username, users.hashed_password AS users_hashed_password, users.role AS users_role, users.created_at AS users_created_at, users.is_active AS users_is_active 
+FROM users 
+WHERE users.username = %(username_1)s AND users.is_active = %(is_active_1)s 
+ LIMIT %(param_1)s
+INFO:sqlalchemy.engine.Engine:SELECT users.id AS users_id, users.username AS users_username, users.hashed_password AS users_hashed_password, users.role AS users_role, users.created_at AS users_created_at, users.is_active AS users_is_active 
+FROM users 
+WHERE users.username = %(username_1)s AND users.is_active = %(is_active_1)s 
+ LIMIT %(param_1)s
+2026-05-05 08:21:42,182 INFO sqlalchemy.engine.Engine [cached since 6088s ago] {'username_1': 'Admin', 'is_active_1': 1, 'param_1': 1}
+INFO:sqlalchemy.engine.Engine:[cached since 6088s ago] {'username_1': 'Admin', 'is_active_1': 1, 'param_1': 1}
+2026-05-05 08:21:42,183 INFO sqlalchemy.engine.Engine SELECT saved_reports.id AS saved_reports_id, saved_reports.user_id AS saved_reports_user_id, saved_reports.username AS saved_reports_username, saved_reports.report_type AS saved_reports_report_type, saved_reports.title AS saved_reports_title, saved_reports.data AS saved_reports_data, saved_reports.model_used AS saved_reports_model_used, saved_reports.provider AS saved_reports_provider, saved_reports.created_at AS saved_reports_created_at 
+FROM saved_reports 
+WHERE saved_reports.username = %(username_1)s ORDER BY saved_reports.created_at DESC 
+ LIMIT %(param_1)s
+INFO:sqlalchemy.engine.Engine:SELECT saved_reports.id AS saved_reports_id, saved_reports.user_id AS saved_reports_user_id, saved_reports.username AS saved_reports_username, saved_reports.report_type AS saved_reports_report_type, saved_reports.title AS saved_reports_title, saved_reports.data AS saved_reports_data, saved_reports.model_used AS saved_reports_model_used, saved_reports.provider AS saved_reports_provider, saved_reports.created_at AS saved_reports_created_at 
+FROM saved_reports 
+WHERE saved_reports.username = %(username_1)s ORDER BY saved_reports.created_at DESC 
+ LIMIT %(param_1)s
+2026-05-05 08:21:42,184 INFO sqlalchemy.engine.Engine [cached since 5377s ago] {'username_1': 'Admin', 'param_1': 50}
+INFO:sqlalchemy.engine.Engine:[cached since 5377s ago] {'username_1': 'Admin', 'param_1': 50}
+2026-05-05 08:21:42,185 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:sqlalchemy.engine.Engine:ROLLBACK
+INFO:     ::ffff:49.37.160.223:0 - "GET /api/reports HTTP/1.1" 200 OK
+2026-05-05 08:21:45,157 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+INFO:sqlalchemy.engine.Engine:BEGIN (implicit)
+2026-05-05 08:21:45,158 INFO sqlalchemy.engine.Engine SELECT users.id AS users_id, users.username AS users_username, users.hashed_password AS users_hashed_password, users.role AS users_role, users.created_at AS users_created_at, users.is_active AS users_is_active 
+FROM users 
+WHERE users.username = %(username_1)s AND users.is_active = %(is_active_1)s 
+ LIMIT %(param_1)s
+INFO:sqlalchemy.engine.Engine:SELECT users.id AS users_id, users.username AS users_username, users.hashed_password AS users_hashed_password, users.role AS users_role, users.created_at AS users_created_at, users.is_active AS users_is_active 
+FROM users 
+WHERE users.username = %(username_1)s AND users.is_active = %(is_active_1)s 
+ LIMIT %(param_1)s
+2026-05-05 08:21:45,158 INFO sqlalchemy.engine.Engine [cached since 6091s ago] {'username_1': 'Admin', 'is_active_1': 1, 'param_1': 1}
+INFO:sqlalchemy.engine.Engine:[cached since 6091s ago] {'username_1': 'Admin', 'is_active_1': 1, 'param_1': 1}
+2026-05-05 08:21:45,159 INFO sqlalchemy.engine.Engine SELECT llm_usage.id AS llm_usage_id, llm_usage.user_id AS llm_usage_user_id, llm_usage.username AS llm_usage_username, llm_usage.provider AS llm_usage_provider, llm_usage.model AS llm_usage_model, llm_usage.action AS llm_usage_action, llm_usage.prompt_tokens AS llm_usage_prompt_tokens, llm_usage.completion_tokens AS llm_usage_completion_tokens, llm_usage.total_tokens AS llm_usage_total_tokens, llm_usage.cost_usd AS llm_usage_cost_usd, llm_usage.timestamp AS llm_usage_timestamp 
+FROM llm_usage 
+WHERE llm_usage.timestamp >= %(timestamp_1)s AND llm_usage.username = %(username_1)s
+INFO:sqlalchemy.engine.Engine:SELECT llm_usage.id AS llm_usage_id, llm_usage.user_id AS llm_usage_user_id, llm_usage.username AS llm_usage_username, llm_usage.provider AS llm_usage_provider, llm_usage.model AS llm_usage_model, llm_usage.action AS llm_usage_action, llm_usage.prompt_tokens AS llm_usage_prompt_tokens, llm_usage.completion_tokens AS llm_usage_completion_tokens, llm_usage.total_tokens AS llm_usage_total_tokens, llm_usage.cost_usd AS llm_usage_cost_usd, llm_usage.timestamp AS llm_usage_timestamp 
+FROM llm_usage 
+WHERE llm_usage.timestamp >= %(timestamp_1)s AND llm_usage.username = %(username_1)s
+2026-05-05 08:21:45,160 INFO sqlalchemy.engine.Engine [cached since 5430s ago] {'timestamp_1': datetime.datetime(2026, 4, 5, 8, 21, 45, 159334, tzinfo=datetime.timezone.utc), 'username_1': 'Admin'}
+INFO:sqlalchemy.engine.Engine:[cached since 5430s ago] {'timestamp_1': datetime.datetime(2026, 4, 5, 8, 21, 45, 159334, tzinfo=datetime.timezone.utc), 'username_1': 'Admin'}
+2026-05-05 08:21:45,161 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:sqlalchemy.engine.Engine:ROLLBACK
+INFO:     ::ffff:49.37.160.223:0 - "GET /api/usage/summary?days=30 HTTP/1.1" 200 OK
+2026-05-05 08:21:45,404 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+INFO:sqlalchemy.engine.Engine:BEGIN (implicit)
+2026-05-05 08:21:45,405 INFO sqlalchemy.engine.Engine SELECT users.id AS users_id, users.username AS users_username, users.hashed_password AS users_hashed_password, users.role AS users_role, users.created_at AS users_created_at, users.is_active AS users_is_active 
+FROM users 
+WHERE users.username = %(username_1)s AND users.is_active = %(is_active_1)s 
+ LIMIT %(param_1)s
+INFO:sqlalchemy.engine.Engine:SELECT users.id AS users_id, users.username AS users_username, users.hashed_password AS users_hashed_password, users.role AS users_role, users.created_at AS users_created_at, users.is_active AS users_is_active 
+FROM users 
+WHERE users.username = %(username_1)s AND users.is_active = %(is_active_1)s 
+ LIMIT %(param_1)s
+2026-05-05 08:21:45,405 INFO sqlalchemy.engine.Engine [cached since 6091s ago] {'username_1': 'Admin', 'is_active_1': 1, 'param_1': 1}
+INFO:sqlalchemy.engine.Engine:[cached since 6091s ago] {'username_1': 'Admin', 'is_active_1': 1, 'param_1': 1}
+2026-05-05 08:21:45,407 INFO sqlalchemy.engine.Engine SELECT audit_logs.id AS audit_logs_id, audit_logs.user_id AS audit_logs_user_id, audit_logs.username AS audit_logs_username, audit_logs.action AS audit_logs_action, audit_logs.resource AS audit_logs_resource, audit_logs.detail AS audit_logs_detail, audit_logs.ip_address AS audit_logs_ip_address, audit_logs.status AS audit_logs_status, audit_logs.timestamp AS audit_logs_timestamp 
+FROM audit_logs 
+WHERE audit_logs.username = %(username_1)s ORDER BY audit_logs.timestamp DESC 
+ LIMIT %(param_1)s
+INFO:sqlalchemy.engine.Engine:SELECT audit_logs.id AS audit_logs_id, audit_logs.user_id AS audit_logs_user_id, audit_logs.username AS audit_logs_username, audit_logs.action AS audit_logs_action, audit_logs.resource AS audit_logs_resource, audit_logs.detail AS audit_logs_detail, audit_logs.ip_address AS audit_logs_ip_address, audit_logs.status AS audit_logs_status, audit_logs.timestamp AS audit_logs_timestamp 
+FROM audit_logs 
+WHERE audit_logs.username = %(username_1)s ORDER BY audit_logs.timestamp DESC 
+ LIMIT %(param_1)s
+2026-05-05 08:21:45,407 INFO sqlalchemy.engine.Engine [cached since 5430s ago] {'username_1': 'Admin', 'param_1': 100}
+INFO:sqlalchemy.engine.Engine:[cached since 5430s ago] {'username_1': 'Admin', 'param_1': 100}
+2026-05-05 08:21:45,409 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:sqlalchemy.engine.Engine:ROLLBACK
+INFO:     ::ffff:49.37.160.223:0 - "GET /api/audit/logs?limit=100 HTTP/1.1" 200 OK
+2026-05-05 08:21:48,073 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+INFO:sqlalchemy.engine.Engine:BEGIN (implicit)
+2026-05-05 08:21:48,074 INFO sqlalchemy.engine.Engine SELECT conversations.session_id AS conversations_session_id, conversations.title AS conversations_title, conversations.category AS conversations_category, conversations.messages AS conversations_messages, conversations.timestamp AS conversations_timestamp, conversations.updated_at AS conversations_updated_at 
+FROM conversations ORDER BY conversations.updated_at DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+INFO:sqlalchemy.engine.Engine:SELECT conversations.session_id AS conversations_session_id, conversations.title AS conversations_title, conversations.category AS conversations_category, conversations.messages AS conversations_messages, conversations.timestamp AS conversations_timestamp, conversations.updated_at AS conversations_updated_at 
+FROM conversations ORDER BY conversations.updated_at DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-05-05 08:21:48,074 INFO sqlalchemy.engine.Engine [cached since 6105s ago] {'param_1': 50, 'param_2': 0}
+INFO:sqlalchemy.engine.Engine:[cached since 6105s ago] {'param_1': 50, 'param_2': 0}
+2026-05-05 08:21:48,083 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:sqlalchemy.engine.Engine:ROLLBACK
+INFO:     ::ffff:49.37.160.223:0 - "GET /api/conversations?limit=50 HTTP/1.1" 200 OK
+2026-05-05 08:22:09,260 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+INFO:sqlalchemy.engine.Engine:BEGIN (implicit)
+2026-05-05 08:22:09,260 INFO sqlalchemy.engine.Engine SELECT documents.id AS documents_id, documents.title AS documents_title, documents.category AS documents_category, documents.uploaded_by AS documents_uploaded_by, documents.timestamp AS documents_timestamp, documents.source_path AS documents_source_path, documents.file_type AS documents_file_type, documents.file_size AS documents_file_size, documents.chunk_count AS documents_chunk_count, documents.status AS documents_status, documents.content_hash AS documents_content_hash 
+FROM documents ORDER BY documents.timestamp DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+INFO:sqlalchemy.engine.Engine:SELECT documents.id AS documents_id, documents.title AS documents_title, documents.category AS documents_category, documents.uploaded_by AS documents_uploaded_by, documents.timestamp AS documents_timestamp, documents.source_path AS documents_source_path, documents.file_type AS documents_file_type, documents.file_size AS documents_file_size, documents.chunk_count AS documents_chunk_count, documents.status AS documents_status, documents.content_hash AS documents_content_hash 
+FROM documents ORDER BY documents.timestamp DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-05-05 08:22:09,260 INFO sqlalchemy.engine.Engine [cached since 7266s ago] {'param_1': 10, 'param_2': 0}
+INFO:sqlalchemy.engine.Engine:[cached since 7266s ago] {'param_1': 10, 'param_2': 0}
+2026-05-05 08:22:09,263 INFO sqlalchemy.engine.Engine SELECT count(*) AS count_1 
+FROM (SELECT documents.id AS documents_id, documents.title AS documents_title, documents.category AS documents_category, documents.uploaded_by AS documents_uploaded_by, documents.timestamp AS documents_timestamp, documents.source_path AS documents_source_path, documents.file_type AS documents_file_type, documents.file_size AS documents_file_size, documents.chunk_count AS documents_chunk_count, documents.status AS documents_status, documents.content_hash AS documents_content_hash 
+FROM documents) AS anon_1
+INFO:sqlalchemy.engine.Engine:SELECT count(*) AS count_1 
+FROM (SELECT documents.id AS documents_id, documents.title AS documents_title, documents.category AS documents_category, documents.uploaded_by AS documents_uploaded_by, documents.timestamp AS documents_timestamp, documents.source_path AS documents_source_path, documents.file_type AS documents_file_type, documents.file_size AS documents_file_size, documents.chunk_count AS documents_chunk_count, documents.status AS documents_status, documents.content_hash AS documents_content_hash 
+FROM documents) AS anon_1
+2026-05-05 08:22:09,263 INFO sqlalchemy.engine.Engine [cached since 7266s ago] {}
+INFO:sqlalchemy.engine.Engine:[cached since 7266s ago] {}
+2026-05-05 08:22:09,266 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:sqlalchemy.engine.Engine:ROLLBACK
+INFO:     ::ffff:49.37.160.223:0 - "GET /api/documents?limit=10 HTTP/1.1" 200 OK
+2026-05-05 08:22:09,267 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+INFO:sqlalchemy.engine.Engine:BEGIN (implicit)
+2026-05-05 08:22:09,268 INFO sqlalchemy.engine.Engine SELECT users.id AS users_id, users.username AS users_username, users.hashed_password AS users_hashed_password, users.role AS users_role, users.created_at AS users_created_at, users.is_active AS users_is_active 
+FROM users 
+WHERE users.username = %(username_1)s AND users.is_active = %(is_active_1)s 
+ LIMIT %(param_1)s
+INFO:sqlalchemy.engine.Engine:SELECT users.id AS users_id, users.username AS users_username, users.hashed_password AS users_hashed_password, users.role AS users_role, users.created_at AS users_created_at, users.is_active AS users_is_active 
+FROM users 
+WHERE users.username = %(username_1)s AND users.is_active = %(is_active_1)s 
+ LIMIT %(param_1)s
+2026-05-05 08:22:09,268 INFO sqlalchemy.engine.Engine [cached since 6115s ago] {'username_1': 'Admin', 'is_active_1': 1, 'param_1': 1}
+INFO:sqlalchemy.engine.Engine:[cached since 6115s ago] {'username_1': 'Admin', 'is_active_1': 1, 'param_1': 1}
+2026-05-05 08:22:09,270 INFO sqlalchemy.engine.Engine SELECT saved_reports.id AS saved_reports_id, saved_reports.user_id AS saved_reports_user_id, saved_reports.username AS saved_reports_username, saved_reports.report_type AS saved_reports_report_type, saved_reports.title AS saved_reports_title, saved_reports.data AS saved_reports_data, saved_reports.model_used AS saved_reports_model_used, saved_reports.provider AS saved_reports_provider, saved_reports.created_at AS saved_reports_created_at 
+FROM saved_reports 
+WHERE saved_reports.username = %(username_1)s ORDER BY saved_reports.created_at DESC 
+ LIMIT %(param_1)s
+INFO:sqlalchemy.engine.Engine:SELECT saved_reports.id AS saved_reports_id, saved_reports.user_id AS saved_reports_user_id, saved_reports.username AS saved_reports_username, saved_reports.report_type AS saved_reports_report_type, saved_reports.title AS saved_reports_title, saved_reports.data AS saved_reports_data, saved_reports.model_used AS saved_reports_model_used, saved_reports.provider AS saved_reports_provider, saved_reports.created_at AS saved_reports_created_at 
+FROM saved_reports 
+WHERE saved_reports.username = %(username_1)s ORDER BY saved_reports.created_at DESC 
+ LIMIT %(param_1)s
+2026-05-05 08:22:09,271 INFO sqlalchemy.engine.Engine [cached since 5404s ago] {'username_1': 'Admin', 'param_1': 50}
+INFO:sqlalchemy.engine.Engine:[cached since 5404s ago] {'username_1': 'Admin', 'param_1': 50}
+2026-05-05 08:22:09,273 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:sqlalchemy.engine.Engine:ROLLBACK
+INFO:     ::ffff:49.37.160.223:0 - "GET /api/reports HTTP/1.1" 200 OK
+INFO:     ::ffff:49.37.160.223:0 - "GET /api/health HTTP/1.1" 200 OK
+2026-05-05 08:22:09,289 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+INFO:sqlalchemy.engine.Engine:BEGIN (implicit)
+2026-05-05 08:22:09,290 INFO sqlalchemy.engine.Engine SELECT documents.id AS documents_id, documents.title AS documents_title, documents.category AS documents_category, documents.uploaded_by AS documents_uploaded_by, documents.timestamp AS documents_timestamp, documents.source_path AS documents_source_path, documents.file_type AS documents_file_type, documents.file_size AS documents_file_size, documents.chunk_count AS documents_chunk_count, documents.status AS documents_status, documents.content_hash AS documents_content_hash 
+FROM documents
+INFO:sqlalchemy.engine.Engine:SELECT documents.id AS documents_id, documents.title AS documents_title, documents.category AS documents_category, documents.uploaded_by AS documents_uploaded_by, documents.timestamp AS documents_timestamp, documents.source_path AS documents_source_path, documents.file_type AS documents_file_type, documents.file_size AS documents_file_size, documents.chunk_count AS documents_chunk_count, documents.status AS documents_status, documents.content_hash AS documents_content_hash 
+FROM documents
+2026-05-05 08:22:09,290 INFO sqlalchemy.engine.Engine [cached since 5423s ago] {}
+INFO:sqlalchemy.engine.Engine:[cached since 5423s ago] {}
+2026-05-05 08:22:09,291 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:sqlalchemy.engine.Engine:ROLLBACK
+INFO:     ::ffff:49.37.160.223:0 - "GET /api/analytics/overview HTTP/1.1" 200 OK
+2026-05-05 08:22:16,403 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+INFO:sqlalchemy.engine.Engine:BEGIN (implicit)
+2026-05-05 08:22:16,404 INFO sqlalchemy.engine.Engine SELECT conversations.session_id AS conversations_session_id, conversations.title AS conversations_title, conversations.category AS conversations_category, conversations.messages AS conversations_messages, conversations.timestamp AS conversations_timestamp, conversations.updated_at AS conversations_updated_at 
+FROM conversations ORDER BY conversations.updated_at DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+INFO:sqlalchemy.engine.Engine:SELECT conversations.session_id AS conversations_session_id, conversations.title AS conversations_title, conversations.category AS conversations_category, conversations.messages AS conversations_messages, conversations.timestamp AS conversations_timestamp, conversations.updated_at AS conversations_updated_at 
+FROM conversations ORDER BY conversations.updated_at DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-05-05 08:22:16,404 INFO sqlalchemy.engine.Engine [cached since 6133s ago] {'param_1': 50, 'param_2': 0}
+INFO:sqlalchemy.engine.Engine:[cached since 6133s ago] {'param_1': 50, 'param_2': 0}
+2026-05-05 08:22:16,411 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:sqlalchemy.engine.Engine:ROLLBACK
+INFO:     ::ffff:49.37.160.223:0 - "GET /api/conversations?limit=50 HTTP/1.1" 200 OK
+2026-05-05 08:22:19,149 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+INFO:sqlalchemy.engine.Engine:BEGIN (implicit)
+2026-05-05 08:22:19,150 INFO sqlalchemy.engine.Engine SELECT documents.id AS documents_id, documents.title AS documents_title, documents.category AS documents_category, documents.uploaded_by AS documents_uploaded_by, documents.timestamp AS documents_timestamp, documents.source_path AS documents_source_path, documents.file_type AS documents_file_type, documents.file_size AS documents_file_size, documents.chunk_count AS documents_chunk_count, documents.status AS documents_status, documents.content_hash AS documents_content_hash 
+FROM documents ORDER BY documents.timestamp DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+INFO:sqlalchemy.engine.Engine:SELECT documents.id AS documents_id, documents.title AS documents_title, documents.category AS documents_category, documents.uploaded_by AS documents_uploaded_by, documents.timestamp AS documents_timestamp, documents.source_path AS documents_source_path, documents.file_type AS documents_file_type, documents.file_size AS documents_file_size, documents.chunk_count AS documents_chunk_count, documents.status AS documents_status, documents.content_hash AS documents_content_hash 
+FROM documents ORDER BY documents.timestamp DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-05-05 08:22:19,150 INFO sqlalchemy.engine.Engine [cached since 7276s ago] {'param_1': 200, 'param_2': 0}
+INFO:sqlalchemy.engine.Engine:[cached since 7276s ago] {'param_1': 200, 'param_2': 0}
+2026-05-05 08:22:19,151 INFO sqlalchemy.engine.Engine SELECT count(*) AS count_1 
+FROM (SELECT documents.id AS documents_id, documents.title AS documents_title, documents.category AS documents_category, documents.uploaded_by AS documents_uploaded_by, documents.timestamp AS documents_timestamp, documents.source_path AS documents_source_path, documents.file_type AS documents_file_type, documents.file_size AS documents_file_size, documents.chunk_count AS documents_chunk_count, documents.status AS documents_status, documents.content_hash AS documents_content_hash 
+FROM documents) AS anon_1
+INFO:sqlalchemy.engine.Engine:SELECT count(*) AS count_1 
+FROM (SELECT documents.id AS documents_id, documents.title AS documents_title, documents.category AS documents_category, documents.uploaded_by AS documents_uploaded_by, documents.timestamp AS documents_timestamp, documents.source_path AS documents_source_path, documents.file_type AS documents_file_type, documents.file_size AS documents_file_size, documents.chunk_count AS documents_chunk_count, documents.status AS documents_status, documents.content_hash AS documents_content_hash 
+FROM documents) AS anon_1
+2026-05-05 08:22:19,152 INFO sqlalchemy.engine.Engine [cached since 7276s ago] {}
+INFO:sqlalchemy.engine.Engine:[cached since 7276s ago] {}
+2026-05-05 08:22:19,153 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:sqlalchemy.engine.Engine:ROLLBACK
+INFO:     ::ffff:49.37.160.223:0 - "GET /api/documents?limit=200 HTTP/1.1" 200 OK
+2026-05-05 08:22:29,688 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+INFO:sqlalchemy.engine.Engine:BEGIN (implicit)
+2026-05-05 08:22:29,688 INFO sqlalchemy.engine.Engine SELECT users.id AS users_id, users.username AS users_username, users.hashed_password AS users_hashed_password, users.role AS users_role, users.created_at AS users_created_at, users.is_active AS users_is_active 
+FROM users 
+WHERE users.username = %(username_1)s AND users.is_active = %(is_active_1)s 
+ LIMIT %(param_1)s
+INFO:sqlalchemy.engine.Engine:SELECT users.id AS users_id, users.username AS users_username, users.hashed_password AS users_hashed_password, users.role AS users_role, users.created_at AS users_created_at, users.is_active AS users_is_active 
+FROM users 
+WHERE users.username = %(username_1)s AND users.is_active = %(is_active_1)s 
+ LIMIT %(param_1)s
+2026-05-05 08:22:29,689 INFO sqlalchemy.engine.Engine [cached since 6135s ago] {'username_1': 'Admin', 'is_active_1': 1, 'param_1': 1}
+INFO:sqlalchemy.engine.Engine:[cached since 6135s ago] {'username_1': 'Admin', 'is_active_1': 1, 'param_1': 1}
+2026-05-05 08:22:29,691 INFO sqlalchemy.engine.Engine SELECT saved_reports.id AS saved_reports_id, saved_reports.user_id AS saved_reports_user_id, saved_reports.username AS saved_reports_username, saved_reports.report_type AS saved_reports_report_type, saved_reports.title AS saved_reports_title, saved_reports.data AS saved_reports_data, saved_reports.model_used AS saved_reports_model_used, saved_reports.provider AS saved_reports_provider, saved_reports.created_at AS saved_reports_created_at 
+FROM saved_reports 
+WHERE saved_reports.username = %(username_1)s ORDER BY saved_reports.created_at DESC 
+ LIMIT %(param_1)s
+INFO:sqlalchemy.engine.Engine:SELECT saved_reports.id AS saved_reports_id, saved_reports.user_id AS saved_reports_user_id, saved_reports.username AS saved_reports_username, saved_reports.report_type AS saved_reports_report_type, saved_reports.title AS saved_reports_title, saved_reports.data AS saved_reports_data, saved_reports.model_used AS saved_reports_model_used, saved_reports.provider AS saved_reports_provider, saved_reports.created_at AS saved_reports_created_at 
+FROM saved_reports 
+WHERE saved_reports.username = %(username_1)s ORDER BY saved_reports.created_at DESC 
+ LIMIT %(param_1)s
+2026-05-05 08:22:29,691 INFO sqlalchemy.engine.Engine [cached since 5425s ago] {'username_1': 'Admin', 'param_1': 50}
+INFO:sqlalchemy.engine.Engine:[cached since 5425s ago] {'username_1': 'Admin', 'param_1': 50}
+2026-05-05 08:22:29,694 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:sqlalchemy.engine.Engine:ROLLBACK
+INFO:     ::ffff:49.37.160.223:0 - "GET /api/reports HTTP/1.1" 200 OK
+2026-05-05 08:22:32,304 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+INFO:sqlalchemy.engine.Engine:BEGIN (implicit)
+2026-05-05 08:22:32,305 INFO sqlalchemy.engine.Engine SELECT users.id AS users_id, users.username AS users_username, users.hashed_password AS users_hashed_password, users.role AS users_role, users.created_at AS users_created_at, users.is_active AS users_is_active 
+FROM users 
+WHERE users.username = %(username_1)s AND users.is_active = %(is_active_1)s 
+ LIMIT %(param_1)s
+INFO:sqlalchemy.engine.Engine:SELECT users.id AS users_id, users.username AS users_username, users.hashed_password AS users_hashed_password, users.role AS users_role, users.created_at AS users_created_at, users.is_active AS users_is_active 
+FROM users 
+WHERE users.username = %(username_1)s AND users.is_active = %(is_active_1)s 
+ LIMIT %(param_1)s
+2026-05-05 08:22:32,305 INFO sqlalchemy.engine.Engine [cached since 6138s ago] {'username_1': 'Admin', 'is_active_1': 1, 'param_1': 1}
+INFO:sqlalchemy.engine.Engine:[cached since 6138s ago] {'username_1': 'Admin', 'is_active_1': 1, 'param_1': 1}
+2026-05-05 08:22:32,307 INFO sqlalchemy.engine.Engine SELECT saved_reports.id AS saved_reports_id, saved_reports.user_id AS saved_reports_user_id, saved_reports.username AS saved_reports_username, saved_reports.report_type AS saved_reports_report_type, saved_reports.title AS saved_reports_title, saved_reports.data AS saved_reports_data, saved_reports.model_used AS saved_reports_model_used, saved_reports.provider AS saved_reports_provider, saved_reports.created_at AS saved_reports_created_at 
+FROM saved_reports 
+WHERE saved_reports.id = %(id_1)s::UUID 
+ LIMIT %(param_1)s
+INFO:sqlalchemy.engine.Engine:SELECT saved_reports.id AS saved_reports_id, saved_reports.user_id AS saved_reports_user_id, saved_reports.username AS saved_reports_username, saved_reports.report_type AS saved_reports_report_type, saved_reports.title AS saved_reports_title, saved_reports.data AS saved_reports_data, saved_reports.model_used AS saved_reports_model_used, saved_reports.provider AS saved_reports_provider, saved_reports.created_at AS saved_reports_created_at 
+FROM saved_reports 
+WHERE saved_reports.id = %(id_1)s::UUID 
+ LIMIT %(param_1)s
+2026-05-05 08:22:32,307 INFO sqlalchemy.engine.Engine [generated in 0.00023s] {'id_1': UUID('f65f5e83-be57-48ff-8622-38fffa5af617'), 'param_1': 1}
+INFO:sqlalchemy.engine.Engine:[generated in 0.00023s] {'id_1': UUID('f65f5e83-be57-48ff-8622-38fffa5af617'), 'param_1': 1}
+2026-05-05 08:22:32,309 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:sqlalchemy.engine.Engine:ROLLBACK
+INFO:     ::ffff:49.37.160.223:0 - "GET /api/reports/f65f5e83-be57-48ff-8622-38fffa5af617 HTTP/1.1" 200 OK
+INFO:     ::ffff:49.37.160.223:0 - "GET /api/export/report?report_id=f65f5e83-be57-48ff-8622-38fffa5af617&format=csv HTTP/1.1" 405 Method Not Allowed
+2026-05-05 08:22:43,005 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+INFO:sqlalchemy.engine.Engine:BEGIN (implicit)
+2026-05-05 08:22:43,005 INFO sqlalchemy.engine.Engine SELECT users.id AS users_id, users.username AS users_username, users.hashed_password AS users_hashed_password, users.role AS users_role, users.created_at AS users_created_at, users.is_active AS users_is_active 
+FROM users 
+WHERE users.username = %(username_1)s AND users.is_active = %(is_active_1)s 
+ LIMIT %(param_1)s
+INFO:sqlalchemy.engine.Engine:SELECT users.id AS users_id, users.username AS users_username, users.hashed_password AS users_hashed_password, users.role AS users_role, users.created_at AS users_created_at, users.is_active AS users_is_active 
+FROM users 
+WHERE users.username = %(username_1)s AND users.is_active = %(is_active_1)s 
+ LIMIT %(param_1)s
+2026-05-05 08:22:43,005 INFO sqlalchemy.engine.Engine [cached since 6148s ago] {'username_1': 'Admin', 'is_active_1': 1, 'param_1': 1}
+INFO:sqlalchemy.engine.Engine:[cached since 6148s ago] {'username_1': 'Admin', 'is_active_1': 1, 'param_1': 1}
+2026-05-05 08:22:43,007 INFO sqlalchemy.engine.Engine SELECT llm_usage.id AS llm_usage_id, llm_usage.user_id AS llm_usage_user_id, llm_usage.username AS llm_usage_username, llm_usage.provider AS llm_usage_provider, llm_usage.model AS llm_usage_model, llm_usage.action AS llm_usage_action, llm_usage.prompt_tokens AS llm_usage_prompt_tokens, llm_usage.completion_tokens AS llm_usage_completion_tokens, llm_usage.total_tokens AS llm_usage_total_tokens, llm_usage.cost_usd AS llm_usage_cost_usd, llm_usage.timestamp AS llm_usage_timestamp 
+FROM llm_usage 
+WHERE llm_usage.timestamp >= %(timestamp_1)s AND llm_usage.username = %(username_1)s
+INFO:sqlalchemy.engine.Engine:SELECT llm_usage.id AS llm_usage_id, llm_usage.user_id AS llm_usage_user_id, llm_usage.username AS llm_usage_username, llm_usage.provider AS llm_usage_provider, llm_usage.model AS llm_usage_model, llm_usage.action AS llm_usage_action, llm_usage.prompt_tokens AS llm_usage_prompt_tokens, llm_usage.completion_tokens AS llm_usage_completion_tokens, llm_usage.total_tokens AS llm_usage_total_tokens, llm_usage.cost_usd AS llm_usage_cost_usd, llm_usage.timestamp AS llm_usage_timestamp 
+FROM llm_usage 
+WHERE llm_usage.timestamp >= %(timestamp_1)s AND llm_usage.username = %(username_1)s
+2026-05-05 08:22:43,007 INFO sqlalchemy.engine.Engine [cached since 5487s ago] {'timestamp_1': datetime.datetime(2026, 4, 5, 8, 22, 43, 6906, tzinfo=datetime.timezone.utc), 'username_1': 'Admin'}
+INFO:sqlalchemy.engine.Engine:[cached since 5487s ago] {'timestamp_1': datetime.datetime(2026, 4, 5, 8, 22, 43, 6906, tzinfo=datetime.timezone.utc), 'username_1': 'Admin'}
+2026-05-05 08:22:43,008 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:sqlalchemy.engine.Engine:ROLLBACK
+INFO:     ::ffff:49.37.160.223:0 - "GET /api/usage/summary?days=30 HTTP/1.1" 200 OK
+2026-05-05 08:22:43,223 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+INFO:sqlalchemy.engine.Engine:BEGIN (implicit)
+2026-05-05 08:22:43,224 INFO sqlalchemy.engine.Engine SELECT users.id AS users_id, users.username AS users_username, users.hashed_password AS users_hashed_password, users.role AS users_role, users.created_at AS users_created_at, users.is_active AS users_is_active 
+FROM users 
+WHERE users.username = %(username_1)s AND users.is_active = %(is_active_1)s 
+ LIMIT %(param_1)s
+INFO:sqlalchemy.engine.Engine:SELECT users.id AS users_id, users.username AS users_username, users.hashed_password AS users_hashed_password, users.role AS users_role, users.created_at AS users_created_at, users.is_active AS users_is_active 
+FROM users 
+WHERE users.username = %(username_1)s AND users.is_active = %(is_active_1)s 
+ LIMIT %(param_1)s
+2026-05-05 08:22:43,224 INFO sqlalchemy.engine.Engine [cached since 6149s ago] {'username_1': 'Admin', 'is_active_1': 1, 'param_1': 1}
+INFO:sqlalchemy.engine.Engine:[cached since 6149s ago] {'username_1': 'Admin', 'is_active_1': 1, 'param_1': 1}
+2026-05-05 08:22:43,225 INFO sqlalchemy.engine.Engine SELECT audit_logs.id AS audit_logs_id, audit_logs.user_id AS audit_logs_user_id, audit_logs.username AS audit_logs_username, audit_logs.action AS audit_logs_action, audit_logs.resource AS audit_logs_resource, audit_logs.detail AS audit_logs_detail, audit_logs.ip_address AS audit_logs_ip_address, audit_logs.status AS audit_logs_status, audit_logs.timestamp AS audit_logs_timestamp 
+FROM audit_logs 
+WHERE audit_logs.username = %(username_1)s ORDER BY audit_logs.timestamp DESC 
+ LIMIT %(param_1)s
+INFO:sqlalchemy.engine.Engine:SELECT audit_logs.id AS audit_logs_id, audit_logs.user_id AS audit_logs_user_id, audit_logs.username AS audit_logs_username, audit_logs.action AS audit_logs_action, audit_logs.resource AS audit_logs_resource, audit_logs.detail AS audit_logs_detail, audit_logs.ip_address AS audit_logs_ip_address, audit_logs.status AS audit_logs_status, audit_logs.timestamp AS audit_logs_timestamp 
+FROM audit_logs 
+WHERE audit_logs.username = %(username_1)s ORDER BY audit_logs.timestamp DESC 
+ LIMIT %(param_1)s
+2026-05-05 08:22:43,226 INFO sqlalchemy.engine.Engine [cached since 5488s ago] {'username_1': 'Admin', 'param_1': 100}
+INFO:sqlalchemy.engine.Engine:[cached since 5488s ago] {'username_1': 'Admin', 'param_1': 100}
+2026-05-05 08:22:43,228 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:sqlalchemy.engine.Engine:ROLLBACK
+INFO:     ::ffff:49.37.160.223:0 - "GET /api/audit/logs?limit=100 HTTP/1.1" 200 OK
+2026-05-05 08:22:46,930 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+INFO:sqlalchemy.engine.Engine:BEGIN (implicit)
+2026-05-05 08:22:46,931 INFO sqlalchemy.engine.Engine SELECT users.id AS users_id, users.username AS users_username, users.hashed_password AS users_hashed_password, users.role AS users_role, users.created_at AS users_created_at, users.is_active AS users_is_active 
+FROM users 
+WHERE users.username = %(username_1)s AND users.is_active = %(is_active_1)s 
+ LIMIT %(param_1)s
+INFO:sqlalchemy.engine.Engine:SELECT users.id AS users_id, users.username AS users_username, users.hashed_password AS users_hashed_password, users.role AS users_role, users.created_at AS users_created_at, users.is_active AS users_is_active 
+FROM users 
+WHERE users.username = %(username_1)s AND users.is_active = %(is_active_1)s 
+ LIMIT %(param_1)s
+2026-05-05 08:22:46,931 INFO sqlalchemy.engine.Engine [cached since 6152s ago] {'username_1': 'Admin', 'is_active_1': 1, 'param_1': 1}
+INFO:sqlalchemy.engine.Engine:[cached since 6152s ago] {'username_1': 'Admin', 'is_active_1': 1, 'param_1': 1}
+2026-05-05 08:22:46,932 INFO sqlalchemy.engine.Engine SELECT saved_reports.id AS saved_reports_id, saved_reports.user_id AS saved_reports_user_id, saved_reports.username AS saved_reports_username, saved_reports.report_type AS saved_reports_report_type, saved_reports.title AS saved_reports_title, saved_reports.data AS saved_reports_data, saved_reports.model_used AS saved_reports_model_used, saved_reports.provider AS saved_reports_provider, saved_reports.created_at AS saved_reports_created_at 
+FROM saved_reports 
+WHERE saved_reports.username = %(username_1)s ORDER BY saved_reports.created_at DESC 
+ LIMIT %(param_1)s
+INFO:sqlalchemy.engine.Engine:SELECT saved_reports.id AS saved_reports_id, saved_reports.user_id AS saved_reports_user_id, saved_reports.username AS saved_reports_username, saved_reports.report_type AS saved_reports_report_type, saved_reports.title AS saved_reports_title, saved_reports.data AS saved_reports_data, saved_reports.model_used AS saved_reports_model_used, saved_reports.provider AS saved_reports_provider, saved_reports.created_at AS saved_reports_created_at 
+FROM saved_reports 
+WHERE saved_reports.username = %(username_1)s ORDER BY saved_reports.created_at DESC 
+ LIMIT %(param_1)s
+2026-05-05 08:22:46,933 INFO sqlalchemy.engine.Engine [cached since 5442s ago] {'username_1': 'Admin', 'param_1': 50}
+INFO:sqlalchemy.engine.Engine:[cached since 5442s ago] {'username_1': 'Admin', 'param_1': 50}
+2026-05-05 08:22:46,934 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:sqlalchemy.engine.Engine:ROLLBACK
+INFO:     ::ffff:49.37.160.223:0 - "GET /api/reports HTTP/1.1" 200 OK
+2026-05-05 08:22:47,584 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+INFO:sqlalchemy.engine.Engine:BEGIN (implicit)
+2026-05-05 08:22:47,584 INFO sqlalchemy.engine.Engine SELECT documents.id AS documents_id, documents.title AS documents_title, documents.category AS documents_category, documents.uploaded_by AS documents_uploaded_by, documents.timestamp AS documents_timestamp, documents.source_path AS documents_source_path, documents.file_type AS documents_file_type, documents.file_size AS documents_file_size, documents.chunk_count AS documents_chunk_count, documents.status AS documents_status, documents.content_hash AS documents_content_hash 
+FROM documents ORDER BY documents.timestamp DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+INFO:sqlalchemy.engine.Engine:SELECT documents.id AS documents_id, documents.title AS documents_title, documents.category AS documents_category, documents.uploaded_by AS documents_uploaded_by, documents.timestamp AS documents_timestamp, documents.source_path AS documents_source_path, documents.file_type AS documents_file_type, documents.file_size AS documents_file_size, documents.chunk_count AS documents_chunk_count, documents.status AS documents_status, documents.content_hash AS documents_content_hash 
+FROM documents ORDER BY documents.timestamp DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-05-05 08:22:47,585 INFO sqlalchemy.engine.Engine [cached since 7304s ago] {'param_1': 200, 'param_2': 0}
+INFO:sqlalchemy.engine.Engine:[cached since 7304s ago] {'param_1': 200, 'param_2': 0}
+2026-05-05 08:22:47,587 INFO sqlalchemy.engine.Engine SELECT count(*) AS count_1 
+FROM (SELECT documents.id AS documents_id, documents.title AS documents_title, documents.category AS documents_category, documents.uploaded_by AS documents_uploaded_by, documents.timestamp AS documents_timestamp, documents.source_path AS documents_source_path, documents.file_type AS documents_file_type, documents.file_size AS documents_file_size, documents.chunk_count AS documents_chunk_count, documents.status AS documents_status, documents.content_hash AS documents_content_hash 
+FROM documents) AS anon_1
+INFO:sqlalchemy.engine.Engine:SELECT count(*) AS count_1 
+FROM (SELECT documents.id AS documents_id, documents.title AS documents_title, documents.category AS documents_category, documents.uploaded_by AS documents_uploaded_by, documents.timestamp AS documents_timestamp, documents.source_path AS documents_source_path, documents.file_type AS documents_file_type, documents.file_size AS documents_file_size, documents.chunk_count AS documents_chunk_count, documents.status AS documents_status, documents.content_hash AS documents_content_hash 
+FROM documents) AS anon_1
+2026-05-05 08:22:47,587 INFO sqlalchemy.engine.Engine [cached since 7304s ago] {}
+INFO:sqlalchemy.engine.Engine:[cached since 7304s ago] {}
+2026-05-05 08:22:47,588 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:sqlalchemy.engine.Engine:ROLLBACK
+INFO:     ::ffff:49.37.160.223:0 - "GET /api/documents?limit=200 HTTP/1.1" 200 OK
+2026-05-05 08:22:48,927 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+INFO:sqlalchemy.engine.Engine:BEGIN (implicit)
+2026-05-05 08:22:48,927 INFO sqlalchemy.engine.Engine SELECT conversations.session_id AS conversations_session_id, conversations.title AS conversations_title, conversations.category AS conversations_category, conversations.messages AS conversations_messages, conversations.timestamp AS conversations_timestamp, conversations.updated_at AS conversations_updated_at 
+FROM conversations ORDER BY conversations.updated_at DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+INFO:sqlalchemy.engine.Engine:SELECT conversations.session_id AS conversations_session_id, conversations.title AS conversations_title, conversations.category AS conversations_category, conversations.messages AS conversations_messages, conversations.timestamp AS conversations_timestamp, conversations.updated_at AS conversations_updated_at 
+FROM conversations ORDER BY conversations.updated_at DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-05-05 08:22:48,927 INFO sqlalchemy.engine.Engine [cached since 6165s ago] {'param_1': 50, 'param_2': 0}
+INFO:sqlalchemy.engine.Engine:[cached since 6165s ago] {'param_1': 50, 'param_2': 0}
+2026-05-05 08:22:48,934 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:sqlalchemy.engine.Engine:ROLLBACK
+INFO:     ::ffff:49.37.160.223:0 - "GET /api/conversations?limit=50 HTTP/1.1" 200 OK
+2026-05-05 08:22:49,639 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+INFO:sqlalchemy.engine.Engine:BEGIN (implicit)
+2026-05-05 08:22:49,640 INFO sqlalchemy.engine.Engine SELECT documents.id AS documents_id, documents.title AS documents_title, documents.category AS documents_category, documents.uploaded_by AS documents_uploaded_by, documents.timestamp AS documents_timestamp, documents.source_path AS documents_source_path, documents.file_type AS documents_file_type, documents.file_size AS documents_file_size, documents.chunk_count AS documents_chunk_count, documents.status AS documents_status, documents.content_hash AS documents_content_hash 
+FROM documents ORDER BY documents.timestamp DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+INFO:sqlalchemy.engine.Engine:SELECT documents.id AS documents_id, documents.title AS documents_title, documents.category AS documents_category, documents.uploaded_by AS documents_uploaded_by, documents.timestamp AS documents_timestamp, documents.source_path AS documents_source_path, documents.file_type AS documents_file_type, documents.file_size AS documents_file_size, documents.chunk_count AS documents_chunk_count, documents.status AS documents_status, documents.content_hash AS documents_content_hash 
+FROM documents ORDER BY documents.timestamp DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-05-05 08:22:49,640 INFO sqlalchemy.engine.Engine [cached since 7307s ago] {'param_1': 10, 'param_2': 0}
+INFO:sqlalchemy.engine.Engine:[cached since 7307s ago] {'param_1': 10, 'param_2': 0}
+2026-05-05 08:22:49,641 INFO sqlalchemy.engine.Engine SELECT count(*) AS count_1 
+FROM (SELECT documents.id AS documents_id, documents.title AS documents_title, documents.category AS documents_category, documents.uploaded_by AS documents_uploaded_by, documents.timestamp AS documents_timestamp, documents.source_path AS documents_source_path, documents.file_type AS documents_file_type, documents.file_size AS documents_file_size, documents.chunk_count AS documents_chunk_count, documents.status AS documents_status, documents.content_hash AS documents_content_hash 
+FROM documents) AS anon_1
+INFO:sqlalchemy.engine.Engine:SELECT count(*) AS count_1 
+FROM (SELECT documents.id AS documents_id, documents.title AS documents_title, documents.category AS documents_category, documents.uploaded_by AS documents_uploaded_by, documents.timestamp AS documents_timestamp, documents.source_path AS documents_source_path, documents.file_type AS documents_file_type, documents.file_size AS documents_file_size, documents.chunk_count AS documents_chunk_count, documents.status AS documents_status, documents.content_hash AS documents_content_hash 
+FROM documents) AS anon_1
+2026-05-05 08:22:49,642 INFO sqlalchemy.engine.Engine [cached since 7307s ago] {}
+INFO:sqlalchemy.engine.Engine:[cached since 7307s ago] {}
+2026-05-05 08:22:49,643 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:sqlalchemy.engine.Engine:ROLLBACK
+INFO:     ::ffff:49.37.160.223:0 - "GET /api/documents?limit=10 HTTP/1.1" 200 OK
+2026-05-05 08:22:49,874 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+INFO:sqlalchemy.engine.Engine:BEGIN (implicit)
+2026-05-05 08:22:49,875 INFO sqlalchemy.engine.Engine SELECT users.id AS users_id, users.username AS users_username, users.hashed_password AS users_hashed_password, users.role AS users_role, users.created_at AS users_created_at, users.is_active AS users_is_active 
+FROM users 
+WHERE users.username = %(username_1)s AND users.is_active = %(is_active_1)s 
+ LIMIT %(param_1)s
+INFO:sqlalchemy.engine.Engine:SELECT users.id AS users_id, users.username AS users_username, users.hashed_password AS users_hashed_password, users.role AS users_role, users.created_at AS users_created_at, users.is_active AS users_is_active 
+FROM users 
+WHERE users.username = %(username_1)s AND users.is_active = %(is_active_1)s 
+ LIMIT %(param_1)s
+2026-05-05 08:22:49,875 INFO sqlalchemy.engine.Engine [cached since 6155s ago] {'username_1': 'Admin', 'is_active_1': 1, 'param_1': 1}
+INFO:sqlalchemy.engine.Engine:[cached since 6155s ago] {'username_1': 'Admin', 'is_active_1': 1, 'param_1': 1}
+2026-05-05 08:22:49,878 INFO sqlalchemy.engine.Engine SELECT saved_reports.id AS saved_reports_id, saved_reports.user_id AS saved_reports_user_id, saved_reports.username AS saved_reports_username, saved_reports.report_type AS saved_reports_report_type, saved_reports.title AS saved_reports_title, saved_reports.data AS saved_reports_data, saved_reports.model_used AS saved_reports_model_used, saved_reports.provider AS saved_reports_provider, saved_reports.created_at AS saved_reports_created_at 
+FROM saved_reports 
+WHERE saved_reports.username = %(username_1)s ORDER BY saved_reports.created_at DESC 
+ LIMIT %(param_1)s
+INFO:sqlalchemy.engine.Engine:SELECT saved_reports.id AS saved_reports_id, saved_reports.user_id AS saved_reports_user_id, saved_reports.username AS saved_reports_username, saved_reports.report_type AS saved_reports_report_type, saved_reports.title AS saved_reports_title, saved_reports.data AS saved_reports_data, saved_reports.model_used AS saved_reports_model_used, saved_reports.provider AS saved_reports_provider, saved_reports.created_at AS saved_reports_created_at 
+FROM saved_reports 
+WHERE saved_reports.username = %(username_1)s ORDER BY saved_reports.created_at DESC 
+ LIMIT %(param_1)s
+2026-05-05 08:22:49,878 INFO sqlalchemy.engine.Engine [cached since 5445s ago] {'username_1': 'Admin', 'param_1': 50}
+INFO:sqlalchemy.engine.Engine:[cached since 5445s ago] {'username_1': 'Admin', 'param_1': 50}
+2026-05-05 08:22:49,880 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:sqlalchemy.engine.Engine:ROLLBACK
+2026-05-05 08:22:49,881 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+INFO:sqlalchemy.engine.Engine:BEGIN (implicit)
+2026-05-05 08:22:49,882 INFO sqlalchemy.engine.Engine SELECT documents.id AS documents_id, documents.title AS documents_title, documents.category AS documents_category, documents.uploaded_by AS documents_uploaded_by, documents.timestamp AS documents_timestamp, documents.source_path AS documents_source_path, documents.file_type AS documents_file_type, documents.file_size AS documents_file_size, documents.chunk_count AS documents_chunk_count, documents.status AS documents_status, documents.content_hash AS documents_content_hash 
+FROM documents
+INFO:sqlalchemy.engine.Engine:SELECT documents.id AS documents_id, documents.title AS documents_title, documents.category AS documents_category, documents.uploaded_by AS documents_uploaded_by, documents.timestamp AS documents_timestamp, documents.source_path AS documents_source_path, documents.file_type AS documents_file_type, documents.file_size AS documents_file_size, documents.chunk_count AS documents_chunk_count, documents.status AS documents_status, documents.content_hash AS documents_content_hash 
+FROM documents
+2026-05-05 08:22:49,882 INFO sqlalchemy.engine.Engine [cached since 5464s ago] {}
+INFO:sqlalchemy.engine.Engine:[cached since 5464s ago] {}
+INFO:     ::ffff:49.37.160.223:0 - "GET /api/reports HTTP/1.1" 200 OK
+2026-05-05 08:22:49,884 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:sqlalchemy.engine.Engine:ROLLBACK
+INFO:     ::ffff:49.37.160.223:0 - "GET /api/analytics/overview HTTP/1.1" 200 OK
+INFO:     ::ffff:49.37.160.223:0 - "GET /api/health HTTP/1.1" 200 OK
+2026-05-05 08:22:50,249 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+INFO:sqlalchemy.engine.Engine:BEGIN (implicit)
+2026-05-05 08:22:50,249 INFO sqlalchemy.engine.Engine SELECT conversations.session_id AS conversations_session_id, conversations.title AS conversations_title, conversations.category AS conversations_category, conversations.messages AS conversations_messages, conversations.timestamp AS conversations_timestamp, conversations.updated_at AS conversations_updated_at 
+FROM conversations ORDER BY conversations.updated_at DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+INFO:sqlalchemy.engine.Engine:SELECT conversations.session_id AS conversations_session_id, conversations.title AS conversations_title, conversations.category AS conversations_category, conversations.messages AS conversations_messages, conversations.timestamp AS conversations_timestamp, conversations.updated_at AS conversations_updated_at 
+FROM conversations ORDER BY conversations.updated_at DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-05-05 08:22:50,249 INFO sqlalchemy.engine.Engine [cached since 6167s ago] {'param_1': 50, 'param_2': 0}
+INFO:sqlalchemy.engine.Engine:[cached since 6167s ago] {'param_1': 50, 'param_2': 0}
+2026-05-05 08:22:50,255 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:sqlalchemy.engine.Engine:ROLLBACK
+INFO:     ::ffff:49.37.160.223:0 - "GET /api/conversations?limit=50 HTTP/1.1" 200 OK

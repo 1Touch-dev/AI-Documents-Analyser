@@ -30,7 +30,8 @@ import {
   UploadCloud,
   Loader2,
   LayoutGrid,
-  List
+  List,
+  X
 } from "lucide-react";
 
 type NormalizedStatus = "ready" | "processing" | "failed";
@@ -70,6 +71,8 @@ export default function DocumentsPage() {
   const [batchStatus, setBatchStatus] = useState<BatchStatusResponse | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [docStatus, setDocStatus] = useState<DocumentStatusResponse | null>(null);
   
   // UI State
   const [searchQuery, setSearchQuery] = useState("");
@@ -98,6 +101,12 @@ export default function DocumentsPage() {
   useEffect(() => {
     refreshDocuments();
   }, [token]);
+
+  useEffect(() => {
+    if (showStatusModal && token) {
+      getDocumentStatus(token).then(setDocStatus).catch(console.error);
+    }
+  }, [showStatusModal, token]);
 
   // Grouping logic
   const groupedDocs = useMemo(() => {
@@ -235,6 +244,15 @@ export default function DocumentsPage() {
           </button>
         </div>
 
+        {/* Status Check */}
+        <button
+          onClick={() => setShowStatusModal(true)}
+          className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+        >
+          <Clock className="h-4 w-4" />
+          Check Index Status
+        </button>
+
         {/* Refresh */}
         <button
           onClick={() => refreshDocuments(true)}
@@ -245,6 +263,75 @@ export default function DocumentsPage() {
           {isRefreshing ? "Refreshing..." : "Refresh"}
         </button>
       </div>
+
+      {/* Status Modal */}
+      {showStatusModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-4xl max-h-[80vh] overflow-hidden flex flex-col rounded-[2.5rem] border border-white/10 bg-slate-900 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/5 p-6 bg-white/5">
+              <h3 className="text-xl font-bold text-white">Document Index Status</h3>
+              <button onClick={() => setShowStatusModal(false)} className="text-slate-400 hover:text-white">
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6 space-y-8">
+              {!docStatus ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <Loader2 className="h-10 w-10 animate-spin text-indigo-400 mb-4" />
+                  <p className="text-slate-400">Loading indexing status...</p>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="rounded-2xl bg-emerald-500/10 border border-emerald-500/20 p-4 text-center">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-500">Indexed</p>
+                      <p className="text-2xl font-bold text-white">{docStatus.indexed_count}</p>
+                    </div>
+                    <div className="rounded-2xl bg-amber-500/10 border border-amber-500/20 p-4 text-center">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-amber-500">Not Indexed</p>
+                      <p className="text-2xl font-bold text-white">{docStatus.not_indexed_count}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-bold text-white border-b border-white/5 pb-2">Ready & Searchable</h4>
+                    <div className="grid gap-2">
+                      {docStatus.indexed.map(d => (
+                        <div key={d.document_id} className="flex items-center justify-between rounded-xl bg-white/5 p-3 text-xs border border-white/5">
+                          <span className="text-slate-300 truncate pr-4">{d.title}</span>
+                          <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-bold text-white border-b border-white/5 pb-2">Pending Indexing</h4>
+                    <div className="grid gap-2">
+                      {docStatus.not_indexed.map(d => (
+                        <div key={d.document_id} className="flex items-center justify-between rounded-xl bg-white/5 p-3 text-xs border border-white/5">
+                          <span className="text-slate-300 truncate pr-4">{d.title}</span>
+                          <Clock className="h-4 w-4 text-amber-400 shrink-0" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+            
+            <div className="p-6 border-t border-white/5 flex justify-end bg-white/5">
+              <button 
+                onClick={() => setShowStatusModal(false)}
+                className="rounded-xl bg-indigo-500 px-6 py-2 text-sm font-bold text-white transition hover:brightness-110"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
         {/* Main Content: Grouped List */}
