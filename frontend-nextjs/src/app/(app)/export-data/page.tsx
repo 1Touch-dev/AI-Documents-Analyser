@@ -1,129 +1,83 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import {
-  getAnalyticsContent,
-  getAnalyticsOverview,
-  getAnalyticsStorage,
-  listDocuments,
-  type DocumentItem,
-} from "@/lib/api";
+import { useState } from "react";
+import { 
+  FileOutput, 
+  Download, 
+  Files, 
+  Activity, 
+  BarChart3, 
+  CheckCircle2, 
+  Loader2,
+  Table as TableIcon,
+  Search
+} from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
-
-function downloadFile(content: string, fileName: string, mimeType: string) {
-  const blob = new Blob([content], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  link.click();
-  URL.revokeObjectURL(url);
-}
+import { API_PROXY_BASE_URL } from "@/lib/config";
 
 export default function ExportDataPage() {
   const { token } = useAuth();
-  const [documents, setDocuments] = useState<DocumentItem[]>([]);
-  const [overview, setOverview] = useState<Record<string, unknown> | null>(null);
-  const [content, setContent] = useState<Record<string, unknown> | null>(null);
-  const [storage, setStorage] = useState<Record<string, unknown> | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState<string | null>(null);
 
-  useEffect(() => {
-    Promise.all([
-      listDocuments(token ?? undefined, 500),
-      getAnalyticsOverview(token ?? undefined),
-      getAnalyticsContent(token ?? undefined),
-      getAnalyticsStorage(token ?? undefined),
-    ])
-      .then(([docs, ov, ct, st]) => {
-        setDocuments(docs.documents);
-        setOverview(ov as unknown as Record<string, unknown>);
-        setContent(ct as unknown as Record<string, unknown>);
-        setStorage(st as unknown as Record<string, unknown>);
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load export data."));
-  }, [token]);
-
-  const csvData = useMemo(() => {
-    const headers = ["id", "title", "category", "uploaded_by", "timestamp", "file_type", "file_size", "chunk_count", "status"];
-    const rows = documents.map((d) =>
-      [
-        d.id,
-        d.title,
-        d.category || "",
-        d.uploaded_by || "",
-        d.timestamp || "",
-        d.file_type || "",
-        String(d.file_size || 0),
-        String(d.chunk_count || 0),
-        d.status || "",
-      ]
-        .map((v) => `"${String(v).replace(/"/g, '""')}"`)
-        .join(",")
-    );
-    return [headers.join(","), ...rows].join("\n");
-  }, [documents]);
-
-  const jsonData = useMemo(() => JSON.stringify(documents, null, 2), [documents]);
-
-  const analyticsSummary = useMemo(
-    () =>
-      JSON.stringify(
-        {
-          overview,
-          storage,
-          content_summary: content,
-        },
-        null,
-        2
-      ),
-    [content, overview, storage]
-  );
+  const handleExport = async (type: string) => {
+    setIsExporting(type);
+    try {
+      // Direct download via window.open with auth token in query if needed, 
+      // but usually backend provides an endpoint that returns a file.
+      const endpoint = type === 'documents' ? '/export/documents' : type === 'audit' ? '/export/audit' : '/export/analytics';
+      window.open(`${API_PROXY_BASE_URL}${endpoint}?token=${token}`, '_blank');
+      
+      // Simulate completion
+      setTimeout(() => setIsExporting(null), 1000);
+    } catch (e) {
+      setIsExporting(null);
+    }
+  };
 
   return (
-    <section className="space-y-5">
-      <div>
-        <h2 className="text-2xl font-semibold text-white">Export Data (BI Integration)</h2>
-        <p className="text-sm text-slate-300">
-          Download document datasets and analytics summaries for Tableau/Power BI.
-        </p>
-      </div>
-      {error ? <p className="text-sm text-red-300">{error}</p> : null}
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <button
-          type="button"
-          onClick={() => downloadFile(csvData, "documents_export.csv", "text/csv")}
-          className="rounded-xl border border-white/15 bg-white/5 p-5 text-left hover:bg-white/10"
-        >
-          <p className="text-sm font-semibold text-white">CSV (Tableau / Power BI)</p>
-          <p className="mt-1 text-xs text-slate-300">Flat tabular export of all documents.</p>
-        </button>
-        <button
-          type="button"
-          onClick={() => downloadFile(jsonData, "documents_export.json", "application/json")}
-          className="rounded-xl border border-white/15 bg-white/5 p-5 text-left hover:bg-white/10"
-        >
-          <p className="text-sm font-semibold text-white">JSON Export</p>
-          <p className="mt-1 text-xs text-slate-300">Raw document objects for API pipelines.</p>
-        </button>
-        <button
-          type="button"
-          onClick={() => downloadFile(analyticsSummary, "analytics_summary.json", "application/json")}
-          className="rounded-xl border border-white/15 bg-white/5 p-5 text-left hover:bg-white/10"
-        >
-          <p className="text-sm font-semibold text-white">Analytics Summary</p>
-          <p className="mt-1 text-xs text-slate-300">Overview, storage, and content metrics.</p>
-        </button>
+    <div className="mx-auto max-w-4xl space-y-8 pb-20">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-3xl font-bold tracking-tight text-white">Data Export Center</h1>
+        <p className="text-slate-400">Download your platform data for offline analysis or compliance audits.</p>
       </div>
 
-      <article className="rounded-xl border border-white/15 bg-white/5 p-4">
-        <p className="text-xs text-slate-300">Export Preview</p>
-        <p className="mt-1 text-sm text-slate-100">
-          {documents.length} documents ready for export.
-        </p>
-      </article>
-    </section>
+      <div className="grid gap-6">
+        {[
+          { id: "documents", name: "Document Inventory", desc: "A full list of indexed documents including metadata, size, and category.", icon: Files, color: "indigo" },
+          { id: "analytics", name: "Business Analytics", desc: "Aggregated financial data and entity intelligence in CSV format.", icon: BarChart3, color: "emerald" },
+          { id: "audit", name: "System Audit Logs", desc: "Detailed history of user actions, login times, and IP addresses.", icon: Activity, color: "amber" }
+        ].map(item => (
+          <div key={item.id} className="group relative rounded-[2.5rem] border border-white/10 bg-slate-900/40 p-8 backdrop-blur-xl transition hover:bg-slate-900/60 shadow-xl">
+            <div className="flex flex-col gap-6 md:flex-row md:items-center">
+              <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-${item.color}-500/10 text-${item.color}-400 group-hover:scale-110 transition`}>
+                <item.icon className="h-8 w-8" />
+              </div>
+              
+              <div className="flex-1 min-w-0">
+                <h3 className="text-xl font-bold text-white">{item.name}</h3>
+                <p className="mt-1 text-sm text-slate-500 leading-relaxed max-w-lg">{item.desc}</p>
+              </div>
+
+              <button 
+                onClick={() => handleExport(item.id)}
+                disabled={!!isExporting}
+                className="flex items-center justify-center gap-2 rounded-2xl bg-white/5 border border-white/10 px-8 py-3 text-sm font-bold text-white transition hover:bg-white/10 active:scale-95 disabled:opacity-50"
+              >
+                {isExporting === item.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                Export CSV
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-3xl border border-dashed border-white/10 bg-white/2 p-8 text-center mt-12">
+        <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/5 mb-4">
+          <Search className="h-6 w-6 text-slate-600" />
+        </div>
+        <h4 className="text-sm font-bold text-white">Need a Custom Export?</h4>
+        <p className="mt-1 text-xs text-slate-500">Contact your system administrator for specialized data extraction or API access.</p>
+      </div>
+    </div>
   );
 }
-

@@ -196,8 +196,18 @@ export function getHealth(token?: string) {
   return request<HealthResponse>("/health", { method: "GET" }, token);
 }
 
+export type ModelItem = {
+  model_id: string;
+  label: string;
+  provider: string;
+};
+
 export function getModels(token?: string) {
-  return request<{ models: string[] }>("/models", { method: "GET" }, token);
+  return request<{ 
+    models: string[]; // Backwards compat
+    all_models: Record<string, ModelItem[]>;
+    providers: string[];
+  }>("/models", { method: "GET" }, token);
 }
 
 export function listDocuments(token?: string, limit = 200) {

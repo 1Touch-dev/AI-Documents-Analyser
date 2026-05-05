@@ -33,6 +33,7 @@ import {
   uploadBatch,
   type ConversationItem,
   type PromptItem,
+  type ModelItem
 } from "@/lib/api";
 import { useAuth } from "@/contexts/auth-context";
 import { useAppPreferences } from "@/contexts/app-preferences-context";
@@ -86,13 +87,13 @@ const CURRENCY_OPTIONS = [
 
 export default function ChatPage() {
   const { token } = useAuth();
-  const {
-    selectedCategory,
-    setSelectedCategory,
-    translateToEnglish,
-    setTranslateToEnglish,
-    targetCurrency,
-    setTargetCurrency,
+  const { 
+    selectedProvider: provider, setSelectedProvider: setProvider,
+    selectedModel: model, setSelectedModel: setModel,
+    selectedCategory, setSelectedCategory,
+    selectedPromptTemplate: selectedPrompt, setSelectedPromptTemplate: setSelectedPrompt,
+    translateToEnglish, setTranslateToEnglish,
+    targetCurrency, setTargetCurrency
   } = useAppPreferences();
 
   const [question, setQuestion] = useState("");
@@ -104,16 +105,12 @@ export default function ChatPage() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"general" | "advanced">("general");
   
-  // Advanced Settings State (Restored)
-  const [provider, setProvider] = useState("openai");
-  const [model, setModel] = useState("auto");
-  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [availableModels, setAvailableModels] = useState<ModelItem[]>([]);
   const [prompts, setPrompts] = useState<PromptItem[]>([]);
-  const [selectedPrompt, setSelectedPrompt] = useState<string>("");
   
-  // Upload State (Restored)
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [customModelId, setCustomModelId] = useState("");
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -135,7 +132,7 @@ export default function ChatPage() {
         getModels(token),
         listPrompts(token)
       ]);
-      setAvailableModels(modelsRes.models || []);
+      setAvailableModels(modelsRes.all_models[provider] || modelsRes.models || []);
       setPrompts(promptsRes.prompts);
     } catch (e) {}
   }
@@ -143,7 +140,7 @@ export default function ChatPage() {
   useEffect(() => {
     if (token) {
       getModels(token).then(res => {
-        setAvailableModels(res.models || []);
+        setAvailableModels(res.all_models[provider] || []);
       }).catch(() => {});
     }
   }, [provider, token]);
@@ -171,7 +168,7 @@ export default function ChatPage() {
     try {
       const result = await queryDocuments({
         question: currentQuestion,
-        model: model,
+        model: model === "custom" ? customModelId : model,
         provider: provider,
         category: selectedCategory === "All" ? null : selectedCategory,
         session_id: sessionId || undefined,
@@ -491,11 +488,33 @@ export default function ChatPage() {
                         >
                           <option value="auto">Auto-Select</option>
                           {availableModels.map(m => (
-                            <option key={m} value={m}>{m}</option>
+                            <option key={m.model_id} value={m.model_id}>{m.label}</option>
                           ))}
+                          {provider === 'bedrock' && <option value="custom">Custom ID...</option>}
                         </select>
                       </div>
                     </div>
+
+                    {provider === 'bedrock' && model === 'custom' && (
+                      <div className="space-y-2 animate-in slide-in-from-top-1 duration-200">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Bedrock Model ID</label>
+                        <input 
+                          type="text"
+                          value={customModelId}
+                          onChange={(e) => {
+                            setCustomModelId(e.target.value);
+                            // We don't setModel(e.target.value) here because we want to keep the "custom" selection in the dropdown
+                          }}
+                          onBlur={() => {
+                            if (customModelId.trim()) {
+                               // Optional: we could set something else, but we need to pass this ID to the API.
+                            }
+                          }}
+                          placeholder="e.g. us.anthropic.claude-3-5-sonnet-20241022-v2:0"
+                          className="w-full rounded-xl bg-white/5 border border-white/10 p-3 text-sm text-white focus:outline-none"
+                        />
+                      </div>
+                    )}
 
                     <div className="space-y-2">
                       <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">
