@@ -43122,3 +43122,54 @@ INFO:     ::ffff:49.37.160.223:0 - "GET /api/conversations?limit=50 HTTP/1.1" 20
 INFO:sqlalchemy.engine.Engine:ROLLBACK
 INFO:     ::ffff:49.37.160.223:0 - "GET /api/prompts HTTP/1.1" 200 OK
 INFO:     46.151.178.13:0 - "PROPFIND / HTTP/1.1" 404 Not Found
+INFO:     157.245.89.0:0 - "GET / HTTP/1.1" 404 Not Found
+INFO:     ::ffff:49.37.160.223:0 - "GET /api/models HTTP/1.1" 200 OK
+2026-05-05 08:15:16,843 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+INFO:sqlalchemy.engine.Engine:BEGIN (implicit)
+2026-05-05 08:15:16,844 INFO sqlalchemy.engine.Engine SELECT prompt_templates.id AS prompt_templates_id, prompt_templates.name AS prompt_templates_name, prompt_templates.category AS prompt_templates_category, prompt_templates.template AS prompt_templates_template, prompt_templates.description AS prompt_templates_description, prompt_templates.created_at AS prompt_templates_created_at 
+FROM prompt_templates ORDER BY prompt_templates.created_at DESC
+INFO:sqlalchemy.engine.Engine:SELECT prompt_templates.id AS prompt_templates_id, prompt_templates.name AS prompt_templates_name, prompt_templates.category AS prompt_templates_category, prompt_templates.template AS prompt_templates_template, prompt_templates.description AS prompt_templates_description, prompt_templates.created_at AS prompt_templates_created_at 
+FROM prompt_templates ORDER BY prompt_templates.created_at DESC
+2026-05-05 08:15:16,844 INFO sqlalchemy.engine.Engine [cached since 5714s ago] {}
+INFO:sqlalchemy.engine.Engine:[cached since 5714s ago] {}
+2026-05-05 08:15:16,846 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:sqlalchemy.engine.Engine:ROLLBACK
+INFO:     ::ffff:49.37.160.223:0 - "GET /api/prompts HTTP/1.1" 200 OK
+ERROR:chromadb.telemetry.product.posthog:Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+ERROR:chromadb.telemetry.product.posthog:Failed to send telemetry event ClientCreateCollectionEvent: capture() takes 1 positional argument but 3 were given
+INFO:backend.vector_store:ChromaDB collection 'documents' ready (1346 items)
+INFO:     ::ffff:49.37.160.223:0 - "GET /api/detect_currency HTTP/1.1" 200 OK
+2026-05-05 08:15:17,240 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+INFO:sqlalchemy.engine.Engine:BEGIN (implicit)
+2026-05-05 08:15:17,240 INFO sqlalchemy.engine.Engine SELECT conversations.session_id AS conversations_session_id, conversations.title AS conversations_title, conversations.category AS conversations_category, conversations.messages AS conversations_messages, conversations.timestamp AS conversations_timestamp, conversations.updated_at AS conversations_updated_at 
+FROM conversations ORDER BY conversations.updated_at DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+INFO:sqlalchemy.engine.Engine:SELECT conversations.session_id AS conversations_session_id, conversations.title AS conversations_title, conversations.category AS conversations_category, conversations.messages AS conversations_messages, conversations.timestamp AS conversations_timestamp, conversations.updated_at AS conversations_updated_at 
+FROM conversations ORDER BY conversations.updated_at DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-05-05 08:15:17,240 INFO sqlalchemy.engine.Engine [cached since 5714s ago] {'param_1': 50, 'param_2': 0}
+INFO:sqlalchemy.engine.Engine:[cached since 5714s ago] {'param_1': 50, 'param_2': 0}
+2026-05-05 08:15:17,247 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:sqlalchemy.engine.Engine:ROLLBACK
+INFO:     ::ffff:49.37.160.223:0 - "GET /api/conversations?limit=50 HTTP/1.1" 200 OK
+2026-05-05 08:15:19,646 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+INFO:sqlalchemy.engine.Engine:BEGIN (implicit)
+2026-05-05 08:15:19,646 INFO sqlalchemy.engine.Engine SELECT documents.id AS documents_id, documents.title AS documents_title, documents.category AS documents_category, documents.uploaded_by AS documents_uploaded_by, documents.timestamp AS documents_timestamp, documents.source_path AS documents_source_path, documents.file_type AS documents_file_type, documents.file_size AS documents_file_size, documents.chunk_count AS documents_chunk_count, documents.status AS documents_status, documents.content_hash AS documents_content_hash 
+FROM documents ORDER BY documents.timestamp DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+INFO:sqlalchemy.engine.Engine:SELECT documents.id AS documents_id, documents.title AS documents_title, documents.category AS documents_category, documents.uploaded_by AS documents_uploaded_by, documents.timestamp AS documents_timestamp, documents.source_path AS documents_source_path, documents.file_type AS documents_file_type, documents.file_size AS documents_file_size, documents.chunk_count AS documents_chunk_count, documents.status AS documents_status, documents.content_hash AS documents_content_hash 
+FROM documents ORDER BY documents.timestamp DESC 
+ LIMIT %(param_1)s OFFSET %(param_2)s
+2026-05-05 08:15:19,647 INFO sqlalchemy.engine.Engine [cached since 6857s ago] {'param_1': 200, 'param_2': 0}
+INFO:sqlalchemy.engine.Engine:[cached since 6857s ago] {'param_1': 200, 'param_2': 0}
+2026-05-05 08:15:19,648 INFO sqlalchemy.engine.Engine SELECT count(*) AS count_1 
+FROM (SELECT documents.id AS documents_id, documents.title AS documents_title, documents.category AS documents_category, documents.uploaded_by AS documents_uploaded_by, documents.timestamp AS documents_timestamp, documents.source_path AS documents_source_path, documents.file_type AS documents_file_type, documents.file_size AS documents_file_size, documents.chunk_count AS documents_chunk_count, documents.status AS documents_status, documents.content_hash AS documents_content_hash 
+FROM documents) AS anon_1
+INFO:sqlalchemy.engine.Engine:SELECT count(*) AS count_1 
+FROM (SELECT documents.id AS documents_id, documents.title AS documents_title, documents.category AS documents_category, documents.uploaded_by AS documents_uploaded_by, documents.timestamp AS documents_timestamp, documents.source_path AS documents_source_path, documents.file_type AS documents_file_type, documents.file_size AS documents_file_size, documents.chunk_count AS documents_chunk_count, documents.status AS documents_status, documents.content_hash AS documents_content_hash 
+FROM documents) AS anon_1
+2026-05-05 08:15:19,648 INFO sqlalchemy.engine.Engine [cached since 6857s ago] {}
+INFO:sqlalchemy.engine.Engine:[cached since 6857s ago] {}
+2026-05-05 08:15:19,650 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:sqlalchemy.engine.Engine:ROLLBACK
+INFO:     ::ffff:49.37.160.223:0 - "GET /api/documents?limit=200 HTTP/1.1" 200 OK

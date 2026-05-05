@@ -227,13 +227,13 @@ export default function DashboardPage() {
               </ResponsiveContainer>
             </div>
             <div className="mt-4 space-y-2">
-              {categoryData.slice(0, 4).map((entry, i) => (
+              {(categoryData as any[]).slice(0, 4).map((entry: any, i: number) => (
                 <div key={i} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
                     <div className="h-2 w-2 rounded-full" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
                     <span className="text-slate-300">{entry.name}</span>
                   </div>
-                  <span className="font-bold text-white">{entry.value}</span>
+                  <span className="font-bold text-white">{String(entry.value)}</span>
                 </div>
               ))}
             </div>

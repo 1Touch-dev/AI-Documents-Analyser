@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   getAnalyticsContentInsights,
   getFinancialDashboard,
@@ -63,6 +63,14 @@ export default function AnalyticsPage() {
     fetchData();
   }, [token]);
 
+  const financialChartData = useMemo(() => {
+    if (!financialData) return [];
+    return [
+      ...Object.entries(financialData.revenue || {}).map(([name, value]) => ({ name, value, type: 'revenue' })),
+      ...Object.entries(financialData.expenses || {}).map(([name, value]) => ({ name, value, type: 'expense' }))
+    ];
+  }, [financialData]);
+
   if (loading) {
     return (
       <div className="flex h-[80vh] flex-col items-center justify-center gap-4">
@@ -112,10 +120,7 @@ export default function AnalyticsPage() {
             
             <div className="h-64 w-full rounded-2xl bg-white/2 p-4">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={[
-                  ...Object.entries(financialData?.revenue || {}).map(([name, value]) => ({ name, value, type: 'revenue' })),
-                  ...Object.entries(financialData?.expenses || {}).map(([name, value]) => ({ name, value, type: 'expense' }))
-                ]}>
+                <BarChart data={financialChartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                   <XAxis dataKey="name" hide />
                   <YAxis hide />
@@ -123,7 +128,7 @@ export default function AnalyticsPage() {
                     contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px' }}
                   />
                   <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                    {(data: any) => data.map((entry: any, index: number) => (
+                    {financialChartData.map((entry: any, index: number) => (
                       <Cell key={`cell-${index}`} fill={entry.type === 'revenue' ? '#10b981' : '#ef4444'} />
                     ))}
                   </Bar>
