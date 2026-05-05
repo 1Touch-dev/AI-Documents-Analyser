@@ -10,7 +10,7 @@ Welcome to the AI Knowledge Platform. This system empowers you to upload hundred
 |---|---|
 | Production (EC2) | `http://54.175.54.77:3001` |
 | Local development | `http://localhost:3001` |
-| Backend API Docs | `http://54.175.54.77:8010/docs` |
+| Backend API Docs | `http://54.175.54.77:8000/docs` |
 
 ### Default Credentials
 Log in with the credentials provided by your administrator. To register a new account, use the **Register** page at `/register`.
@@ -30,7 +30,7 @@ docker compose down       # stop
 ```bash
 # Terminal 1 — Backend
 source .venv/bin/activate
-uvicorn backend.main:app --host 0.0.0.0 --port 8010
+uvicorn backend.main:app --host 0.0.0.0 --port 8000
 
 # Terminal 2 — Frontend
 cd frontend-nextjs
@@ -50,14 +50,15 @@ pkill -f "next.*3001" || true
 All chat settings are accessed via the **Chat Settings** button (gear icon) in the Chat page. Settings persist across the browser session via `localStorage`.
 
 ### Model Selection
-The platform routes all requests through **OpenAI GPT models**. Available options:
+The platform routes all requests through a **Universal Multi-Model Router**. Supported providers:
 
-| Model | Best For |
-|---|---|
-| `auto` *(default)* | Automatically picks gpt-4o or gpt-4.1 based on query complexity |
-| `gpt-4o` | Fast responses, cost-efficient, everyday queries |
-| `gpt-4.1` | Deep reasoning, complex analysis, long documents |
-| `gpt-4.1-mini` | Fastest response time, simple lookups |
+| Provider | Supported Models | Best For |
+|---|---|---|
+| **OpenAI** | `gpt-4o`, `gpt-4.1`, `gpt-4.1-mini` | High accuracy, fast responses, everyday queries. |
+| **AWS Bedrock** | Any Bedrock Model ID (e.g., `amazon.nova-pro-v1:0`, `anthropic.claude-3-5-sonnet-v2:0`) | Enterprise compliance, massive document contexts, varied model choices. |
+
+- **Auto Mode**: If `auto` is selected, the system automatically picks the best model (typically `gpt-4.1` or `gpt-4o`) based on query complexity.
+- **Custom Model IDs**: For Bedrock, you can enter any valid Model ID directly in the settings sidebar.
 
 > **No local model is required.** All AI runs through the OpenAI cloud API. Ensure `OPENAI_API_KEY` is set in the server environment, or paste your key in the **OpenAI API** tab of Chat Settings.
 

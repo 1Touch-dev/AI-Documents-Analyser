@@ -64,8 +64,9 @@ argument validation** on top of the same underlying skill logic.
 
 ## Roadmap
 
-- [ ] Register skills as MCP tools via `skills_mcp.py`
-- [ ] Connect MCP server to Claude Desktop or a Cursor agent
-- [ ] Expose skills in n8n via HTTP Request nodes
+- [x] Register skills as MCP tools via `server.py`
+- [x] Implement JSON-RPC 2.0 tool execution via `POST /api/mcp/execute`
+- [x] Enforce RBAC on MCP tool calls
+- [ ] Connect MCP server to external orchestrators (n8n, LangGraph)
 - [ ] Add skill chaining (output of one skill feeds another)
 - [ ] Add streaming support for long-running report generation

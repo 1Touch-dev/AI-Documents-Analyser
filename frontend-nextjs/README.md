@@ -1,80 +1,60 @@
 # AI Knowledge Platform Frontend (Next.js)
 
-This is the active frontend for the current `feature/business-features-v1` branch.
-It talks to the FastAPI backend and uses the backend's GPT-only runtime for chat,
-translation, report generation, and financial extraction.
+Premium, SaaS-ready frontend for the AI Knowledge Platform. Built with Next.js, Tailwind CSS, and Lucide.
 
-## What is implemented
+## 🚀 Features
 
-- App Router + TypeScript + Tailwind setup
-- Auth baseline:
-  - Login page (`/login`)
-  - Register page (`/register`)
-  - Protected dashboard route (`/dashboard`)
-  - Client auth context with token storage
-  - Next middleware guard for protected/auth routes
-- FastAPI integration baseline:
-  - `POST /api/auth/login`
-  - `POST /api/auth/register`
-  - `GET /api/health`
-  - `GET /api/models`
-  - `POST /api/query`
-  - `POST /api/analytics/financial_dashboard`
-  - `GET /api/documents/status`
+- **Executive Dashboard**: Real-time business metrics with Recharts integration.
+- **AI Assistant**: Conversational interface with multi-model support (OpenAI/Bedrock), translation, and currency conversion.
+- **Business Intelligence**: One-click analysis workflows with structured executive insights.
+- **Document Management**: Categorized file vault with AI auto-classification and indexing status tracking.
+- **Report Vault**: Historical analysis storage with export capabilities (JSON/CSV).
+- **Enterprise Ready**: Role-based access control (RBAC), usage tracking, and audit logging.
 
-## Current branch features
+## 🛠️ Technology Stack
 
-- Chat page with:
-  - translation toggle
-  - currency selector
-  - GPT-backed query flow
-- Analytics page with:
-  - financial extraction button
-  - table + bar chart
-- Documents page with:
-  - document status check
-- Protected app routes using the existing auth flow
+- **Framework**: Next.js 14+ (App Router)
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS
+- **Icons**: Lucide React
+- **Charts**: Recharts
+- **State Management**: React Context (Auth)
 
-## Run locally
+## 📖 Development
 
-1. Install dependencies:
-
+### 1. Install Dependencies
 ```bash
 npm install
 ```
 
-2. Configure env:
-
+### 2. Configure Environment
+Create a `.env.local` file:
 ```bash
-cat <<'EOF' > .env.local
-NEXT_PUBLIC_BACKEND_API_URL=http://127.0.0.1:8010/api
-EOF
+NEXT_PUBLIC_BACKEND_API_URL=http://localhost:8000/api
 ```
 
-3. Start dev server:
-
+### 3. Start Development Server
 ```bash
-npm run dev -- --hostname 0.0.0.0 --port 3000
+npm run dev
 ```
 
-4. Open:
+### 4. Build for Production
+```bash
+npm run build
+npm start
+```
 
-- [http://localhost:3000/login](http://localhost:3000/login)
-- [http://localhost:3000/register](http://localhost:3000/register)
-- [http://localhost:3000/dashboard](http://localhost:3000/dashboard)
-- [http://localhost:3000/chat](http://localhost:3000/chat)
-- [http://localhost:3000/analytics](http://localhost:3000/analytics)
-- [http://localhost:3000/documents](http://localhost:3000/documents)
+## 📂 Project Structure
 
-## Environment variables
+- `src/app`: App Router pages and layouts.
+- `src/components`: Shared UI components.
+- `src/contexts`: Auth and Theme contexts.
+- `src/lib`: API clients and utility functions.
+- `src/styles`: Global CSS and Tailwind configuration.
 
-- `NEXT_PUBLIC_BACKEND_API_URL`
-  Recommended local value: `http://127.0.0.1:8010/api`
+## 🔌 API Integration
 
-Note: the frontend calls a same-origin proxy route (`/api/backend/*`) that forwards to this backend URL. This is more resilient against browser extension fetch interception and avoids CORS issues in development.
+The frontend communicates with the FastAPI backend (default port `8000`). All API calls are routed through `src/lib/api.ts` and use a consistent error-handling pattern.
 
-## Backend dependency
-
-- The backend must be running separately on port `8010`.
-- The backend now requires a valid `OPENAI_API_KEY` for GPT-powered features.
-- Internet/API access is required for local testing of chat, translation, reports, and financial extraction.
+---
+Part of the AI Knowledge Platform.

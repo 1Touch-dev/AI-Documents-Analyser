@@ -9,20 +9,22 @@ A production-grade, SaaS-ready platform for automated document analysis and busi
 This platform is designed for **Business Users**, not just engineers. It follows a simple, high-impact workflow:
 
 1.  **📂 Intelligent Ingestion**: Upload documents; AI automatically categorizes them (F&B, Ticketing, Retail, etc.).
-2.  **💬 AI Assistant**: Chat with your document knowledge base in plain English.
-3.  **⚡ One-Click Analysis**: Run complex business intelligence workflows across your entire data set with a single search.
+2.  **💬 AI Assistant**: Chat with your document knowledge base in plain English with translation and currency conversion.
+3.  **⚡ One-Click Analysis**: Run complex business intelligence workflows (Financial, Strategy, Operations) across your entire data set.
 4.  **📊 Executive Insights**: View structured summaries, key findings, risks, and actionable recommendations.
 5.  **📑 Report Vault**: Access, manage, and export your history of saved reports in JSON/CSV formats.
+6.  **🔌 MCP Orchestration**: Seamlessly integrate AI tools and workflows via the Model Context Protocol (MCP).
 
 ---
 
 ## 🛠️ Technology Stack
 
-- **Frontend**: Next.js (Tailwind, Lucide, Recharts, GSAP) - *Premium Glassmorphism UI*
+- **Frontend**: Next.js (Tailwind, Lucide, Recharts) - *Premium Glassmorphism UI*
 - **Backend**: FastAPI (Python 3.10+)
-- **Database**: PostgreSQL (Relational data) + ChromaDB (Vector Knowledge Base)
+- **Database**: PostgreSQL (Relational) + ChromaDB (Vector Store)
 - **AI Engine**: OpenAI GPT-4o & AWS Bedrock (Universal Multi-Model Router)
-- **Storage**: AWS S3 (Scalable document storage)
+- **Protocols**: Model Context Protocol (MCP) for tool & skill execution
+- **Security**: RBAC (Admin/Analyst/Viewer), Audit Logs, Rate Limiting
 
 ---
 
@@ -41,7 +43,8 @@ docker compose up --build -d
 
 ### 3. Access the Platform
 - **UI**: [http://localhost:3000](http://localhost:3000)
-- **API Docs**: [http://localhost:8010/docs](http://localhost:8010/docs)
+- **API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **MCP Endpoint**: `POST /api/mcp/execute`
 
 ---
 
@@ -49,28 +52,27 @@ docker compose up --build -d
 
 | Module | Purpose |
 |---|---|
-| **Executive Dashboard** | High-level KPI tracking and system health. |
-| **Document Management** | Categorized, searchable document vault with AI auto-classification. |
-| **Business Analysis** | One-click intelligence engine for Financials, Consulting, and Operations. |
-| **Report Vault** | Persistent history of analysis results with BI-compatible exports (CSV/JSON). |
-| **AI Assistant** | Natural language interface to your document knowledge. |
-| **Usage & Audit** | Enterprise-grade cost tracking and security logging. |
+| **Executive Dashboard** | High-level KPI tracking, document distribution, and system health. |
+| **Document Management** | Categorized document vault with AI auto-classification and indexing tracking. |
+| **Business Intelligence** | One-click analysis engine using Workflows and Skills. |
+| **Report Vault** | Persistent history of analysis results with BI-compatible exports. |
+| **AI Assistant** | Natural language interface with advanced model selection (OpenAI/Bedrock). |
+| **Usage & Audit** | Enterprise-grade cost tracking (USD estimates) and security logging. |
 
 ---
 
-## 🔧 Recovered + Verified Features
-The following features have been restored for parity with the core technical baseline:
-- **Skills Workbench**: Manual execution of specialized AI tasks (Financial, Consulting).
-- **Advanced Chat Control**: Deep selection of Models (GPT/Bedrock), Providers, and Prompt Templates.
-- **Index Lifecycle Tracking**: Real-time modal for document indexing status and vector store health.
-- **Workflow Templates**: One-click access to legacy Financial and Consulting pipelines.
+## 🔧 Key System Features
+- **MCP Server**: Real JSON-RPC 2.0 tool execution. Exposes all Skills as callable tools.
+- **Universal LLM Router**: Seamless switching between OpenAI and AWS Bedrock models.
+- **One-Click Workflows**: Intent-based analysis that maps user queries to multi-step pipelines.
+- **SaaS Readiness**: Integrated rate limiting, audit logging, and role-based access control.
 
 ---
 
 ## 📄 Documentation
 - 🚀 **[Deployment Manual](Documents/deployment%20manual.md)**: Installation & Cloud setup.
 - 📖 **[User Manual](Documents/user%20manual.md)**: How to use the business features.
-- 🧪 **[UI Testing Guide](Documents/UI-TESTING-GUIDE.md)**: Validating the SaaS product experience.
+- 🔌 **[MCP Overview](backend/mcp/README.md)**: Technical details of the tool execution server.
 
 ---
 MIT License. Created for high-performance business intelligence.
