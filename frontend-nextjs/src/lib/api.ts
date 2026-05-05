@@ -221,7 +221,7 @@ export function uploadBatch(files: File[], category: string, token?: string) {
   files.forEach((file) => form.append("files", file));
   form.append("category", category || "general");
 
-  return fetch(`${BACKEND_API_BASE_URL}/upload_batch`, {
+  return fetch(`${API_PROXY_BASE_URL}/upload_batch`, {
     method: "POST",
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     body: form,
@@ -572,6 +572,21 @@ export function saveReport(
   );
 }
 
+export function deleteSavedReport(id: string, token?: string) {
+  return request<{ message: string }>(
+    `/reports/${id}`,
+    { method: "DELETE" },
+    token
+  );
+}
+
+export function exportSavedReport(id: string, format: "json" | "csv" = "json", token?: string) {
+  if (format === "json") {
+    return request<Record<string, unknown>>(`/export/report?report_id=${id}&format=json`, { method: "POST" }, token);
+  }
+  return `${API_PROXY_BASE_URL}/export/report?report_id=${id}&format=csv`;
+}
+
 // ── Auth/me ───────────────────────────────────────────────────────────────────
 
 export type UserProfile = {
@@ -623,10 +638,14 @@ export function classifyWorkflow(query: string, token?: string) {
 }
 
 export function runOneClickAnalysis(
-  payload: { provider?: string; model?: string; context?: string; openai_api_key?: string | null },
+  payload: { query: string; provider?: string; model?: string; openai_api_key?: string | null },
   token?: string
 ) {
-  return request<UnifiedAnalysis>(
+  return request<{
+    workflow_type: string;
+    query: string;
+    result: WorkflowResult;
+  }>(
     "/workflows/analyze",
     { method: "POST", body: JSON.stringify(payload) },
     token

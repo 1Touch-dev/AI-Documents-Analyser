@@ -13,6 +13,25 @@ import {
   uploadBatch,
 } from "@/lib/api";
 import { useAuth } from "@/contexts/auth-context";
+import { 
+  FileText, 
+  Search, 
+  Filter, 
+  Trash2, 
+  RefreshCw, 
+  CheckCircle2, 
+  Clock, 
+  AlertCircle,
+  ChevronDown,
+  ChevronUp,
+  FileCode,
+  FilePieChart,
+  FileBox,
+  UploadCloud,
+  Loader2,
+  LayoutGrid,
+  List
+} from "lucide-react";
 
 type NormalizedStatus = "ready" | "processing" | "failed";
 
@@ -27,29 +46,43 @@ function normalizeStatus(status?: string): NormalizedStatus {
   return "failed";
 }
 
+const CATEGORIES = [
+  "Financial",
+  "F&B",
+  "Ticketing",
+  "Retail",
+  "Player Sales",
+  "Sponsors",
+  "Legal",
+  "HR",
+  "Operations",
+  "Others"
+];
+
 export default function DocumentsPage() {
   const { token } = useAuth();
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [category, setCategory] = useState("general");
+  const [uploadCategory, setUploadCategory] = useState("Financial");
   const [uploadSummary, setUploadSummary] = useState<UploadBatchResponse | null>(null);
   const [batchStatus, setBatchStatus] = useState<BatchStatusResponse | null>(null);
-  const [documentStatus, setDocumentStatus] = useState<DocumentStatusResponse | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+  
+  // UI State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterCategory, setFilterCategory] = useState<string | "All">("All");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
+    "Financial": true,
+    "F&B": true,
+    "Ticketing": true,
+    "Others": true
+  });
 
-  const metrics = useMemo(() => {
-    const ready = documents.filter((d) => normalizeStatus(d.status) === "ready").length;
-    const processing = documents.filter((d) => normalizeStatus(d.status) === "processing").length;
-    const failed = documents.filter((d) => normalizeStatus(d.status) === "failed").length;
-    const totalSizeMb = documents.reduce((sum, doc) => sum + (doc.file_size || 0), 0) / (1024 * 1024);
-    return { total: documents.length, ready, processing, failed, totalSizeMb };
-  }, [documents]);
-
-  async function refreshDocuments(showRefreshState = false) {
+  const refreshDocuments = async (showRefreshState = false) => {
     if (showRefreshState) setIsRefreshing(true);
     try {
       const res = await listDocuments(token ?? undefined);
@@ -60,430 +93,290 @@ export default function DocumentsPage() {
       setIsLoading(false);
       if (showRefreshState) setIsRefreshing(false);
     }
-  }
+  };
 
   useEffect(() => {
     refreshDocuments();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  useEffect(() => {
-    if (!uploadSummary?.batch_id || !token) return;
-
-    let timer: number | undefined;
-    let cancelled = false;
-    let pollCount = 0;
-    let sameProcessingCount = 0;
-    let lastProcessing = -1;
-    const MAX_POLLS = 300;
-    const MAX_STAGNANT_POLLS = 30;
-    // Refresh the doc list every 5 polls so top-level metrics stay in sync
-    const DOC_REFRESH_EVERY = 5;
-
-    const poll = async () => {
-      try {
-        const status = await getBatchStatus(uploadSummary.batch_id, token ?? undefined);
-        if (cancelled) return;
-
-        // Cross-reference: if a file is "processing" in the batch dict but
-        // already "ready" in the live document list, override its display status
-        // so both panels stay in sync.
-        setDocuments((currentDocs) => {
-          const readyIds = new Set(
-            currentDocs.filter((d) => normalizeStatus(d.status) === "ready").map((d) => d.id)
-          );
-          if (readyIds.size === 0) return currentDocs;
-
-          let anyFixed = false;
-          const fixedFiles = { ...status.files };
-          for (const [docId, fileInfo] of Object.entries(fixedFiles)) {
-            if (fileInfo.status === "processing" && readyIds.has(docId)) {
-              fixedFiles[docId] = { ...fileInfo, status: "ready" };
-              anyFixed = true;
-            }
-          }
-          if (anyFixed) {
-            const fixedReady = Object.values(fixedFiles).filter((f) => f.status === "ready").length;
-            const fixedProcessing = Object.values(fixedFiles).filter((f) => f.status === "processing").length;
-            setBatchStatus({ ...status, files: fixedFiles, ready: fixedReady, processing: fixedProcessing });
-          } else {
-            setBatchStatus(status);
-          }
-          return currentDocs; // docs state unchanged, we just read it
-        });
-
-        // Re-read batchStatus after potential fix — use raw status for completion check
-        const effectiveProcessing = Object.values(status.files).filter(
-          (f) => f.status === "processing"
-        ).length;
-
-        const completed =
-          effectiveProcessing === 0 ||
-          status.ready + status.failed >= status.total;
-
-        if (completed) {
-          await refreshDocuments();
-          return;
-        }
-
-        pollCount += 1;
-
-        // Periodically refresh docs so metrics & table stay current
-        if (pollCount % DOC_REFRESH_EVERY === 0) {
-          await refreshDocuments();
-        }
-
-        if (status.processing === lastProcessing) {
-          sameProcessingCount += 1;
-        } else {
-          sameProcessingCount = 0;
-          lastProcessing = status.processing;
-        }
-
-        if (pollCount >= MAX_POLLS || sameProcessingCount >= MAX_STAGNANT_POLLS) {
-          await refreshDocuments();
-          return;
-        }
-
-        if (status.processing > 0) {
-          timer = window.setTimeout(poll, 800);
-        }
-      } catch {
-        pollCount += 1;
-        if (pollCount < MAX_POLLS) {
-          timer = window.setTimeout(poll, 1500);
-        }
-      }
-    };
-
-    poll();
-    return () => {
-      cancelled = true;
-      if (timer) window.clearTimeout(timer);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [uploadSummary?.batch_id, token]);
-
-  function onFileChange(event: ChangeEvent<HTMLInputElement>) {
-    setSelectedFiles(Array.from(event.target.files || []));
-  }
-
-  async function onUpload() {
-    if (!selectedFiles.length) {
-      setError("Please select at least one file.");
-      return;
+  // Grouping logic
+  const groupedDocs = useMemo(() => {
+    let filtered = documents;
+    if (searchQuery) {
+      filtered = filtered.filter(d => d.title.toLowerCase().includes(searchQuery.toLowerCase()));
     }
-    setError(null);
+    if (filterCategory !== "All") {
+      filtered = filtered.filter(d => d.category === filterCategory);
+    }
+
+    const groups: Record<string, DocumentItem[]> = {};
+    filtered.forEach(doc => {
+      const cat = doc.category || "Others";
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(doc);
+    });
+
+    return groups;
+  }, [documents, searchQuery, filterCategory]);
+
+  const metrics = useMemo(() => {
+    const ready = documents.filter((d) => normalizeStatus(d.status) === "ready").length;
+    const processing = documents.filter((d) => normalizeStatus(d.status) === "processing").length;
+    const totalSizeMb = documents.reduce((sum, doc) => sum + (doc.file_size || 0), 0) / (1024 * 1024);
+    return { total: documents.length, ready, processing, totalSizeMb };
+  }, [documents]);
+
+  const onFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setSelectedFiles(Array.from(event.target.files || []));
+  };
+
+  const onUpload = async () => {
+    if (!selectedFiles.length) return;
     setIsUploading(true);
     try {
-      const result = await uploadBatch(selectedFiles, category, token ?? undefined);
+      const result = await uploadBatch(selectedFiles, uploadCategory, token ?? undefined);
       setUploadSummary(result);
       setSelectedFiles([]);
+      refreshDocuments();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed.");
     } finally {
       setIsUploading(false);
     }
-  }
+  };
 
-  async function onDelete(documentId: string) {
-    setError(null);
+  const onDelete = async (documentId: string) => {
     try {
       await deleteDocument(documentId, token ?? undefined);
       await refreshDocuments(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Delete failed.");
     }
-  }
+  };
 
-  async function onCheckDocumentStatus() {
-    setError(null);
-    setIsCheckingStatus(true);
-    try {
-      const result = await getDocumentStatus(token ?? undefined);
-      setDocumentStatus(result);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Status check failed.");
-    } finally {
-      setIsCheckingStatus(false);
-    }
-  }
+  const toggleCategory = (cat: string) => {
+    setExpandedCategories(prev => ({ ...prev, [cat]: !prev[cat] }));
+  };
+
+  const getStatusIcon = (status?: string) => {
+    const normalized = normalizeStatus(status);
+    if (normalized === "ready") return <CheckCircle2 className="h-4 w-4 text-emerald-400" />;
+    if (normalized === "processing") return <Loader2 className="h-4 w-4 animate-spin text-amber-400" />;
+    return <AlertCircle className="h-4 w-4 text-red-400" />;
+  };
 
   return (
-    <section className="space-y-5">
-      <div>
-        <h2 className="text-2xl font-semibold text-white">Documents</h2>
-        <p className="text-sm text-slate-300">
-          Full migration baseline: upload, metrics, polling status, and delete.
-        </p>
+    <div className="mx-auto max-w-7xl space-y-8 pb-12">
+      {/* Header & Metrics */}
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-white">Document Management</h1>
+          <p className="mt-2 text-slate-400">
+            Organize, classify, and manage your business documents for analysis.
+          </p>
+        </div>
+        
+        <div className="flex gap-4">
+          <div className="rounded-2xl border border-white/10 bg-white/5 px-6 py-3 backdrop-blur-md">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Total Files</p>
+            <p className="text-xl font-bold text-white">{metrics.total}</p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/5 px-6 py-3 backdrop-blur-md">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Ready</p>
+            <p className="text-xl font-bold text-emerald-400">{metrics.ready}</p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/5 px-6 py-3 backdrop-blur-md">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Processing</p>
+            <p className="text-xl font-bold text-amber-400">{metrics.processing}</p>
+          </div>
+        </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <article className="rounded-xl border border-white/15 bg-white/5 p-4">
-          <p className="text-xs text-slate-300">Total</p>
-          <p className="mt-1 text-2xl font-semibold text-white">{metrics.total}</p>
-        </article>
-        <article className="rounded-xl border border-white/15 bg-white/5 p-4">
-          <p className="text-xs text-slate-300">Ready</p>
-          <p className="mt-1 text-2xl font-semibold text-emerald-300">{metrics.ready}</p>
-        </article>
-        <article className="rounded-xl border border-white/15 bg-white/5 p-4">
-          <p className="text-xs text-slate-300">Processing</p>
-          <p className="mt-1 text-2xl font-semibold text-amber-300">{metrics.processing}</p>
-        </article>
-        <article className="rounded-xl border border-white/15 bg-white/5 p-4">
-          <p className="text-xs text-slate-300">Total Size</p>
-          <p className="mt-1 text-2xl font-semibold text-cyan-200">{metrics.totalSizeMb.toFixed(1)} MB</p>
-        </article>
-      </div>
+      {/* Action Bar */}
+      <div className="flex flex-col gap-4 rounded-3xl border border-white/10 bg-slate-900/40 p-4 backdrop-blur-xl lg:flex-row lg:items-center">
+        {/* Search */}
+        <div className="relative flex-1">
+          <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+          <input
+            type="text"
+            placeholder="Search documents..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full rounded-2xl border border-white/10 bg-slate-950/50 py-2.5 pl-11 pr-4 text-sm text-white placeholder-slate-500 focus:border-indigo-500/50 focus:outline-none"
+          />
+        </div>
 
-      <div className="rounded-xl border border-white/15 bg-white/5 p-5">
-        <h3 className="text-sm font-semibold text-white">Batch Upload</h3>
-        <p className="mt-1 text-xs text-slate-300">
-          Upload multiple files (PDF, DOCX, PPTX, XLSX, CSV, TXT, JSON) — files are indexed in parallel.
-        </p>
-        <div className="mt-3 grid gap-3 md:grid-cols-[1fr_180px_140px]">
-          <input
-            type="file"
-            multiple
-            onChange={onFileChange}
-            className="rounded-lg border border-white/20 bg-slate-950/60 px-3 py-2 text-sm text-slate-200"
-          />
-          <input
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            placeholder="category"
-            className="rounded-lg border border-white/20 bg-slate-950/60 px-3 py-2 text-sm text-slate-200"
-          />
-          <button
-            onClick={onUpload}
-            disabled={isUploading}
-            className="rounded-lg bg-gradient-to-r from-indigo-500 to-cyan-500 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+        {/* Filter */}
+        <div className="flex items-center gap-2 px-2">
+          <Filter className="h-4 w-4 text-slate-500" />
+          <select
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+            className="rounded-xl border border-white/10 bg-slate-950/50 px-3 py-2 text-sm text-slate-300 focus:outline-none"
           >
-            {isUploading ? "Uploading…" : "Upload"}
+            <option value="All">All Categories</option>
+            {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+
+        {/* View Switcher */}
+        <div className="flex gap-1 rounded-xl bg-slate-950/50 p-1">
+          <button 
+            onClick={() => setViewMode("grid")}
+            className={`rounded-lg p-2 transition ${viewMode === "grid" ? "bg-white/15 text-white" : "text-slate-500 hover:text-slate-300"}`}
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </button>
+          <button 
+            onClick={() => setViewMode("list")}
+            className={`rounded-lg p-2 transition ${viewMode === "list" ? "bg-white/15 text-white" : "text-slate-500 hover:text-slate-300"}`}
+          >
+            <List className="h-4 w-4" />
           </button>
         </div>
 
-        {!!selectedFiles.length && !uploadSummary && (
-          <p className="mt-2 text-xs text-slate-300">{selectedFiles.length} file(s) selected — ready to upload.</p>
-        )}
-
-        {/* Live batch progress panel */}
-        {uploadSummary && (
-          <div className="mt-4 space-y-3">
-            {/* Overall progress bar */}
-            {batchStatus && batchStatus.total > 0 && (
-              <div>
-                <div className="mb-1 flex items-center justify-between text-xs text-slate-300">
-                  <span>
-                    {batchStatus.processing > 0
-                      ? `Processing ${batchStatus.processing} file${batchStatus.processing > 1 ? "s" : ""} in parallel…`
-                      : `Complete — ${batchStatus.ready} ready${batchStatus.failed > 0 ? `, ${batchStatus.failed} failed` : ""}`}
-                  </span>
-                  <span className="text-slate-400">
-                    {batchStatus.ready + batchStatus.failed}/{batchStatus.total}
-                  </span>
-                </div>
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-                  <div
-                    className={`h-full rounded-full transition-all duration-500 ${
-                      batchStatus.processing > 0
-                        ? "bg-gradient-to-r from-indigo-400 to-cyan-400"
-                        : batchStatus.failed > 0
-                        ? "bg-gradient-to-r from-amber-400 to-red-400"
-                        : "bg-gradient-to-r from-emerald-400 to-cyan-400"
-                    }`}
-                    style={{
-                      width: `${Math.round(((batchStatus.ready + batchStatus.failed) / batchStatus.total) * 100)}%`,
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Per-file status rows */}
-            {batchStatus && Object.values(batchStatus.files).length > 0 && (
-              <div className="max-h-48 space-y-1.5 overflow-y-auto">
-                {Object.values(batchStatus.files).map((f) => (
-                  <div
-                    key={f.filename}
-                    className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs"
-                  >
-                    <span className="truncate max-w-[60%] text-slate-200">{f.filename}</span>
-                    <span
-                      className={`ml-2 shrink-0 rounded-full px-2 py-0.5 font-medium ${
-                        f.status === "ready"
-                          ? "bg-emerald-500/20 text-emerald-200"
-                          : f.status === "processing"
-                          ? "bg-amber-500/20 text-amber-200"
-                          : "bg-red-500/20 text-red-200"
-                      }`}
-                    >
-                      {f.status === "ready"
-                        ? `✓ ready${f.chunks ? ` · ${f.chunks} chunks` : ""}`
-                        : f.status === "processing"
-                        ? "⟳ indexing…"
-                        : `✗ ${f.error || "failed"}`}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Summary line */}
-            <p className="text-xs text-slate-400">
-              Submitted: accepted {uploadSummary.accepted}
-              {uploadSummary.duplicates > 0 ? ` · duplicates ${uploadSummary.duplicates}` : ""}
-              {uploadSummary.rejected > 0 ? ` · rejected ${uploadSummary.rejected}` : ""}
-            </p>
-          </div>
-        )}
-      </div>
-
-      {error ? <p className="text-sm text-red-300">{error}</p> : null}
-      <div className="overflow-hidden rounded-xl border border-white/15 bg-white/5">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-white/10 text-slate-200">
-            <tr>
-              <th className="px-4 py-3">Title</th>
-              <th className="px-4 py-3">Category</th>
-              <th className="px-4 py-3">Type</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Size</th>
-              <th className="px-4 py-3">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {documents.map((doc) => (
-              <tr key={doc.id} className="border-t border-white/10 text-slate-100">
-                {(() => {
-                  const normalizedStatus = normalizeStatus(doc.status);
-                  const statusClass =
-                    normalizedStatus === "ready"
-                      ? "bg-emerald-500/20 text-emerald-200"
-                      : normalizedStatus === "processing"
-                      ? "bg-amber-500/20 text-amber-200"
-                      : "bg-red-500/20 text-red-200";
-                  return (
-                    <>
-                <td className="px-4 py-3">{doc.title}</td>
-                <td className="px-4 py-3">{doc.category || "-"}</td>
-                <td className="px-4 py-3">{doc.file_type}</td>
-                <td className="px-4 py-3">
-                  <span className={`rounded-full px-2 py-0.5 text-xs ${statusClass}`}>
-                    {normalizedStatus}
-                  </span>
-                </td>
-                <td className="px-4 py-3">{((doc.file_size || 0) / 1024).toFixed(1)} KB</td>
-                <td className="px-4 py-3">
-                  <button
-                    onClick={() => onDelete(doc.id)}
-                    className="rounded-md border border-red-300/40 px-2 py-1 text-xs text-red-200 hover:bg-red-500/10"
-                  >
-                    Delete
-                  </button>
-                </td>
-                    </>
-                  );
-                })()}
-              </tr>
-            ))}
-            {!documents.length ? (
-              <tr>
-                <td className="px-4 py-4 text-slate-300" colSpan={6}>
-                  {isLoading ? "Loading documents..." : "No documents available."}
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
-      <div className="flex flex-wrap gap-3">
+        {/* Refresh */}
         <button
           onClick={() => refreshDocuments(true)}
           disabled={isRefreshing}
-          className="rounded-lg border border-white/25 px-4 py-2 text-sm text-slate-200 hover:bg-white/10 disabled:opacity-60"
+          className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:opacity-50"
         >
+          <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
           {isRefreshing ? "Refreshing..." : "Refresh"}
-        </button>
-        <button
-          onClick={() => void onCheckDocumentStatus()}
-          disabled={isCheckingStatus}
-          className="rounded-lg bg-gradient-to-r from-indigo-500 to-cyan-500 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-        >
-          {isCheckingStatus ? "Checking..." : "Check Document Status"}
         </button>
       </div>
 
-      {documentStatus && (
-        <article className="space-y-4 rounded-xl border border-white/15 bg-white/5 p-5">
-          <div className="grid gap-3 md:grid-cols-3">
-            <div className="rounded-lg border border-white/10 bg-slate-950/40 p-3">
-              <p className="text-xs text-slate-300">Uploaded</p>
-              <p className="mt-1 text-xl font-semibold text-white">
-                {documentStatus.total_documents}
-              </p>
+      <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
+        {/* Main Content: Grouped List */}
+        <div className="space-y-6">
+          {Object.keys(groupedDocs).length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-white/10 bg-white/2 py-24 text-center">
+              <FileBox className="mb-4 h-12 w-12 text-slate-700" />
+              <p className="text-lg font-medium text-slate-400">No documents found</p>
+              <p className="mt-1 text-sm text-slate-600">Try adjusting your filters or upload new files.</p>
             </div>
-            <div className="rounded-lg border border-white/10 bg-slate-950/40 p-3">
-              <p className="text-xs text-slate-300">Indexed</p>
-              <p className="mt-1 text-xl font-semibold text-emerald-300">
-                {documentStatus.indexed_count}
-              </p>
-            </div>
-            <div className="rounded-lg border border-white/10 bg-slate-950/40 p-3">
-              <p className="text-xs text-slate-300">Not Indexed</p>
-              <p className="mt-1 text-xl font-semibold text-amber-300">
-                {documentStatus.not_indexed_count}
-              </p>
-            </div>
-          </div>
-
-          <div className="grid gap-4 xl:grid-cols-2">
-            <div className="rounded-xl border border-white/10 bg-slate-950/40 p-4">
-              <p className="text-sm font-semibold text-white">Indexed Documents</p>
-              <div className="mt-3 space-y-2">
-                {documentStatus.indexed.length ? (
-                  documentStatus.indexed.map((item) => (
-                    <div
-                      key={item.document_id}
-                      className="rounded-lg border border-white/10 bg-white/5 px-3 py-2"
-                    >
-                      <p className="text-sm text-slate-100">{item.title}</p>
-                      <p className="mt-1 text-xs text-slate-400">
-                        {item.file_type} · storage {item.storage_present ? "ok" : "missing"}
-                      </p>
+          ) : (
+            Object.entries(groupedDocs).sort().map(([cat, docs]) => (
+              <div key={cat} className="overflow-hidden rounded-3xl border border-white/10 bg-white/5 backdrop-blur-md">
+                <button
+                  onClick={() => toggleCategory(cat)}
+                  className="flex w-full items-center justify-between border-b border-white/5 bg-white/5 px-6 py-4 transition hover:bg-white/10"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/20 text-indigo-400">
+                      <FilePieChart className="h-5 w-5" />
                     </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-slate-300">No indexed documents found.</p>
+                    <div className="text-left">
+                      <h3 className="font-semibold text-white">{cat}</h3>
+                      <p className="text-xs text-slate-500">{docs.length} file{docs.length !== 1 ? 's' : ''}</p>
+                    </div>
+                  </div>
+                  {expandedCategories[cat] ? <ChevronUp className="h-5 w-5 text-slate-500" /> : <ChevronDown className="h-5 w-5 text-slate-500" />}
+                </button>
+
+                {expandedCategories[cat] && (
+                  <div className={`p-4 ${viewMode === "grid" ? "grid gap-4 sm:grid-cols-2" : "space-y-2"}`}>
+                    {docs.map(doc => (
+                      <div 
+                        key={doc.id}
+                        className={`group relative rounded-2xl border border-white/5 bg-slate-900/40 p-4 transition hover:border-white/20 hover:bg-slate-900/60 ${viewMode === "list" ? "flex items-center gap-4" : ""}`}
+                      >
+                        <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl transition group-hover:scale-110 ${doc.file_type.includes('xls') ? 'bg-emerald-500/10 text-emerald-400' : 'bg-indigo-500/10 text-indigo-400'}`}>
+                          {doc.file_type.includes('xls') ? <FileCode className="h-6 w-6" /> : <FileText className="h-6 w-6" />}
+                        </div>
+                        
+                        <div className="min-w-0 flex-1">
+                          <h4 className="truncate text-sm font-medium text-slate-100">{doc.title}</h4>
+                          <div className="mt-1 flex items-center gap-3 text-[10px] text-slate-500">
+                            <span className="uppercase">{doc.file_type}</span>
+                            <span>{((doc.file_size || 0) / 1024).toFixed(1)} KB</span>
+                            <div className="flex items-center gap-1">
+                              {getStatusIcon(doc.status)}
+                              <span className="capitalize">{normalizeStatus(doc.status)}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <button 
+                          onClick={() => onDelete(doc.id)}
+                          className="ml-2 rounded-lg p-2 text-slate-600 transition hover:bg-red-500/10 hover:text-red-400"
+                          title="Delete document"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
+            ))
+          )}
+        </div>
+
+        {/* Sidebar: Upload */}
+        <div className="space-y-6">
+          <div className="sticky top-24 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl">
+            <h3 className="text-lg font-bold text-white">Import Documents</h3>
+            <p className="mt-1 text-xs text-slate-500 leading-relaxed">
+              Upload PDF, Excel, or CSV files. Our AI will automatically categorize them for you.
+            </p>
+
+            <div className="mt-6 space-y-4">
+              <div className="relative">
+                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-500">Category (Optional)</label>
+                <select
+                  value={uploadCategory}
+                  onChange={(e) => setUploadCategory(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-slate-950/50 px-4 py-2.5 text-sm text-white focus:outline-none"
+                >
+                  <option value="Auto">Auto-Detect (AI)</option>
+                  {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+
+              <div className="group relative mt-2">
+                <input
+                  type="file"
+                  multiple
+                  onChange={onFileChange}
+                  className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+                />
+                <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-white/10 bg-slate-950/30 py-8 transition group-hover:border-indigo-500/40 group-hover:bg-indigo-500/5">
+                  <UploadCloud className="mb-2 h-8 w-8 text-slate-600 group-hover:text-indigo-400" />
+                  <p className="text-xs font-medium text-slate-400 group-hover:text-slate-200">
+                    {selectedFiles.length ? `${selectedFiles.length} files selected` : "Drop files here or click"}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={onUpload}
+                disabled={isUploading || selectedFiles.length === 0}
+                className="w-full rounded-2xl bg-gradient-to-r from-indigo-500 to-cyan-500 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-500/20 transition hover:scale-[1.02] hover:brightness-110 disabled:opacity-50 disabled:hover:scale-100"
+              >
+                {isUploading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Processing...
+                  </span>
+                ) : "Upload & Analyze"}
+              </button>
             </div>
 
-            <div className="rounded-xl border border-white/10 bg-slate-950/40 p-4">
-              <p className="text-sm font-semibold text-white">Uploaded But Not Indexed</p>
-              <div className="mt-3 space-y-2">
-                {documentStatus.not_indexed.length ? (
-                  documentStatus.not_indexed.map((item) => (
-                    <div
-                      key={item.document_id}
-                      className="rounded-lg border border-amber-300/20 bg-amber-500/10 px-3 py-2"
-                    >
-                      <p className="text-sm text-slate-100">{item.title}</p>
-                      <p className="mt-1 text-xs text-slate-400">
-                        {item.file_type} · db {item.db_status} · storage{" "}
-                        {item.storage_present ? "ok" : "missing"}
-                      </p>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-slate-300">All uploaded documents are indexed.</p>
-                )}
+            {uploadSummary && (
+              <div className="mt-6 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                  <p className="text-xs font-bold text-emerald-400 uppercase">Success</p>
+                </div>
+                <p className="mt-1 text-[11px] text-slate-400">
+                  {uploadSummary.accepted} documents are being indexed. This may take a minute.
+                </p>
               </div>
-            </div>
+            )}
           </div>
-        </article>
-      )}
-    </section>
+        </div>
+      </div>
+    </div>
   );
 }

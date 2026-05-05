@@ -87,4 +87,9 @@ def list_workflows() -> list[dict[str, Any]]:
 
 
 # ── Auto-register all workflows on import ─────────────────────────────────────
-from backend.workflows import financial_workflow, consulting_workflow, report_workflow  # noqa: E402, F401
+from backend.workflows import (
+    financial_workflow,
+    consulting_workflow,
+    report_workflow,
+    debt_workflow
+)

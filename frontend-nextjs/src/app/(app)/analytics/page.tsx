@@ -1,6 +1,26 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import {
+  getAnalyticsContentInsights,
+  getFinancialDashboard,
+  getAnalyticsOverview,
+} from "@/lib/api";
+import { useAuth } from "@/contexts/auth-context";
+import { 
+  BarChart3, 
+  TrendingUp, 
+  Target, 
+  AlertCircle, 
+  PieChart as PieIcon, 
+  Search, 
+  Briefcase, 
+  DollarSign, 
+  Globe, 
+  Calendar,
+  Sparkles,
+  Loader2
+} from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -9,1084 +29,203 @@ import {
   Pie,
   PieChart,
   ResponsiveContainer,
-  Tooltip as RechartsTooltip,
+  Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
-import { Bar as ChartBar } from "react-chartjs-2";
-import {
-  CategoryScale,
-  Chart as ChartJS,
-  Legend,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-} from "chart.js";
-import {
-  getAnalyticsContent,
-  getAnalyticsContentInsights,
-  getFinancialDashboard,
-  getAnalyticsOverview,
-  getAnalyticsStorage,
-  listDocuments,
-  runSkill,
-  type DocumentItem,
-  type FinancialDashboardResponse,
-  type SkillResult,
-} from "@/lib/api";
-import { useAuth } from "@/contexts/auth-context";
-import { useAppPreferences } from "@/contexts/app-preferences-context";
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
-
-const PIE_COLORS = ["#22d3ee", "#6366f1", "#34d399", "#f59e0b", "#f472b6", "#60a5fa"];
-const REVENUE_LABELS: Record<string, string> = {
-  f_and_b: "F&B",
-  sponsorship: "Sponsorship",
-  tickets: "Tickets",
-  retail: "Retail",
-  player_sales: "Player Sales",
-};
-const EXPENSE_LABELS: Record<string, string> = {
-  player_salary: "Player Salary",
-  coach_salary: "Coach Salary",
-  travel: "Travel",
-  stadium: "Stadium",
-  retail: "Retail",
-  f_and_b: "F&B",
-  back_office: "Back Office",
-  misc: "Misc",
-};
-
-type MultiSelectChipProps = {
-  label: string;
-  options: string[];
-  selected: string[];
-  onChange: (next: string[]) => void;
-};
-
-function MultiSelectChip({ label, options, selected, onChange }: MultiSelectChipProps) {
-  function toggleOption(option: string) {
-    if (selected.includes(option)) {
-      onChange(selected.filter((item) => item !== option));
-      return;
-    }
-    onChange([...selected, option]);
-  }
-
-  return (
-    <details className="group relative">
-      <summary className="flex h-11 cursor-pointer items-center gap-2 rounded-lg border border-white/20 bg-slate-950/60 px-3 py-2 text-sm text-white marker:content-['']">
-        <span className="text-slate-300">{label}:</span>
-        <span className="truncate text-slate-100">
-          {selected.length ? `${selected.length} selected` : "All"}
-        </span>
-      </summary>
-      <div className="absolute left-0 top-12 z-20 w-full min-w-[220px] rounded-lg border border-white/15 bg-slate-950 p-3 shadow-2xl">
-        <div className="max-h-48 space-y-1 overflow-auto">
-          {options.map((option) => (
-            <label key={option} className="flex items-center gap-2 rounded px-2 py-1 text-xs text-slate-200 hover:bg-white/10">
-              <input
-                type="checkbox"
-                checked={selected.includes(option)}
-                onChange={() => toggleOption(option)}
-                className="accent-cyan-400"
-              />
-              <span className="truncate">{option}</span>
-            </label>
-          ))}
-        </div>
-        {!!selected.length && (
-          <button
-            type="button"
-            onClick={() => onChange([])}
-            className="mt-2 text-xs text-cyan-200 hover:underline"
-          >
-            Clear
-          </button>
-        )}
-      </div>
-    </details>
-  );
-}
+const COLORS = ["#6366f1", "#06b6d4", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
 
 export default function AnalyticsPage() {
   const { token } = useAuth();
-  const {
-    selectedModel,
-    selectedCategory,
-    openaiApiKey,
-  } = useAppPreferences();
-  const [content, setContent] = useState<{
-    total_estimated_words: number;
-    total_reading_time_min: number;
-    word_frequencies: Record<string, number>;
-  } | null>(null);
-  const [contentInsights, setContentInsights] = useState<{
-    topics: Array<{ topic: string; frequency: number; type?: string }>;
-    entities?: {
-      monetary?: Array<{ value: string; occurrences: number }>;
-      percentages?: Array<{ value: string; occurrences: number }>;
-      dates?: Array<{ value: string; occurrences: number }>;
-      emails?: Array<{ value: string; occurrences: number }>;
-      urls?: Array<{ value: string; occurrences: number }>;
-      organizations?: Array<{ value: string; occurrences: number }>;
-    };
-    financials?: Array<{
-      keyword: string;
-      context: string;
-      values_found?: string[];
-    }>;
-    summary: {
-      total_topics: number;
-      total_entities: number;
-      total_financial_items: number;
-      docs_analyzed: number;
-      chunks_analyzed: number;
-    };
-  } | null>(null);
-  const [documents, setDocuments] = useState<DocumentItem[]>([]);
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
-  const [selectedUploaders, setSelectedUploaders] = useState<string[]>([]);
-  const [search, setSearch] = useState("");
-  const [explorerSearch, setExplorerSearch] = useState("");
-  const [explorerCategory, setExplorerCategory] = useState("all");
-  const [explorerType, setExplorerType] = useState("all");
-  const [explorerStatus, setExplorerStatus] = useState("all");
-  const [financialDashboard, setFinancialDashboard] = useState<FinancialDashboardResponse | null>(null);
-  const [isFinancialLoading, setIsFinancialLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Skills Workbench state
-  const [skillProvider, setSkillProvider] = useState("openai");
-  const [skillModel, setSkillModel] = useState("auto");
-  const [skillBedrockCustom, setSkillBedrockCustom] = useState("");
-  const [skillResults, setSkillResults] = useState<Record<string, SkillResult | null>>({});
-  const [skillLoading, setSkillLoading] = useState<Record<string, boolean>>({});
-  const [skillErrors, setSkillErrors] = useState<Record<string, string | null>>({});
+  const [loading, setLoading] = useState(true);
+  const [financialData, setFinancialData] = useState<any>(null);
+  const [insights, setInsights] = useState<any>(null);
+  const [overview, setOverview] = useState<any>(null);
 
   useEffect(() => {
-    let mounted = true;
-    Promise.all([
-      getAnalyticsOverview(token ?? undefined),
-      getAnalyticsContent(token ?? undefined),
-      getAnalyticsContentInsights(token ?? undefined),
-      getAnalyticsStorage(token ?? undefined),
-      listDocuments(token ?? undefined, 500),
-    ])
-      .then(([, ct, insights, , docs]) => {
-        if (!mounted) return;
-        setContent(ct);
-        setContentInsights(insights);
-        setDocuments(docs.documents);
-
-      })
-      .catch((e) => mounted && setError(e instanceof Error ? e.message : "Failed to load analytics."));
-    return () => {
-      mounted = false;
+    const fetchData = async () => {
+      try {
+        const [finRes, insightRes, overviewRes] = await Promise.all([
+          getFinancialDashboard({ model: "auto" }, token ?? undefined),
+          getAnalyticsContentInsights(token ?? undefined),
+          getAnalyticsOverview(token ?? undefined)
+        ]);
+        setFinancialData(finRes);
+        setInsights(insightRes);
+        setOverview(overviewRes);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
     };
+    fetchData();
   }, [token]);
 
-  const categories = useMemo(
-    () => [...new Set(documents.map((d) => d.category || "uncategorized"))],
-    [documents]
-  );
-  const types = useMemo(() => [...new Set(documents.map((d) => d.file_type || "unknown"))], [documents]);
-  const statuses = useMemo(() => [...new Set(documents.map((d) => d.status || "unknown"))], [documents]);
-  const uploaders = useMemo(
-    () => [...new Set(documents.map((d) => d.uploaded_by || "unknown"))],
-    [documents]
-  );
-
-  const selectedCategoriesSafe = useMemo(
-    () => selectedCategories.filter((v) => categories.includes(v)),
-    [categories, selectedCategories]
-  );
-  const selectedTypesSafe = useMemo(
-    () => selectedTypes.filter((v) => types.includes(v)),
-    [selectedTypes, types]
-  );
-  const selectedStatusesSafe = useMemo(
-    () => selectedStatuses.filter((v) => statuses.includes(v)),
-    [selectedStatuses, statuses]
-  );
-  const selectedUploadersSafe = useMemo(
-    () => selectedUploaders.filter((v) => uploaders.includes(v)),
-    [selectedUploaders, uploaders]
-  );
-
-  const filteredDocuments = useMemo(() => {
-    return documents.filter((d) => {
-      const docCategory = d.category || "uncategorized";
-      const docType = d.file_type || "unknown";
-      const docStatus = d.status || "unknown";
-      const docUploader = d.uploaded_by || "unknown";
-      const matchesCategory = !selectedCategoriesSafe.length || selectedCategoriesSafe.includes(docCategory);
-      const matchesType = !selectedTypesSafe.length || selectedTypesSafe.includes(docType);
-      const matchesStatus = !selectedStatusesSafe.length || selectedStatusesSafe.includes(docStatus);
-      const matchesUploader = !selectedUploadersSafe.length || selectedUploadersSafe.includes(docUploader);
-      const matchesSearch = search.trim()
-        ? `${d.title} ${d.category} ${d.file_type} ${d.uploaded_by}`
-            .toLowerCase()
-            .includes(search.toLowerCase())
-        : true;
-      return matchesCategory && matchesType && matchesStatus && matchesUploader && matchesSearch;
-    });
-  }, [
-    documents,
-    search,
-    selectedCategoriesSafe,
-    selectedTypesSafe,
-    selectedStatusesSafe,
-    selectedUploadersSafe,
-  ]);
-
-  const docsKpis = useMemo(() => {
-    const totalDocuments = filteredDocuments.length;
-    const totalChunks = filteredDocuments.reduce((sum, d) => sum + (d.chunk_count || 0), 0);
-    const totalSizeMb =
-      filteredDocuments.reduce((sum, d) => sum + (d.file_size || 0), 0) / (1024 * 1024);
-    return { totalDocuments, totalChunks, totalSizeMb };
-  }, [filteredDocuments]);
-
-  const categoryData = useMemo(() => {
-    const map = new Map<string, number>();
-    filteredDocuments.forEach((d) => map.set(d.category || "uncategorized", (map.get(d.category || "uncategorized") || 0) + 1));
-    return [...map.entries()].map(([name, value]) => ({ name, value }));
-  }, [filteredDocuments]);
-
-  const statusData = useMemo(() => {
-    const map = new Map<string, number>();
-    filteredDocuments.forEach((d) => map.set(d.status || "unknown", (map.get(d.status || "unknown") || 0) + 1));
-    return [...map.entries()].map(([name, value]) => ({ name, value }));
-  }, [filteredDocuments]);
-
-  const sizeByTypeData = useMemo(() => {
-    const map = new Map<string, number>();
-    filteredDocuments.forEach((d) =>
-      map.set(d.file_type || "unknown", (map.get(d.file_type || "unknown") || 0) + (d.file_size || 0) / 1024)
+  if (loading) {
+    return (
+      <div className="flex h-[80vh] flex-col items-center justify-center gap-4">
+        <Loader2 className="h-12 w-12 animate-spin text-indigo-500" />
+        <p className="text-slate-400 font-medium">Synthesizing Business Insights...</p>
+      </div>
     );
-    return [...map.entries()].map(([name, value]) => ({ name, value: Number(value.toFixed(1)) }));
-  }, [filteredDocuments]);
-
-  const sizeDistData = useMemo(() => {
-    const buckets = { "<100KB": 0, "100KB-1MB": 0, "1MB-10MB": 0, ">10MB": 0 };
-    filteredDocuments.forEach((d) => {
-      const size = d.file_size || 0;
-      if (size < 100 * 1024) buckets["<100KB"] += 1;
-      else if (size < 1024 * 1024) buckets["100KB-1MB"] += 1;
-      else if (size < 10 * 1024 * 1024) buckets["1MB-10MB"] += 1;
-      else buckets[">10MB"] += 1;
-    });
-    return Object.entries(buckets).map(([name, value]) => ({ name, value }));
-  }, [filteredDocuments]);
-
-  const topicData = (contentInsights?.topics ?? []).slice(0, 12).map((item) => ({
-    name: item.topic,
-    value: item.frequency,
-    type: item.type || "topic",
-  }));
-  const monetaryData = (contentInsights?.entities?.monetary ?? []).slice(0, 10);
-  const percentageData = (contentInsights?.entities?.percentages ?? []).slice(0, 10);
-  const organizationsData = (contentInsights?.entities?.organizations ?? []).slice(0, 10);
-  const datesData = (contentInsights?.entities?.dates ?? []).slice(0, 10);
-  const contactsData = [
-    ...(contentInsights?.entities?.emails ?? []),
-    ...(contentInsights?.entities?.urls ?? []),
-  ].slice(0, 10);
-  const financialContext = (contentInsights?.financials ?? []).slice(0, 10);
-
-  const chartJsTypeData = {
-    labels: sizeByTypeData.map((d) => d.name),
-    datasets: [
-      {
-        label: "Size by file type (KB)",
-        data: sizeByTypeData.map((d) => d.value),
-        backgroundColor: "rgba(34, 211, 238, 0.5)",
-        borderColor: "rgba(34, 211, 238, 1)",
-        borderWidth: 1,
-      },
-    ],
-  };
-
-  const financialChartData = useMemo(() => {
-    if (!financialDashboard) return [];
-    return [
-      ...Object.entries(financialDashboard.revenue).map(([key, value]) => ({
-        name: REVENUE_LABELS[key] || key,
-        value,
-        fill: "#22c55e",
-      })),
-      ...Object.entries(financialDashboard.expenses).map(([key, value]) => ({
-        name: EXPENSE_LABELS[key] || key,
-        value,
-        fill: "#f97316",
-      })),
-    ];
-  }, [financialDashboard]);
-
-  const explorerDocuments = useMemo(() => {
-    return filteredDocuments.filter((doc) => {
-      const matchesCategory =
-        explorerCategory === "all" || (doc.category || "uncategorized") === explorerCategory;
-      const matchesType = explorerType === "all" || (doc.file_type || "unknown") === explorerType;
-      const matchesStatus = explorerStatus === "all" || (doc.status || "unknown") === explorerStatus;
-      const matchesSearch = explorerSearch.trim()
-        ? `${doc.title} ${doc.category} ${doc.file_type} ${doc.uploaded_by} ${doc.status}`
-            .toLowerCase()
-            .includes(explorerSearch.toLowerCase())
-        : true;
-      return matchesCategory && matchesType && matchesStatus && matchesSearch;
-    });
-  }, [explorerCategory, explorerSearch, explorerStatus, explorerType, filteredDocuments]);
-
-  async function loadFinancialDashboard() {
-    setError(null);
-    setIsFinancialLoading(true);
-    try {
-      const response = await getFinancialDashboard(
-        {
-          model: selectedModel || "auto",
-          provider: skillProvider,
-          category: selectedCategory || null,
-          openai_api_key: openaiApiKey || null,
-        },
-        token ?? undefined
-      );
-      setFinancialDashboard(response);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to extract financial dashboard.");
-    } finally {
-      setIsFinancialLoading(false);
-    }
-  }
-
-  async function runSkillHandler(skillName: "financial_analysis" | "report_generation" | "consulting_insights") {
-    const effectiveModel = skillProvider === "bedrock" && skillBedrockCustom.trim()
-      ? skillBedrockCustom.trim()
-      : skillModel;
-    setSkillLoading((p) => ({ ...p, [skillName]: true }));
-    setSkillErrors((p) => ({ ...p, [skillName]: null }));
-    setSkillResults((p) => ({ ...p, [skillName]: null }));
-    try {
-      const res = await runSkill(
-        { skill: skillName, input: { context: "Analyze the indexed documents." }, provider: skillProvider, model: effectiveModel },
-        token ?? undefined
-      );
-      setSkillResults((p) => ({ ...p, [skillName]: res.result }));
-    } catch (e) {
-      setSkillErrors((p) => ({ ...p, [skillName]: e instanceof Error ? e.message : "Skill failed." }));
-    } finally {
-      setSkillLoading((p) => ({ ...p, [skillName]: false }));
-    }
   }
 
   return (
-    <section className="space-y-5">
-      <div>
-        <h2 className="text-2xl font-semibold text-white">Analytics</h2>
-        <p className="text-sm text-slate-300">
-          Interactive analytics showcase using Recharts + Chart.js in Next.js.
-        </p>
-      </div>
-      {error ? <p className="text-sm text-red-300">{error}</p> : null}
-      <div className="rounded-xl border border-white/15 bg-white/5 p-4">
-        <p className="mb-3 text-sm font-semibold text-white">Filters</p>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <MultiSelectChip
-            label="Category"
-            options={categories}
-            selected={selectedCategoriesSafe}
-            onChange={setSelectedCategories}
-          />
-          <MultiSelectChip
-            label="Type"
-            options={types}
-            selected={selectedTypesSafe}
-            onChange={setSelectedTypes}
-          />
-          <MultiSelectChip
-            label="Status"
-            options={statuses}
-            selected={selectedStatusesSafe}
-            onChange={setSelectedStatuses}
-          />
-          <MultiSelectChip
-            label="Uploader"
-            options={uploaders}
-            selected={selectedUploadersSafe}
-            onChange={setSelectedUploaders}
-          />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search documents"
-            className="h-11 rounded-lg border border-white/20 bg-slate-950/60 px-3 py-2 text-sm text-white"
-          />
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {selectedCategoriesSafe.map((item) => (
-            <button
-              key={`cat-chip-${item}`}
-              type="button"
-              onClick={() => setSelectedCategories((prev) => prev.filter((v) => v !== item))}
-              className="rounded-full border border-cyan-300/40 bg-cyan-500/15 px-2.5 py-1 text-xs text-cyan-100"
-            >
-              {item} x
-            </button>
-          ))}
-          {selectedTypesSafe.map((item) => (
-            <button
-              key={`type-chip-${item}`}
-              type="button"
-              onClick={() => setSelectedTypes((prev) => prev.filter((v) => v !== item))}
-              className="rounded-full border border-indigo-300/40 bg-indigo-500/15 px-2.5 py-1 text-xs text-indigo-100"
-            >
-              {item} x
-            </button>
-          ))}
-          {selectedStatusesSafe.map((item) => (
-            <button
-              key={`status-chip-${item}`}
-              type="button"
-              onClick={() => setSelectedStatuses((prev) => prev.filter((v) => v !== item))}
-              className="rounded-full border border-amber-300/40 bg-amber-500/15 px-2.5 py-1 text-xs text-amber-100"
-            >
-              {item} x
-            </button>
-          ))}
-          {selectedUploadersSafe.map((item) => (
-            <button
-              key={`uploader-chip-${item}`}
-              type="button"
-              onClick={() => setSelectedUploaders((prev) => prev.filter((v) => v !== item))}
-              className="rounded-full border border-emerald-300/40 bg-emerald-500/15 px-2.5 py-1 text-xs text-emerald-100"
-            >
-              {item} x
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="grid gap-4 md:grid-cols-3">
-        <article className="rounded-xl border border-white/15 bg-white/5 p-4">
-          <p className="text-xs text-slate-300">Documents</p>
-          <p className="mt-1 text-2xl font-semibold text-white">{docsKpis.totalDocuments}</p>
-        </article>
-        <article className="rounded-xl border border-white/15 bg-white/5 p-4">
-          <p className="text-xs text-slate-300">Chunks</p>
-          <p className="mt-1 text-2xl font-semibold text-white">{docsKpis.totalChunks}</p>
-        </article>
-        <article className="rounded-xl border border-white/15 bg-white/5 p-4">
-          <p className="text-xs text-slate-300">Estimated Words</p>
-          <p className="mt-1 text-2xl font-semibold text-white">{content?.total_estimated_words ?? "-"}</p>
-        </article>
-      </div>
-      <div className="grid gap-4 md:grid-cols-3">
-        <article className="rounded-xl border border-white/15 bg-white/5 p-4">
-          <p className="text-xs text-slate-300">Size (Filtered)</p>
-          <p className="mt-1 text-2xl font-semibold text-white">{docsKpis.totalSizeMb.toFixed(1)} MB</p>
-        </article>
-        <article className="rounded-xl border border-white/15 bg-white/5 p-4">
-          <p className="text-xs text-slate-300">Reading Time</p>
-          <p className="mt-1 text-2xl font-semibold text-white">
-            {Math.round(content?.total_reading_time_min ?? 0)} min
-          </p>
-        </article>
-        <article className="rounded-xl border border-white/15 bg-white/5 p-4">
-          <p className="text-xs text-slate-300">Categories</p>
-          <p className="mt-1 text-2xl font-semibold text-white">
-            {selectedCategoriesSafe.length || categories.length}
-          </p>
-        </article>
+    <div className="mx-auto max-w-7xl space-y-8 pb-12">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-3xl font-bold tracking-tight text-white">Business Insights</h1>
+        <p className="text-slate-400">Deep-dive into extracted intelligence across all your documents.</p>
       </div>
 
-      <article className="space-y-4 rounded-xl border border-white/15 bg-white/5 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-white">Financial Dashboard</p>
-            <p className="text-xs text-slate-300">
-              LLM-based extraction for revenue and expense categories.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => void loadFinancialDashboard()}
-            disabled={isFinancialLoading}
-            className="rounded-lg bg-gradient-to-r from-indigo-500 to-cyan-500 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-          >
-            {isFinancialLoading ? "Extracting..." : "Extract Financial Data"}
-          </button>
-        </div>
-
-        {financialDashboard ? (
-          <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-            <div className="overflow-x-auto rounded-xl border border-white/10 bg-slate-950/40">
-              <table className="min-w-full text-sm">
-                <thead className="bg-white/5 text-left text-slate-300">
-                  <tr>
-                    <th className="px-4 py-3">Category</th>
-                    <th className="px-4 py-3">Revenue</th>
-                    <th className="px-4 py-3">Expense</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Array.from(
-                    new Set([
-                      ...Object.keys(financialDashboard.revenue),
-                      ...Object.keys(financialDashboard.expenses),
-                    ])
-                  ).map((key) => (
-                    <tr key={key} className="border-t border-white/10 text-slate-100">
-                      <td className="px-4 py-3">
-                        {REVENUE_LABELS[key] || EXPENSE_LABELS[key] || key}
-                      </td>
-                      <td className="px-4 py-3 text-emerald-300">
-                        {(financialDashboard.revenue as Record<string, number>)[key]?.toLocaleString() ??
-                          "0"}
-                      </td>
-                      <td className="px-4 py-3 text-orange-300">
-                        {(financialDashboard.expenses as Record<string, number>)[key]?.toLocaleString() ??
-                          "0"}
-                      </td>
-                    </tr>
-                  ))}
-                  <tr className="border-t border-white/10 bg-white/5 font-semibold text-white">
-                    <td className="px-4 py-3">Totals</td>
-                    <td className="px-4 py-3 text-emerald-300">
-                      {financialDashboard.totals.revenue_total.toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3 text-orange-300">
-                      {financialDashboard.totals.expense_total.toLocaleString()}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+      {/* Financial Health Section */}
+      <div className="rounded-[2.5rem] border border-white/10 bg-white/5 p-8 backdrop-blur-xl">
+        <div className="mb-8 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
+              <DollarSign className="h-6 w-6 text-emerald-400" />
             </div>
+            <div>
+              <h2 className="text-xl font-bold text-white">Financial Summary</h2>
+              <p className="text-xs text-slate-500">Aggregated from multiple sources</p>
+            </div>
+          </div>
+        </div>
 
-            <div className="space-y-4">
-              <article className="h-80 rounded-xl border border-white/10 bg-slate-950/40 p-3">
-                <p className="mb-2 text-xs text-slate-300">Bar Chart</p>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={financialChartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                    <XAxis dataKey="name" stroke="#cbd5e1" angle={-25} textAnchor="end" height={70} />
-                    <YAxis stroke="#cbd5e1" />
-                    <RechartsTooltip />
-                    <Bar dataKey="value">
-                      {financialChartData.map((entry, idx) => (
-                        <Cell key={`financial-bar-${idx}`} fill={entry.fill} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </article>
-
-              <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-1">
-                <div className="rounded-lg border border-white/10 bg-slate-950/40 p-3">
-                  <p className="text-xs text-slate-300">Revenue Total</p>
-                  <p className="mt-1 text-xl font-semibold text-emerald-300">
-                    {financialDashboard.totals.revenue_total.toLocaleString()}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-white/10 bg-slate-950/40 p-3">
-                  <p className="text-xs text-slate-300">Expense Total</p>
-                  <p className="mt-1 text-xl font-semibold text-orange-300">
-                    {financialDashboard.totals.expense_total.toLocaleString()}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-white/10 bg-slate-950/40 p-3">
-                  <p className="text-xs text-slate-300">Net Total</p>
-                  <p className="mt-1 text-xl font-semibold text-cyan-200">
-                    {financialDashboard.totals.net_total.toLocaleString()}
-                  </p>
-                </div>
+        <div className="grid gap-8 lg:grid-cols-2">
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-4">
+              <div className="rounded-2xl bg-white/5 p-4 border border-white/5">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Revenue</p>
+                <p className="text-xl font-bold text-emerald-400 mt-1">${financialData?.totals.revenue_total.toLocaleString()}</p>
               </div>
-
-              {!!financialDashboard.notes.length && (
-                <div className="rounded-lg border border-white/10 bg-slate-950/40 p-3">
-                  <p className="text-xs font-semibold text-slate-200">Notes</p>
-                  <div className="mt-2 space-y-1">
-                    {financialDashboard.notes.map((note, idx) => (
-                      <p key={`financial-note-${idx}`} className="text-xs text-slate-300">
-                        {note}
-                      </p>
+              <div className="rounded-2xl bg-white/5 p-4 border border-white/5">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Expenses</p>
+                <p className="text-xl font-bold text-red-400 mt-1">${financialData?.totals.expense_total.toLocaleString()}</p>
+              </div>
+              <div className="rounded-2xl bg-white/5 p-4 border border-white/5">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Net Position</p>
+                <p className="text-xl font-bold text-cyan-400 mt-1">${financialData?.totals.net_total.toLocaleString()}</p>
+              </div>
+            </div>
+            
+            <div className="h-64 w-full rounded-2xl bg-white/2 p-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={[
+                  ...Object.entries(financialData?.revenue || {}).map(([name, value]) => ({ name, value, type: 'revenue' })),
+                  ...Object.entries(financialData?.expenses || {}).map(([name, value]) => ({ name, value, type: 'expense' }))
+                ]}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                  <XAxis dataKey="name" hide />
+                  <YAxis hide />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px' }}
+                  />
+                  <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                    {(data: any) => data.map((entry: any, index: number) => (
+                      <Cell key={`cell-${index}`} fill={entry.type === 'revenue' ? '#10b981' : '#ef4444'} />
                     ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-slate-950/50 p-6 border border-white/5 overflow-y-auto max-h-[360px]">
+            <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-4">Financial Context Detected</h3>
+            <div className="space-y-4">
+              {insights?.financials?.map((item: any, i: number) => (
+                <div key={i} className="rounded-xl bg-white/5 p-4 border border-white/5">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="rounded-lg bg-indigo-500/10 px-2 py-0.5 text-[10px] font-bold text-indigo-400 uppercase">{item.keyword}</span>
+                    <div className="flex gap-1">
+                      {item.values_found?.map((v: string, j: number) => (
+                        <span key={j} className="text-[10px] text-emerald-400 font-mono">{v}</span>
+                      ))}
+                    </div>
                   </div>
+                  <p className="text-xs text-slate-400 leading-relaxed italic">"{item.context}"</p>
                 </div>
-              )}
+              ))}
             </div>
           </div>
-        ) : (
-          <p className="text-sm text-slate-300">
-            Extract financial data to populate the table and bar chart.
-          </p>
-        )}
-      </article>
+        </div>
+      </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <article className="h-96 rounded-xl border border-white/15 bg-white/5 p-4">
-          <p className="mb-3 text-xs text-slate-300">Topic Intelligence</p>
-          {topicData.length ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={topicData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis type="number" stroke="#cbd5e1" />
-                <YAxis dataKey="name" type="category" width={150} stroke="#cbd5e1" />
-                <RechartsTooltip />
-                <Bar dataKey="value" radius={[0, 6, 6, 0]}>
-                  {topicData.map((entry, idx) => (
-                    <Cell
-                      key={`topic-${idx}`}
-                      fill={entry.type === "bigram" ? "#6366f1" : "#7c3aed"}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <p className="text-sm text-slate-300">Topic insights are not available yet.</p>
-          )}
-        </article>
-
-        <article className="space-y-3 rounded-xl border border-white/15 bg-white/5 p-4">
-          <p className="text-xs text-slate-300">Theme Tags & Summary</p>
+      <div className="grid gap-8 lg:grid-cols-2">
+        {/* Intelligence Topics */}
+        <div className="rounded-[2.5rem] border border-white/10 bg-white/5 p-8 backdrop-blur-xl">
+          <div className="mb-6 flex items-center gap-3">
+            <Sparkles className="h-6 w-6 text-indigo-400" />
+            <h3 className="text-lg font-bold text-white">Dominant Themes</h3>
+          </div>
           <div className="flex flex-wrap gap-2">
-            {(contentInsights?.topics ?? []).slice(0, 20).map((topic) => (
-              <span
-                key={topic.topic}
-                className={`rounded-full border px-2.5 py-1 text-xs ${
-                  topic.type === "bigram"
-                    ? "border-indigo-300/40 bg-indigo-500/20 text-indigo-100"
-                    : "border-purple-300/35 bg-purple-500/20 text-purple-100"
-                }`}
+            {insights?.topics?.slice(0, 15).map((topic: any, i: number) => (
+              <div 
+                key={i} 
+                className="flex items-center gap-2 rounded-xl border border-white/5 bg-white/5 px-4 py-2 transition hover:border-indigo-500/30 hover:bg-indigo-500/5"
               >
-                {topic.topic}
-              </span>
-            ))}
-            {!contentInsights?.topics?.length && (
-              <span className="text-sm text-slate-300">No topic tags available.</span>
-            )}
-          </div>
-          {contentInsights?.summary ? (
-            <div className="grid gap-2 sm:grid-cols-2">
-              <p className="rounded-lg border border-white/10 bg-slate-950/50 px-3 py-2 text-xs text-slate-200">
-                Topics: <span className="font-semibold">{contentInsights.summary.total_topics}</span>
-              </p>
-              <p className="rounded-lg border border-white/10 bg-slate-950/50 px-3 py-2 text-xs text-slate-200">
-                Entities: <span className="font-semibold">{contentInsights.summary.total_entities}</span>
-              </p>
-              <p className="rounded-lg border border-white/10 bg-slate-950/50 px-3 py-2 text-xs text-slate-200">
-                Docs analyzed: <span className="font-semibold">{contentInsights.summary.docs_analyzed}</span>
-              </p>
-              <p className="rounded-lg border border-white/10 bg-slate-950/50 px-3 py-2 text-xs text-slate-200">
-                Chunks analyzed: <span className="font-semibold">{contentInsights.summary.chunks_analyzed}</span>
-              </p>
-            </div>
-          ) : null}
-        </article>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-2">
-        <article className="space-y-3 rounded-xl border border-white/15 bg-white/5 p-4">
-          <p className="text-xs text-slate-300">Financial Data Overview</p>
-          <div className="space-y-2">
-            <p className="text-xs font-semibold text-slate-200">Monetary Values</p>
-            {monetaryData.length ? (
-              (() => {
-                const maxOccurrences = Math.max(...monetaryData.map((item) => item.occurrences), 1);
-                return monetaryData.map((item) => {
-                  const widthPercent = Math.max(
-                    8,
-                    Math.round((item.occurrences / maxOccurrences) * 100)
-                  );
-                  return (
-                    <div
-                      key={`money-${item.value}`}
-                      className="rounded-lg border border-white/10 bg-slate-950/50 px-3 py-2"
-                    >
-                      <div className="mb-1 flex items-center justify-between gap-3">
-                        <span className="truncate font-mono text-xs text-emerald-100">{item.value}</span>
-                        <span className="text-xs font-semibold text-emerald-300">x{item.occurrences}</span>
-                      </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-white/10">
-                        <div
-                          className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-cyan-400"
-                          style={{ width: `${widthPercent}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                });
-              })()
-            ) : (
-              <p className="text-xs text-slate-400">No monetary values detected.</p>
-            )}
-          </div>
-          <div className="space-y-2">
-            <p className="text-xs font-semibold text-slate-200">Percentages</p>
-            {percentageData.length ? (
-              <div className="flex flex-wrap gap-2">
-                {percentageData.map((item) => (
-                  <span
-                    key={`pct-${item.value}`}
-                    className="rounded-full border border-amber-300/35 bg-amber-500/15 px-2.5 py-1 text-xs text-amber-100"
-                  >
-                    {item.value} x{item.occurrences}
-                  </span>
-                ))}
+                <span className="text-sm font-medium text-slate-200">{topic.topic}</span>
+                <span className="text-[10px] font-bold text-slate-500">{topic.frequency}</span>
               </div>
-            ) : (
-              <p className="text-xs text-slate-400">No percentages detected.</p>
-            )}
-          </div>
-        </article>
-
-        <article className="space-y-2 rounded-xl border border-white/15 bg-white/5 p-4">
-          <p className="text-xs text-slate-300">Financial Context Lines</p>
-          {financialContext.length ? (
-            <div className="max-h-80 space-y-2 overflow-auto pr-1">
-              {financialContext.map((item, idx) => (
-                <div
-                  key={`fin-ctx-${idx}`}
-                  className="rounded-lg border border-white/10 bg-slate-950/50 p-3"
-                >
-                  <p className="inline-block rounded bg-red-500/20 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-red-200">
-                    {item.keyword}
-                  </p>
-                  <p className="mt-2 text-xs leading-relaxed text-slate-200">
-                    {item.context.length > 180 ? `${item.context.slice(0, 180)}...` : item.context}
-                  </p>
-                  {!!item.values_found?.length && (
-                    <p className="mt-2 text-[11px] text-slate-400">
-                      Values: {item.values_found.slice(0, 3).join(", ")}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs text-slate-400">No financial context available.</p>
-          )}
-        </article>
-      </div>
-
-      <article className="space-y-4 rounded-xl border border-white/15 bg-white/5 p-4">
-        <p className="text-xs text-slate-300">Entity Intelligence</p>
-        <div className="grid gap-4 md:grid-cols-3">
-          <div className="space-y-2">
-            <p className="text-xs font-semibold text-slate-200">Organizations</p>
-            {organizationsData.length ? (
-              organizationsData.map((item) => (
-                <div
-                  key={`org-${item.value}`}
-                  className="flex items-center justify-between rounded-lg border border-white/10 bg-slate-950/50 px-3 py-2"
-                >
-                  <span className="truncate text-xs text-slate-100">{item.value}</span>
-                  <span className="text-xs font-semibold text-indigo-200">{item.occurrences}</span>
-                </div>
-              ))
-            ) : (
-              <p className="text-xs text-slate-400">No organizations detected.</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <p className="text-xs font-semibold text-slate-200">Dates Referenced</p>
-            {datesData.length ? (
-              datesData.map((item) => (
-                <div
-                  key={`date-${item.value}`}
-                  className="flex items-center justify-between rounded-lg border border-white/10 bg-slate-950/50 px-3 py-2"
-                >
-                  <span className="truncate text-xs text-slate-100">{item.value}</span>
-                  <span className="text-xs font-semibold text-amber-200">{item.occurrences}</span>
-                </div>
-              ))
-            ) : (
-              <p className="text-xs text-slate-400">No dates detected.</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <p className="text-xs font-semibold text-slate-200">Contacts & Links</p>
-            {contactsData.length ? (
-              contactsData.map((item) => (
-                <div
-                  key={`contact-${item.value}`}
-                  className="rounded-lg border border-white/10 bg-slate-950/50 px-3 py-2"
-                >
-                  <p className="truncate text-xs text-cyan-100">{item.value}</p>
-                  <p className="mt-1 text-[11px] text-cyan-300">x{item.occurrences}</p>
-                </div>
-              ))
-            ) : (
-              <p className="text-xs text-slate-400">No contacts/links detected.</p>
-            )}
-          </div>
-        </div>
-      </article>
-
-      <div className="grid gap-4 xl:grid-cols-2">
-        <article className="h-80 rounded-xl border border-white/15 bg-white/5 p-4">
-          <p className="mb-3 text-xs text-slate-300">Documents by Category (Recharts Bar)</p>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={categoryData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-              <XAxis dataKey="name" stroke="#cbd5e1" />
-              <YAxis stroke="#cbd5e1" />
-              <RechartsTooltip />
-              <Bar dataKey="value" radius={[6, 6, 0, 0]}>
-                {categoryData.map((_, idx) => (
-                  <Cell key={`cat-${idx}`} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </article>
-
-        <article className="h-80 rounded-xl border border-white/15 bg-white/5 p-4">
-          <p className="mb-3 text-xs text-slate-300">Status Share (Recharts Pie)</p>
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie data={statusData} dataKey="value" nameKey="name" outerRadius={100} label>
-                {statusData.map((_, idx) => (
-                  <Cell key={`status-${idx}`} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
-                ))}
-              </Pie>
-              <RechartsTooltip />
-            </PieChart>
-          </ResponsiveContainer>
-        </article>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-2">
-        <article className="rounded-xl border border-white/15 bg-white/5 p-4">
-          <p className="mb-3 text-xs text-slate-300">Size by File Type (Chart.js)</p>
-          <ChartBar
-            data={chartJsTypeData}
-            options={{
-              responsive: true,
-              plugins: {
-                legend: { labels: { color: "#e2e8f0" } },
-                title: { display: false, text: "" },
-              },
-              scales: {
-                x: { ticks: { color: "#cbd5e1" }, grid: { color: "#334155" } },
-                y: { ticks: { color: "#cbd5e1" }, grid: { color: "#334155" } },
-              },
-            }}
-          />
-        </article>
-
-        <article className="h-80 rounded-xl border border-white/15 bg-white/5 p-4">
-          <p className="mb-3 text-xs text-slate-300">Size Distribution Buckets (Recharts)</p>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={sizeDistData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-              <XAxis dataKey="name" stroke="#cbd5e1" />
-              <YAxis stroke="#cbd5e1" />
-              <RechartsTooltip />
-              <Bar dataKey="value" fill="#a78bfa" radius={[6, 6, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </article>
-      </div>
-
-      <article className="rounded-xl border border-white/15 bg-white/5 p-4">
-        <p className="mb-3 text-xs text-slate-300">Data Explorer</p>
-        <div className="mb-3 grid gap-2 md:grid-cols-4">
-          <input
-            value={explorerSearch}
-            onChange={(e) => setExplorerSearch(e.target.value)}
-            placeholder="Search in explorer..."
-            className="h-10 rounded-lg border border-white/20 bg-slate-950/60 px-3 py-2 text-xs text-white"
-          />
-          <select
-            value={explorerCategory}
-            onChange={(e) => setExplorerCategory(e.target.value)}
-            className="h-10 rounded-lg border border-white/20 bg-slate-950/60 px-3 py-2 text-xs text-white"
-          >
-            <option value="all">All Categories</option>
-            {categories.map((item) => (
-              <option key={`exp-cat-${item}`} value={item}>
-                {item}
-              </option>
             ))}
-          </select>
-          <select
-            value={explorerType}
-            onChange={(e) => setExplorerType(e.target.value)}
-            className="h-10 rounded-lg border border-white/20 bg-slate-950/60 px-3 py-2 text-xs text-white"
-          >
-            <option value="all">All Types</option>
-            {types.map((item) => (
-              <option key={`exp-type-${item}`} value={item}>
-                {item}
-              </option>
-            ))}
-          </select>
-          <select
-            value={explorerStatus}
-            onChange={(e) => setExplorerStatus(e.target.value)}
-            className="h-10 rounded-lg border border-white/20 bg-slate-950/60 px-3 py-2 text-xs text-white"
-          >
-            <option value="all">All Statuses</option>
-            {statuses.map((item) => (
-              <option key={`exp-status-${item}`} value={item}>
-                {item}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="max-h-80 overflow-auto rounded-lg border border-white/10">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-white/10 text-slate-200">
-              <tr>
-                <th className="px-3 py-2">Title</th>
-                <th className="px-3 py-2">Category</th>
-                <th className="px-3 py-2">Type</th>
-                <th className="px-3 py-2">Status</th>
-                <th className="px-3 py-2">Uploader</th>
-                <th className="px-3 py-2">Chunks</th>
-              </tr>
-            </thead>
-            <tbody>
-              {explorerDocuments.slice(0, 200).map((doc) => (
-                <tr key={doc.id} className="border-t border-white/10 text-slate-100">
-                  <td className="px-3 py-2">{doc.title}</td>
-                  <td className="px-3 py-2">{doc.category || "-"}</td>
-                  <td className="px-3 py-2">{doc.file_type}</td>
-                  <td className="px-3 py-2">{doc.status}</td>
-                  <td className="px-3 py-2">{doc.uploaded_by}</td>
-                  <td className="px-3 py-2">{doc.chunk_count || 0}</td>
-                </tr>
-              ))}
-              {!explorerDocuments.length && (
-                <tr>
-                  <td className="px-3 py-3 text-slate-300" colSpan={6}>
-                    No documents match explorer filters.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </article>
-
-      {/* ── AI Skills Workbench ─────────────────────────────────────────── */}
-      <article className="rounded-2xl border border-white/15 bg-white/5 p-5">
-        <h3 className="mb-1 text-base font-semibold text-white">AI Skills Workbench</h3>
-        <p className="mb-4 text-xs text-slate-400">
-          Run structured AI workflows against your indexed documents. Select a provider and model, then trigger a skill.
-        </p>
-
-        {/* Provider + Model selector row */}
-        <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <label className="block text-xs text-slate-300">
-            AI Provider
-            <select
-              value={skillProvider}
-              onChange={(e) => { const p = e.target.value; setSkillProvider(p); setSkillModel(p === "bedrock" ? "amazon.nova-lite-v1:0" : "auto"); setSkillBedrockCustom(""); }}
-              className="mt-1 w-full rounded-lg border border-white/20 bg-slate-950/60 px-3 py-2 text-sm text-white"
-            >
-              <option value="openai">☁️  OpenAI  (GPT-4o / GPT-4.1)</option>
-              <option value="bedrock">🌩️  AWS Bedrock  (Claude · Nova · Llama)</option>
-            </select>
-          </label>
-
-          {skillProvider === "openai" ? (
-            <label className="block text-xs text-slate-300">
-              Model
-              <select
-                value={skillModel}
-                onChange={(e) => setSkillModel(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-white/20 bg-slate-950/60 px-3 py-2 text-sm text-white"
-              >
-                {["auto", "gpt-4o", "gpt-4.1", "gpt-4.1-mini"].map((m) => (
-                  <option key={m} value={m}>{m === "auto" ? "auto (Recommended)" : m}</option>
-                ))}
-              </select>
-            </label>
-          ) : (
-            <label className="block text-xs text-slate-300">
-              Bedrock Model
-              <select
-                value={skillModel}
-                onChange={(e) => { setSkillModel(e.target.value); setSkillBedrockCustom(""); }}
-                className="mt-1 w-full rounded-lg border border-white/20 bg-slate-950/60 px-3 py-2 text-sm text-white"
-              >
-                <option value="amazon.nova-lite-v1:0">Nova Lite · Amazon</option>
-                <option value="amazon.nova-micro-v1:0">Nova Micro · Amazon</option>
-                <option value="amazon.nova-pro-v1:0">Nova Pro · Amazon</option>
-                <option value="us.anthropic.claude-sonnet-4-5-20251203-v1:0">Claude Sonnet 4.6 · Anthropic</option>
-                <option value="us.anthropic.claude-haiku-3-5-20241022-v1:0">Claude Haiku · Anthropic</option>
-                <option value="us.anthropic.claude-opus-4-5-20251101-v1:0">Claude Opus 4.6 · Anthropic</option>
-                <option value="us.anthropic.claude-opus-4-7-20260416-v1:0">Claude Opus 4.7 · Anthropic (latest)</option>
-              </select>
-            </label>
-          )}
-
-          {skillProvider === "bedrock" && (
-            <label className="block text-xs text-slate-300">
-              Custom Bedrock Model ID <span className="text-slate-500">(overrides dropdown)</span>
-              <input
-                type="text"
-                value={skillBedrockCustom}
-                onChange={(e) => setSkillBedrockCustom(e.target.value)}
-                placeholder="e.g. us.anthropic.claude-opus-4-7-20260416-v1:0"
-                className="mt-1 w-full rounded-lg border border-cyan-500/30 bg-slate-950/60 px-3 py-2 text-sm text-cyan-100 placeholder-slate-500"
-              />
-            </label>
-          )}
-        </div>
-
-        {/* Skill buttons */}
-        <div className="grid gap-4 sm:grid-cols-3">
-          {(
-            [
-              { key: "financial_analysis" as const, label: "Financial Analysis", icon: "📊", desc: "Extract revenue, expenses, and key financial insights from documents." },
-              { key: "report_generation" as const, label: "Generate Report", icon: "📝", desc: "Produce a structured business report with metrics and recommendations." },
-              { key: "consulting_insights" as const, label: "Consulting Insights", icon: "💡", desc: "SWOT-style strategic analysis: strengths, risks, and opportunities." },
-            ]
-          ).map(({ key, label, icon, desc }) => (
-            <div key={key} className="flex flex-col rounded-xl border border-white/15 bg-slate-900/40 p-4">
-              <div className="mb-2 flex items-center gap-2">
-                <span className="text-xl">{icon}</span>
-                <span className="text-sm font-semibold text-white">{label}</span>
-              </div>
-              <p className="mb-3 flex-1 text-xs text-slate-400">{desc}</p>
-              <button
-                type="button"
-                disabled={skillLoading[key]}
-                onClick={() => runSkillHandler(key)}
-                className="rounded-lg bg-gradient-to-r from-indigo-500 to-cyan-500 px-3 py-2 text-xs font-medium text-white hover:brightness-110 disabled:opacity-50"
-              >
-                {skillLoading[key] ? "Running…" : `Run ${label}`}
-              </button>
-
-              {skillErrors[key] && (
-                <p className="mt-2 rounded bg-red-500/15 px-2 py-1 text-xs text-red-300">{skillErrors[key]}</p>
-              )}
-
-              {skillResults[key] && (
-                <div className="mt-3 max-h-64 overflow-auto rounded-lg border border-white/10 bg-slate-950/60 p-3 text-xs text-slate-200">
-                  {Object.entries(skillResults[key]!).map(([k, v]) => (
-                    <div key={k} className="mb-2">
-                      <span className="font-semibold capitalize text-cyan-300">{k.replace(/_/g, " ")}:</span>{" "}
-                      <span className="text-slate-200">
-                        {typeof v === "object" ? JSON.stringify(v, null, 2) : String(v)}
-                      </span>
-                    </div>
+          </div>
+          <div className="mt-8 h-48 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={insights?.topics?.slice(0, 5).map((t: any) => ({ name: t.topic, value: t.frequency }))}
+                  innerRadius={60}
+                  outerRadius={80}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {insights?.topics?.slice(0, 5).map((_: any, index: number) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="none" />
                   ))}
-                </div>
-              )}
-            </div>
-          ))}
+                </Pie>
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px' }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
         </div>
-      </article>
-    </section>
+
+        {/* Entity Intelligence */}
+        <div className="rounded-[2.5rem] border border-white/10 bg-white/5 p-8 backdrop-blur-xl">
+          <div className="mb-6 flex items-center gap-3">
+            <Globe className="h-6 w-6 text-cyan-400" />
+            <h3 className="text-lg font-bold text-white">Entity Intelligence</h3>
+          </div>
+          
+          <div className="grid gap-6 sm:grid-cols-2">
+            <div className="space-y-4">
+              <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Key Organizations</h4>
+              <div className="space-y-2">
+                {insights?.entities?.organizations?.slice(0, 5).map((org: any, i: number) => (
+                  <div key={i} className="flex items-center justify-between rounded-xl bg-white/2 p-3 border border-white/5">
+                    <span className="text-xs text-slate-300 truncate pr-2">{org.value}</span>
+                    <span className="text-[10px] font-bold text-indigo-400">{org.occurrences}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-4">
+              <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Timeline Markers</h4>
+              <div className="space-y-2">
+                {insights?.entities?.dates?.slice(0, 5).map((date: any, i: number) => (
+                  <div key={i} className="flex items-center justify-between rounded-xl bg-white/2 p-3 border border-white/5">
+                    <span className="text-xs text-slate-300">{date.value}</span>
+                    <span className="text-[10px] font-bold text-cyan-400">{date.occurrences}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

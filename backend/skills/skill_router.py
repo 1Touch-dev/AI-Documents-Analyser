@@ -15,6 +15,9 @@ from typing import Any
 from backend.skills.financial_analysis import analyze_financials
 from backend.skills.report_generation import generate_report
 from backend.skills.consulting_insights import generate_consulting_insights
+from backend.skills.debt_analysis import analyze_debt
+from backend.skills.cashflow_analysis import analyze_cashflow
+from backend.skills.refinancing_scenario import simulate_refinancing
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +25,9 @@ SUPPORTED_SKILLS = {
     "financial_analysis",
     "report_generation",
     "consulting_insights",
+    "debt_analysis",
+    "cashflow_analysis",
+    "refinancing_scenario",
 }
 
 
@@ -72,6 +78,19 @@ async def route_skill(
     if skill_name == "consulting_insights":
         context = input_data.get("context") or input_data.get("document_text", "")
         return await generate_consulting_insights(context, llm_router, model, api_keys, effective_provider)
+
+    if skill_name == "debt_analysis":
+        text = input_data.get("document_text") or input_data.get("context", "")
+        return await analyze_debt(text, llm_router, model, api_keys, effective_provider)
+
+    if skill_name == "cashflow_analysis":
+        text = input_data.get("document_text") or input_data.get("context", "")
+        return await analyze_cashflow(text, llm_router, model, api_keys, effective_provider)
+
+    if skill_name == "refinancing_scenario":
+        text = input_data.get("document_text") or input_data.get("context", "")
+        target_rate = float(input_data.get("target_rate", 0.05))
+        return await simulate_refinancing(text, llm_router, target_rate, model, api_keys, effective_provider)
 
     # Unreachable given the guard above, but keeps type-checkers happy
     raise ValueError(f"Unhandled skill: {skill_name}")

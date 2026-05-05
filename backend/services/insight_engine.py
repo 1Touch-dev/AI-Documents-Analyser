@@ -183,6 +183,33 @@ def _report_rule_based(data: dict) -> dict:
     return {"summary": summary, "key_findings": findings, "risks": risks_out, "recommendations": recs_out}
 
 
+def _debt_rule_based(data: dict) -> dict:
+    """Generate insight from debt structured data without LLM."""
+    debt_analysis = data.get("debt_analysis", {})
+    refi = data.get("refinancing_simulation", {})
+    
+    total_debt = debt_analysis.get("total_debt", 0)
+    savings = refi.get("annual_savings", 0)
+    
+    summary = (
+        f"The business has a total identified debt of {total_debt:,.0f}. "
+        f"Based on the current analysis, refinancing could potentially save {savings:,.0f} annually."
+    )
+    
+    findings = [
+        f"Total Debt: {total_debt:,.0f}",
+        f"Annual Savings Potential: {savings:,.0f}",
+        f"Recommendation: {refi.get('recommendation', 'N/A')}"
+    ]
+    
+    return {
+        "summary": summary,
+        "key_findings": findings,
+        "risks": debt_analysis.get("risks", ["Interest rate volatility"]),
+        "recommendations": refi.get("recommendations", ["Consider refinancing options"])
+    }
+
+
 # ── LLM-powered insight generation ───────────────────────────────────────────
 
 async def generate_business_insight(
@@ -203,6 +230,8 @@ async def generate_business_insight(
         fallback = _financial_rule_based(structured_data)
     elif workflow_type == "consulting":
         fallback = _consulting_rule_based(structured_data)
+    elif workflow_type == "debt":
+        fallback = _debt_rule_based(structured_data)
     else:
         fallback = _report_rule_based(structured_data)
 

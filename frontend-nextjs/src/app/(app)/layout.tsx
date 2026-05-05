@@ -24,18 +24,12 @@ import {
 import { useAuth } from "@/contexts/auth-context";
 
 const NAV_ITEMS = [
-  { href: "/demo", label: "Demo", icon: PlayCircle },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/chat", label: "Chat", icon: MessageCircle },
+  { href: "/chat", label: "AI Assistant", icon: MessageCircle },
+  { href: "/workflows", label: "Business Analysis", icon: Workflow },
   { href: "/documents", label: "Documents", icon: Files },
-  { href: "/prompts", label: "Prompts", icon: FileText },
-  { href: "/conversations", label: "Conversations", icon: History },
-  { href: "/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/workflows", label: "Workflows", icon: Workflow },
-  { href: "/saved-reports", label: "Saved Reports", icon: BookMarked },
+  { href: "/reports", label: "Report Vault", icon: BookMarked },
   { href: "/usage", label: "Usage & Audit", icon: Activity },
-  { href: "/report-generation", label: "Report Generation", icon: FileOutput },
-  { href: "/export-data", label: "Export Data", icon: FileSpreadsheet },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {

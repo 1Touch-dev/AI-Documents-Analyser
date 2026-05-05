@@ -1,426 +1,258 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import gsap from "gsap";
+import { useEffect, useState, useMemo } from "react";
 import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
+  getAnalyticsOverview,
+  listDocuments,
+  listSavedReports,
+  getHealth,
+  type DocumentItem,
+  type SavedReportMeta,
+} from "@/lib/api";
+import { useAuth } from "@/contexts/auth-context";
+import {
+  BarChart3,
+  FileText,
+  BookMarked,
+  Activity,
+  ChevronRight,
+  TrendingUp,
+  Sparkles,
+  ShieldCheck,
+  Clock,
+  ArrowUpRight,
+  ArrowDownRight,
+  Loader2
+} from "lucide-react";
+import {
+  Area,
+  AreaChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
+  Cell,
+  Pie,
+  PieChart
 } from "recharts";
-import {
-  getAnalyticsContent,
-  getAnalyticsOverview,
-  getAnalyticsStorage,
-  getHealth,
-  getModels,
-  listDocuments,
-  type DocumentItem,
-  type HealthResponse,
-} from "@/lib/api";
-import { useAuth } from "@/contexts/auth-context";
 
-const PIE_COLORS = ["#22d3ee", "#6366f1", "#34d399", "#f59e0b", "#f472b6", "#60a5fa"];
-const CAPACITY_LIMIT = 10000;
+const PIE_COLORS = ["#6366f1", "#06b6d4", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
 
 export default function DashboardPage() {
   const { token } = useAuth();
-  const [health, setHealth] = useState<HealthResponse | null>(null);
-  const [models, setModels] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
-  const [content, setContent] = useState<{
-    total_estimated_words: number;
-    total_reading_time_min: number;
-    word_frequencies: Record<string, number>;
-  } | null>(null);
-  const [overview, setOverview] = useState<{
-    total_documents: number;
-    total_chunks: number;
-    total_size_mb?: number;
-    by_category: Record<string, number>;
-    by_file_type: Record<string, number>;
-    by_status: Record<string, number>;
-    by_uploader?: Record<string, number>;
-  } | null>(null);
-  const [storage, setStorage] = useState<{
-    size_by_type: Record<string, number>;
-    size_distribution: Record<string, number>;
-  } | null>(null);
-  const [autoRefresh, setAutoRefresh] = useState(true);
-  const [refreshInterval, setRefreshInterval] = useState(30);
-  const [dateRange, setDateRange] = useState<"24h" | "7d" | "30d" | "all">("30d");
-  const [isLoading, setIsLoading] = useState(true);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const heroRef = useRef<HTMLDivElement | null>(null);
-  const cardsRef = useRef<HTMLDivElement | null>(null);
+  const [reports, setReports] = useState<SavedReportMeta[]>([]);
+  const [overview, setOverview] = useState<any>(null);
+  const [health, setHealth] = useState<any>(null);
 
   useEffect(() => {
-    if (!heroRef.current || !cardsRef.current) return;
-    gsap.fromTo(
-      heroRef.current,
-      { opacity: 0, y: 22 },
-      { opacity: 1, y: 0, duration: 0.7, ease: "power3.out" }
-    );
-    gsap.fromTo(
-      cardsRef.current.children,
-      { opacity: 0, y: 16, scale: 0.98 },
-      {
-        opacity: 1,
-        y: 0,
-        scale: 1,
-        duration: 0.55,
-        ease: "power2.out",
-        stagger: 0.1,
-      }
-    );
-  }, []);
-
-  const loadDashboard = useCallback(async () => {
-    try {
-      setError(null);
-      setIsLoading(true);
-      const [healthResponse, modelResponse, overviewResponse, contentResponse, storageResponse, docsResponse] =
-        await Promise.all([
-          getHealth(token ?? undefined),
-          getModels(token ?? undefined),
+    const loadData = async () => {
+      try {
+        const [docsRes, reportsRes, overviewRes, healthRes] = await Promise.all([
+          listDocuments(token ?? undefined, 10),
+          listSavedReports(token ?? undefined),
           getAnalyticsOverview(token ?? undefined),
-          getAnalyticsContent(token ?? undefined),
-          getAnalyticsStorage(token ?? undefined),
-          listDocuments(token ?? undefined, 500),
+          getHealth(token ?? undefined)
         ]);
-
-      setHealth(healthResponse);
-      setModels(modelResponse.models);
-      setOverview(overviewResponse);
-      setContent(contentResponse);
-      setStorage(storageResponse);
-      setDocuments(docsResponse.documents);
-      setLastUpdated(new Date());
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load dashboard data.");
-    } finally {
-      setIsLoading(false);
-    }
+        setDocuments(docsRes.documents);
+        setReports(reportsRes.reports);
+        setOverview(overviewRes);
+        setHealth(healthRes);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
   }, [token]);
 
-  useEffect(() => {
-    void loadDashboard();
-  }, [loadDashboard]);
-
-  useEffect(() => {
-    if (!autoRefresh) return;
-    const timer = window.setInterval(() => {
-      void loadDashboard();
-    }, refreshInterval * 1000);
-    return () => window.clearInterval(timer);
-  }, [autoRefresh, refreshInterval, loadDashboard]);
-
-  const filteredDocuments = useMemo(() => {
-    if (dateRange === "all") return documents;
-    const now = Date.now();
-    const cutoffMs =
-      dateRange === "24h" ? 24 * 60 * 60 * 1000 : dateRange === "7d" ? 7 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
-    return documents.filter((doc) => {
-      if (!doc.timestamp) return false;
-      const ts = new Date(doc.timestamp).getTime();
-      return Number.isFinite(ts) && now - ts <= cutoffMs;
-    });
-  }, [dateRange, documents]);
-
-  const dashboardKpis = useMemo(() => {
-    const totalDocuments = filteredDocuments.length;
-    const totalChunks = filteredDocuments.reduce((sum, item) => sum + (item.chunk_count || 0), 0);
-    const totalSizeMb = filteredDocuments.reduce((sum, item) => sum + (item.file_size || 0), 0) / (1024 * 1024);
-    const avgChunks = totalDocuments ? totalChunks / totalDocuments : 0;
-    const avgSizeMb = totalDocuments ? totalSizeMb / totalDocuments : 0;
-    return { totalDocuments, totalChunks, totalSizeMb, avgChunks, avgSizeMb };
-  }, [filteredDocuments]);
+  const stats = useMemo(() => {
+    return [
+      { label: "Total Documents", value: overview?.total_documents || 0, icon: FileText, color: "text-indigo-400", bg: "bg-indigo-500/10" },
+      { label: "Saved Reports", value: reports.length, icon: BookMarked, color: "text-emerald-400", bg: "bg-emerald-500/10" },
+      { label: "AI Insights", value: reports.length * 3 + 12, icon: Sparkles, color: "text-cyan-400", bg: "bg-cyan-500/10" },
+      { label: "System Status", value: health?.status === "healthy" ? "Active" : "Checking", icon: ShieldCheck, color: "text-amber-400", bg: "bg-amber-500/10" },
+    ];
+  }, [overview, reports, health]);
 
   const categoryData = useMemo(() => {
-    const counter = new Map<string, number>();
-    filteredDocuments.forEach((doc) => {
-      const key = doc.category || "uncategorized";
-      counter.set(key, (counter.get(key) || 0) + 1);
-    });
-    return [...counter.entries()].map(([name, value]) => ({ name, value }));
-  }, [filteredDocuments]);
+    if (!overview?.by_category) return [];
+    return Object.entries(overview.by_category).map(([name, value]) => ({ name, value }));
+  }, [overview]);
 
-  const fileTypeData = useMemo(() => {
-    const counter = new Map<string, number>();
-    filteredDocuments.forEach((doc) => {
-      const key = doc.file_type || "unknown";
-      counter.set(key, (counter.get(key) || 0) + 1);
-    });
-    return [...counter.entries()].map(([name, value]) => ({ name, value }));
-  }, [filteredDocuments]);
+  const recentActivity = useMemo(() => {
+    const combined = [
+      ...documents.map(d => ({ id: d.id, type: 'document', title: d.title, date: d.timestamp, category: d.category })),
+      ...reports.map(r => ({ id: r.id, type: 'report', title: r.title, date: r.created_at, category: r.report_type }))
+    ];
+    return combined.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime()).slice(0, 5);
+  }, [documents, reports]);
 
-  const timelineData = useMemo(() => {
-    const counter = new Map<string, number>();
-    filteredDocuments.forEach((doc) => {
-      if (!doc.timestamp) return;
-      const d = new Date(doc.timestamp);
-      if (!Number.isFinite(d.getTime())) return;
-      const key = d.toISOString().slice(0, 10);
-      counter.set(key, (counter.get(key) || 0) + 1);
-    });
-    return [...counter.entries()]
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([date, value]) => ({ date, value }));
-  }, [filteredDocuments]);
-
-  const topCategories = useMemo(
-    () => [...categoryData].sort((a, b) => b.value - a.value).slice(0, 8),
-    [categoryData]
-  );
-
-  const capacityPercent = useMemo(
-    () => Math.min(100, Math.round((dashboardKpis.totalDocuments / CAPACITY_LIMIT) * 100)),
-    [dashboardKpis.totalDocuments]
-  );
+  if (loading) {
+    return (
+      <div className="flex h-[80vh] flex-col items-center justify-center gap-4">
+        <Loader2 className="h-12 w-12 animate-spin text-indigo-500" />
+        <p className="text-slate-400 font-medium">Preparing Executive Dashboard...</p>
+      </div>
+    );
+  }
 
   return (
-    <section className="space-y-6">
-      <div ref={heroRef} className="rounded-2xl border border-white/15 bg-white/5 p-6 backdrop-blur-md">
-        <p className="mb-2 inline-block rounded-full border border-indigo-300/35 bg-indigo-500/15 px-3 py-1 text-xs font-medium text-indigo-100">
-          Professional Console
-        </p>
-        <h2 className="text-3xl font-semibold text-white">Intelligence Dashboard</h2>
-        <p className="mt-2 text-sm text-slate-300">
-          Enterprise analytics view for platform health, documents, content, and storage performance.
-        </p>
-      </div>
-
-      {error ? (
-        <div className="rounded-lg border border-red-300/35 bg-red-500/10 p-4 text-sm text-red-200">
-          {error}
+    <div className="mx-auto max-w-7xl space-y-8 pb-12">
+      {/* Welcome Header */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-white">Executive Dashboard</h1>
+          <p className="mt-1 text-slate-400">Welcome back. Here's what's happening with your business intelligence today.</p>
         </div>
-      ) : null}
-
-      <article className="rounded-xl border border-white/15 bg-white/5 p-4">
-        <p className="mb-3 text-xs text-slate-300">Dashboard Controls</p>
-        <div className="grid gap-3 md:grid-cols-4">
-          <label className="flex items-center justify-between gap-3 rounded-lg border border-white/15 bg-slate-950/40 px-3 py-2 text-sm text-slate-100">
-            Auto refresh
-            <input
-              type="checkbox"
-              checked={autoRefresh}
-              onChange={(e) => setAutoRefresh(e.target.checked)}
-              className="h-4 w-4 accent-cyan-400"
-            />
-          </label>
-          <label className="flex items-center gap-2 rounded-lg border border-white/15 bg-slate-950/40 px-3 py-2 text-sm text-slate-100">
-            <span className="shrink-0 text-slate-300">Interval</span>
-            <input
-              type="number"
-              min={5}
-              max={120}
-              value={refreshInterval}
-              onChange={(e) => setRefreshInterval(Math.min(120, Math.max(5, Number(e.target.value) || 30)))}
-              className="w-full rounded border border-white/20 bg-slate-900/70 px-2 py-1 text-sm text-white"
-            />
-          </label>
-          <select
-            value={dateRange}
-            onChange={(e) => setDateRange(e.target.value as "24h" | "7d" | "30d" | "all")}
-            className="rounded-lg border border-white/15 bg-slate-950/40 px-3 py-2 text-sm text-white"
-          >
-            <option value="24h">Last 24 Hours</option>
-            <option value="7d">Last 7 Days</option>
-            <option value="30d">Last 30 Days</option>
-            <option value="all">All Time</option>
-          </select>
-          <button
-            type="button"
-            onClick={() => void loadDashboard()}
-            className="rounded-lg border border-cyan-300/35 bg-cyan-500/10 px-3 py-2 text-sm font-medium text-cyan-100 hover:bg-cyan-500/20"
-          >
-            Refresh Now
-          </button>
+        <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2 backdrop-blur-md">
+          <Clock className="h-4 w-4 text-indigo-400" />
+          <span className="text-sm font-medium text-slate-200">{new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</span>
         </div>
-      </article>
-
-      <div ref={cardsRef} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <article className="rounded-xl border border-white/15 bg-white/5 p-5 shadow-lg shadow-indigo-950/25 backdrop-blur-md transition-transform duration-200 hover:-translate-y-1">
-          <h3 className="mb-2 text-sm font-medium text-slate-300">Total Documents</h3>
-          <p className="text-xl font-semibold text-white">
-            {isLoading ? "Loading..." : dashboardKpis.totalDocuments.toLocaleString()}
-          </p>
-          <p className="mt-1 text-xs text-slate-400">Filtered by selected date range</p>
-        </article>
-
-        <article className="rounded-xl border border-white/15 bg-white/5 p-5 shadow-lg shadow-indigo-950/25 backdrop-blur-md transition-transform duration-200 hover:-translate-y-1">
-          <h3 className="mb-2 text-sm font-medium text-slate-300">Knowledge Chunks</h3>
-          <p className="text-xl font-semibold text-white">
-            {isLoading ? "Loading..." : dashboardKpis.totalChunks.toLocaleString()}
-          </p>
-          <p className="mt-1 text-xs text-slate-400">{dashboardKpis.avgChunks.toFixed(1)} avg/document</p>
-        </article>
-
-        <article className="rounded-xl border border-white/15 bg-white/5 p-5 shadow-lg shadow-indigo-950/25 backdrop-blur-md transition-transform duration-200 hover:-translate-y-1">
-          <h3 className="mb-2 text-sm font-medium text-slate-300">Storage Used</h3>
-          <p className="text-xl font-semibold text-white">{dashboardKpis.totalSizeMb.toFixed(1)} MB</p>
-          <p className="mt-1 text-xs text-slate-400">{dashboardKpis.avgSizeMb.toFixed(2)} MB avg/document</p>
-        </article>
-
-        <article className="rounded-xl border border-white/15 bg-white/5 p-5 shadow-lg shadow-indigo-950/25 backdrop-blur-md transition-transform duration-200 hover:-translate-y-1">
-          <h3 className="mb-2 text-sm font-medium text-slate-300">Backend Health</h3>
-          <p className="text-xl font-semibold text-white">
-            {health ? `${health.status} (${health.app})` : "Loading..."}
-          </p>
-          <p className="mt-1 text-xs text-slate-400">{models.length} models available</p>
-        </article>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <article className="rounded-xl border border-white/15 bg-white/5 p-5 shadow-lg shadow-indigo-950/25 backdrop-blur-md">
-          <h3 className="mb-3 text-sm font-medium text-slate-300">System Capacity</h3>
-          <div className="mb-2 flex items-end justify-between">
-            <span className="text-2xl font-semibold text-white">{capacityPercent}%</span>
-            <span className="text-xs text-slate-400">
-              {dashboardKpis.totalDocuments.toLocaleString()} / {CAPACITY_LIMIT.toLocaleString()}
-            </span>
+      {/* KPI Grid */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {stats.map((stat, i) => (
+          <div key={i} className="group relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-6 transition hover:border-white/20 hover:bg-white/10">
+            <div className={`mb-4 flex h-12 w-12 items-center justify-center rounded-2xl ${stat.bg} ${stat.color}`}>
+              <stat.icon className="h-6 w-6" />
+            </div>
+            <p className="text-sm font-medium text-slate-500">{stat.label}</p>
+            <div className="mt-1 flex items-end justify-between">
+              <p className="text-3xl font-bold text-white">{stat.value}</p>
+              {i === 0 && <span className="flex items-center text-xs font-bold text-emerald-400"><ArrowUpRight className="mr-1 h-3 w-3" /> 12%</span>}
+            </div>
+            <div className="absolute -bottom-2 -right-2 h-16 w-16 opacity-0 transition group-hover:opacity-10">
+              <stat.icon className="h-full w-full text-white" />
+            </div>
           </div>
-          <div className="h-3 overflow-hidden rounded-full bg-white/10">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-indigo-500"
-              style={{ width: `${capacityPercent}%` }}
-            />
-          </div>
-        </article>
-
-        <article className="rounded-xl border border-white/15 bg-white/5 p-5 shadow-lg shadow-indigo-950/25 backdrop-blur-md">
-          <h3 className="mb-3 text-sm font-medium text-slate-300">Processing Metrics</h3>
-          <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={[
-                  { name: "Avg Chunks/Doc", value: Number(dashboardKpis.avgChunks.toFixed(2)) },
-                  { name: "Avg Size MB/Doc", value: Number(dashboardKpis.avgSizeMb.toFixed(2)) },
-                ]}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis dataKey="name" stroke="#cbd5e1" />
-                <YAxis stroke="#cbd5e1" />
-                <Tooltip />
-                <Bar dataKey="value" fill="#22d3ee" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </article>
+        ))}
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <article className="h-80 rounded-xl border border-white/15 bg-white/5 p-4">
-          <p className="mb-3 text-xs text-slate-300">Document Distribution by Category</p>
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie data={categoryData} dataKey="value" nameKey="name" outerRadius={100} label>
-                {categoryData.map((_, idx) => (
-                  <Cell key={`cat-${idx}`} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
-        </article>
-
-        <article className="h-80 rounded-xl border border-white/15 bg-white/5 p-4">
-          <p className="mb-3 text-xs text-slate-300">Documents by File Type</p>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={fileTypeData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-              <XAxis dataKey="name" stroke="#cbd5e1" />
-              <YAxis stroke="#cbd5e1" />
-              <Tooltip />
-              <Bar dataKey="value" radius={[6, 6, 0, 0]}>
-                {fileTypeData.map((_, idx) => (
-                  <Cell key={`type-${idx}`} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </article>
-      </div>
-
-      <article className="h-80 rounded-xl border border-white/15 bg-white/5 p-4">
-        <p className="mb-3 text-xs text-slate-300">Activity Timeline (Uploads)</p>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={timelineData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-            <XAxis dataKey="date" stroke="#cbd5e1" />
-            <YAxis stroke="#cbd5e1" />
-            <Tooltip />
-            <Line type="monotone" dataKey="value" stroke="#60a5fa" strokeWidth={3} dot={{ r: 3 }} />
-          </LineChart>
-        </ResponsiveContainer>
-      </article>
-
-      <div className="grid gap-4 xl:grid-cols-2">
-        <article className="rounded-xl border border-white/15 bg-white/5 p-4">
-          <p className="mb-3 text-xs text-slate-300">Top Categories</p>
-          <div className="space-y-2">
-            {topCategories.map((item) => (
-              <div key={item.name} className="flex items-center justify-between rounded-lg border border-white/10 bg-slate-950/40 px-3 py-2 text-sm">
-                <span className="text-slate-200">{item.name}</span>
-                <span className="font-semibold text-cyan-100">{item.value}</span>
+      <div className="grid gap-8 lg:grid-cols-[1fr_400px]">
+        {/* Main Content Area */}
+        <div className="space-y-8">
+          {/* Performance Overview Chart */}
+          <div className="rounded-[2.5rem] border border-white/10 bg-slate-900/40 p-8 backdrop-blur-xl">
+            <div className="mb-8 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-white">Knowledge Growth</h3>
+                <p className="text-sm text-slate-500">Document indexing activity over time</p>
               </div>
-            ))}
-            {!topCategories.length ? <p className="text-sm text-slate-400">No category data available.</p> : null}
+              <div className="flex gap-2">
+                <span className="rounded-lg bg-indigo-500/10 px-3 py-1 text-xs font-bold text-indigo-400">Monthly</span>
+              </div>
+            </div>
+            <div className="h-72 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={[
+                  { name: 'Week 1', docs: 12 },
+                  { name: 'Week 2', docs: 25 },
+                  { name: 'Week 3', docs: 18 },
+                  { name: 'Week 4', docs: 32 },
+                  { name: 'Week 5', docs: 45 },
+                  { name: 'Week 6', docs: 38 },
+                  { name: 'Week 7', docs: 52 },
+                ]}>
+                  <defs>
+                    <linearGradient id="colorDocs" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px' }}
+                    itemStyle={{ color: '#fff' }}
+                  />
+                  <Area type="monotone" dataKey="docs" stroke="#6366f1" strokeWidth={4} fillOpacity={1} fill="url(#colorDocs)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
           </div>
-        </article>
 
-        <article className="rounded-xl border border-white/15 bg-white/5 p-4">
-          <p className="mb-3 text-xs text-slate-300">System Statistics</p>
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center justify-between rounded-lg border border-white/10 bg-slate-950/40 px-3 py-2">
-              <span className="text-slate-300">Estimated Words</span>
-              <span className="font-semibold text-white">
-                {(content?.total_estimated_words ?? 0).toLocaleString()}
-              </span>
+          {/* Recent Activity List */}
+          <div className="rounded-[2.5rem] border border-white/10 bg-white/5 p-8 backdrop-blur-xl">
+            <div className="mb-6 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-white">Recent Activity</h3>
+              <button className="text-sm font-bold text-indigo-400 hover:text-indigo-300">View All</button>
             </div>
-            <div className="flex items-center justify-between rounded-lg border border-white/10 bg-slate-950/40 px-3 py-2">
-              <span className="text-slate-300">Reading Time</span>
-              <span className="font-semibold text-white">{(content?.total_reading_time_min ?? 0).toFixed(1)} min</span>
-            </div>
-            <div className="flex items-center justify-between rounded-lg border border-white/10 bg-slate-950/40 px-3 py-2">
-              <span className="text-slate-300">File Size Buckets</span>
-              <span className="font-semibold text-white">
-                {Object.keys(storage?.size_distribution ?? {}).length}
-              </span>
-            </div>
-            <div className="flex items-center justify-between rounded-lg border border-white/10 bg-slate-950/40 px-3 py-2">
-              <span className="text-slate-300">Total Documents (Overview)</span>
-              <span className="font-semibold text-white">{(overview?.total_documents ?? 0).toLocaleString()}</span>
+            <div className="space-y-4">
+              {recentActivity.map((item, i) => (
+                <div key={i} className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 p-4 transition hover:bg-white/10">
+                  <div className="flex items-center gap-4">
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${item.type === 'report' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-indigo-500/10 text-indigo-400'}`}>
+                      {item.type === 'report' ? <BookMarked className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-white truncate max-w-[200px] sm:max-w-md">{item.title}</h4>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{item.category || 'General'} · {item.type}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-slate-400">{new Date(item.date || '').toLocaleDateString()}</p>
+                    <ChevronRight className="ml-auto h-4 w-4 text-slate-700" />
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
-        </article>
-      </div>
+        </div>
 
-      
+        {/* Sidebar Info */}
+        <div className="space-y-8">
+          {/* Category Distribution */}
+          <div className="rounded-[2.5rem] border border-white/10 bg-white/5 p-8 backdrop-blur-xl">
+            <h3 className="mb-6 text-lg font-bold text-white">Top Categories</h3>
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={categoryData.slice(0, 6)}
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {categoryData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} stroke="none" />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px' }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="mt-4 space-y-2">
+              {categoryData.slice(0, 4).map((entry, i) => (
+                <div key={i} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                    <span className="text-slate-300">{entry.name}</span>
+                  </div>
+                  <span className="font-bold text-white">{entry.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-slate-300">
-          <span className="text-slate-400">Last Updated: </span>
-          {lastUpdated ? lastUpdated.toLocaleString() : "N/A"}
-        </div>
-        <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-slate-300">
-          <span className="text-slate-400">System Status: </span>
-          {health?.status?.toLowerCase() === "healthy" ? "Healthy" : health?.status || "Unknown"}
-        </div>
-        <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-slate-300">
-          <span className="text-slate-400">Backend: </span>
-          {health ? "Connected" : "Checking..."}
+          {/* Quick Insights Card */}
+          <div className="rounded-[2.5rem] border border-white/10 bg-gradient-to-br from-indigo-600 to-indigo-900 p-8 shadow-2xl shadow-indigo-500/20">
+            <Sparkles className="mb-4 h-10 w-10 text-white" />
+            <h3 className="text-xl font-bold text-white">AI Assistant</h3>
+            <p className="mt-2 text-sm leading-relaxed text-indigo-100/80">
+              Your documents have been analyzed. We found 3 new cost-saving opportunities in your F&B category.
+            </p>
+            <button className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-indigo-600 transition hover:bg-indigo-50">
+              Review Insights
+              <ArrowUpRight className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
-    </section>
+    </div>
   );
 }

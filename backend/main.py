@@ -58,6 +58,7 @@ from db.models import Document, User, LLMUsage, SavedReport, AuditLog
 from services.document_parser import DocumentParser
 from services.currency_service import CurrencyService
 from services.s3_storage import S3StorageService
+from backend.services.categorization_service import CategorizationService
 
 # ── Logging ──────────────────────────────────────────────
 logging.basicConfig(level=settings.log_level.upper())
@@ -512,7 +513,7 @@ async def login(request: Request, body: UserLogin, db: Session = Depends(get_db)
 #  Document endpoints
 # ══════════════════════════════════════════════════════════
 
-ALLOWED_EXTENSIONS = {"pdf", "docx", "pptx", "xlsx", "csv", "txt", "json"}
+ALLOWED_EXTENSIONS = {"pdf", "docx", "pptx", "xlsx", "xls", "csv", "txt", "json"}
 
 
 @app.post("/api/upload_document", tags=["Documents"])
@@ -1090,13 +1091,29 @@ def _process_single_file(
         # Parse + ingest
         parse_started = time.perf_counter()
         text = _safe_extract_text(parser, contents, ext)
+        
+        # Auto-categorization
+        if not category or category == "general":
+            import asyncio
+            try:
+                # We are in a thread pool, use a new loop for async call
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                category = loop.run_until_complete(
+                    CategorizationService.categorize_document(text, filename, llm_router)
+                )
+                loop.close()
+            except Exception as cat_exc:
+                logger.warning("Auto-categorization failed, falling back to keywords: %s", cat_exc)
+                category = CategorizationService.get_category_from_keywords(filename, text)
+
         _log_upload_stage(
             "batch_parsed",
             doc_id,
             filename,
             ext=ext,
             elapsed_ms=int((time.perf_counter() - parse_started) * 1000),
-            extra=f"chars={len(text)}",
+            extra=f"chars={len(text)} | category={category}",
         )
         ingest_started = time.perf_counter()
         chunk_count = rag.ingest_document(
@@ -1113,6 +1130,7 @@ def _process_single_file(
         )
         doc.chunk_count = chunk_count
         doc.status = "ready"
+        doc.category = category
         db.commit()
 
         with _batch_status_lock:
@@ -1547,6 +1565,9 @@ async def run_skill(
             "financial_analysis": "revenue expenses financial data profit loss",
             "report_generation": "business performance summary key metrics results",
             "consulting_insights": "strategy risks opportunities strengths competitive",
+            "debt_analysis": "debt liabilities loans interest rates creditors maturity",
+            "cashflow_analysis": "cash flow inflows outflows liquidity burn rate runway",
+            "refinancing_scenario": "debt interest rates refinancing loans credit",
         }
         query_text = skill_queries.get(body.skill, body.skill)
         try:
@@ -1739,6 +1760,54 @@ async def run_workflow_endpoint(
         user=user,
     )
     return result
+
+
+@app.post("/api/workflows/analyze", tags=["Workflows"])
+@limiter.limit(RL_WORKFLOW)
+async def analyze_business(
+    request: Request,
+    body: dict = Body(...), # {query: string, model: string, provider: string}
+    user: User = Depends(require_auth),
+    db: Session = Depends(get_db),
+):
+    """One-click full business analysis."""
+    require_permission(user, "run_workflow")
+    from backend.services.workflow_classifier import WorkflowClassifier
+    from backend.workflows.workflow_engine import WorkflowEngine
+    
+    query = body.get("query", "Summarize business performance and risks.")
+    model = body.get("model", "gpt-4o")
+    provider = body.get("provider", "openai")
+    
+    llm, *_ = _get_services()
+    
+    # 1. Classify intent
+    workflow_type = await WorkflowClassifier.classify_intent(query, llm)
+    
+    # 2. Run workflow
+    engine = WorkflowEngine(llm)
+    result = await engine.run_workflow(workflow_type, {"query": query}, provider=provider, model=model)
+    
+    # 3. Persist audit
+    audit_log(db, "workflow_analyze", user=user, resource=workflow_type, request=request)
+    
+    return {
+        "workflow_type": workflow_type,
+        "query": query,
+        "result": result
+    }
+
+
+@app.post("/api/workflows/classify", tags=["Workflows"])
+async def classify_workflow(
+    body: dict = Body(...),
+    user: User = Depends(require_auth),
+):
+    """Map NL query to workflow type."""
+    from backend.services.workflow_classifier import WorkflowClassifier
+    llm, *_ = _get_services()
+    workflow_type = await WorkflowClassifier.classify_intent(body.get("query", ""), llm)
+    return {"workflow_type": workflow_type}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -2067,6 +2136,81 @@ async def get_report(
         "provider": record.provider,
         "created_at": record.created_at.isoformat() if record.created_at else None,
     }
+
+
+@app.delete("/api/reports/{report_id}", tags=["Reports"])
+async def delete_report(
+    report_id: str,
+    user: User = Depends(require_auth),
+    db: Session = Depends(get_db),
+):
+    """Delete a saved report."""
+    require_permission(user, "delete_report")
+    try:
+        import uuid as _uuid
+        rid = _uuid.UUID(report_id)
+    except ValueError:
+        raise HTTPException(400, "Invalid report ID format.")
+    
+    record = db.query(SavedReport).filter(SavedReport.id == rid).first()
+    if not record:
+        raise HTTPException(404, "Report not found.")
+    
+    if user.role != "admin" and record.username != user.username:
+        raise HTTPException(403, "Access denied.")
+    
+    db.delete(record)
+    db.commit()
+    return {"message": "Report deleted."}
+
+
+@app.post("/api/export/report", tags=["Reports"])
+async def export_report(
+    report_id: str,
+    format: str = Query("json", enum=["json", "csv"]),
+    user: User = Depends(require_auth),
+    db: Session = Depends(get_db),
+):
+    """Export a report in the specified format."""
+    require_permission(user, "view_reports")
+    try:
+        import uuid as _uuid
+        rid = _uuid.UUID(report_id)
+    except ValueError:
+        raise HTTPException(400, "Invalid report ID format.")
+    
+    record = db.query(SavedReport).filter(SavedReport.id == rid).first()
+    if not record:
+        raise HTTPException(404, "Report not found.")
+    
+    if format == "json":
+        return record.data
+    
+    # CSV export logic (simple flattening of the JSON data)
+    import csv
+    import io
+    from fastapi.responses import StreamingResponse
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Simple flattening: write keys as headers and values as row
+    data = record.data
+    if isinstance(data, dict):
+        writer.writerow(data.keys())
+        writer.writerow(data.values())
+    elif isinstance(data, list):
+        if data and isinstance(data[0], dict):
+            writer.writerow(data[0].keys())
+            for item in data:
+                writer.writerow(item.values())
+    
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=report_{report_id}.csv"}
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════════════

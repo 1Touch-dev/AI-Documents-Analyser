@@ -28,7 +28,7 @@ MAX_CSV_ROWS = 20000
 class DocumentParser:
     """Stateless document text extractor."""
 
-    SUPPORTED_TYPES = {"pdf", "docx", "pptx", "xlsx", "csv", "txt", "json"}
+    SUPPORTED_TYPES = {"pdf", "docx", "pptx", "xlsx", "xls", "csv", "txt", "json"}
 
     # ── Public API ───────────────────────────────────────
     def parse(self, file_bytes: bytes, file_type: str) -> str:
@@ -72,6 +72,11 @@ class DocumentParser:
         text = data.decode("utf-8", errors="ignore")
         if not text.strip():
             text = data.decode("latin-1", errors="ignore")
+        
+        # Avoid returning binary garbage if this looks like a ZIP file (XLSX, DOCX, PPTX)
+        if data.startswith(b"PK\x03\x04") and any(x in text for x in ["[Content_Types].xml", "_rels/"]):
+            return "Document content could not be extracted (binary ZIP format). Metadata retained."
+
         text = DocumentParser._normalize_text(text, MAX_FALLBACK_CHARS)
         if len(text) > MAX_FALLBACK_CHARS:
             logger.warning(
@@ -173,32 +178,55 @@ class DocumentParser:
 
     @staticmethod
     def _parse_xlsx(data: bytes) -> str:
-        from openpyxl import load_workbook
-
+        """Parse modern Excel files (.xlsx) using pandas for better tabular extraction."""
+        import pandas as pd
         try:
-            wb = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+            # Use pandas to read all sheets
+            dfs = pd.read_excel(io.BytesIO(data), sheet_name=None, engine="openpyxl")
             text_parts: list[str] = []
-            extracted = 0
-            row_count = 0
-            for ws in wb.worksheets:
-                for row in ws.iter_rows(values_only=True):
-                    row_count += 1
-                    if row_count > MAX_XLSX_ROWS:
-                        logger.warning("XLSX row cap reached (%d).", MAX_XLSX_ROWS)
-                        break
-                    cells = [str(c) if c is not None else "" for c in row]
-                    row_text = "\t".join(cells)
-                    text_parts.append(row_text)
-                    extracted += len(row_text)
-                    if extracted >= MAX_EXTRACTED_CHARS:
-                        break
-                if row_count > MAX_XLSX_ROWS or extracted >= MAX_EXTRACTED_CHARS:
-                    break
-            return "\n".join(text_parts)
+            for sheet_name, df in dfs.items():
+                if df.empty:
+                    continue
+                text_parts.append(f"--- Sheet: {sheet_name} ---")
+                # Convert dataframe to a tab-separated string with headers
+                sheet_text = df.to_csv(sep="\t", index=False)
+                text_parts.append(sheet_text)
+            
+            full_text = "\n\n".join(text_parts)
+            return full_text[:MAX_EXTRACTED_CHARS]
         except Exception as e:
-            # Some files are mislabeled/corrupted .xlsx archives. Fallback to best-effort text
-            # extraction so ingestion can continue rather than failing the whole document.
-            logger.warning("XLSX structured parsing failed, using text fallback: %s", e)
+            logger.warning("Pandas XLSX parsing failed: %s. Falling back to openpyxl.", e)
+            from openpyxl import load_workbook
+            try:
+                wb = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+                text_parts: list[str] = []
+                row_count = 0
+                for ws in wb.worksheets:
+                    text_parts.append(f"--- Sheet: {ws.title} ---")
+                    for row in ws.iter_rows(values_only=True):
+                        row_count += 1
+                        if row_count > MAX_XLSX_ROWS: break
+                        cells = [str(c) if c is not None else "" for c in row]
+                        text_parts.append("\t".join(cells))
+                return "\n".join(text_parts)[:MAX_EXTRACTED_CHARS]
+            except Exception as e2:
+                logger.warning("XLSX structured parsing failed: %s", e2)
+                return DocumentParser._best_effort_text(data)
+
+    @staticmethod
+    def _parse_xls(data: bytes) -> str:
+        """Parse legacy Excel files (.xls) using pandas and xlrd."""
+        import pandas as pd
+        try:
+            dfs = pd.read_excel(io.BytesIO(data), sheet_name=None, engine="xlrd")
+            text_parts: list[str] = []
+            for sheet_name, df in dfs.items():
+                if df.empty: continue
+                text_parts.append(f"--- Sheet: {sheet_name} ---")
+                text_parts.append(df.to_csv(sep="\t", index=False))
+            return "\n\n".join(text_parts)[:MAX_EXTRACTED_CHARS]
+        except Exception as e:
+            logger.warning("XLS parsing failed: %s", e)
             return DocumentParser._best_effort_text(data)
 
     @staticmethod
