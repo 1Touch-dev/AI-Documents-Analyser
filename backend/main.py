@@ -15,6 +15,7 @@ from typing import Any, Optional
 
 from fastapi import (
     BackgroundTasks,
+    Body,
     Depends,
     FastAPI,
     File,
@@ -978,6 +979,7 @@ async def generate_report(
         report_type=body.report_type,
         output_format=body.output_format,
         model_name=body.model,
+        provider=body.provider,
         api_keys={
             "openai_api_key": body.openai_api_key,
             "anthropic_api_key": body.anthropic_api_key,
@@ -1644,7 +1646,7 @@ class AnalyzeRequest(BaseModel):
     context: str = Field("", description="Optional context text (uses vector store if omitted)")
 
 
-@app.post("/api/workflows/analyze", tags=["Workflows"])
+@app.post("/api/workflows/bulk-analyze", tags=["Workflows"])
 @limiter.limit("5/minute")
 async def one_click_analyze(
     request: Request,
@@ -1773,7 +1775,7 @@ async def analyze_business(
     """One-click full business analysis."""
     require_permission(user, "run_workflow")
     from backend.services.workflow_classifier import WorkflowClassifier
-    from backend.workflows.workflow_engine import WorkflowEngine
+    from backend.workflows.workflow_engine import run_workflow
     
     query = body.get("query", "Summarize business performance and risks.")
     model = body.get("model", "gpt-4o")
@@ -1785,8 +1787,7 @@ async def analyze_business(
     workflow_type = await WorkflowClassifier.classify_intent(query, llm)
     
     # 2. Run workflow
-    engine = WorkflowEngine(llm)
-    result = await engine.run_workflow(workflow_type, {"query": query}, provider=provider, model=model)
+    result = await run_workflow(workflow_type, {"query": query}, llm, provider=provider, model=model)
     
     # 3. Persist audit
     audit_log(db, "workflow_analyze", user=user, resource=workflow_type, request=request)

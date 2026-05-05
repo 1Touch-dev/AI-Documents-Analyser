@@ -19,6 +19,37 @@ logger = logging.getLogger(__name__)
 class ReportGenerator:
     """Generate structured reports from document queries."""
 
+    # ── Constants ─────────────────────────────────────────
+    TYPE_INSTRUCTIONS = {
+        "general": "Write a thorough analysis covering key findings, insights, and conclusions.",
+        "market_analysis": (
+            "Focus on market trends, competitive landscape, opportunities, "
+            "and threats. Include data points and projections where available."
+        ),
+        "financial_summary": (
+            "Focus on financial metrics, revenue analysis, cost breakdown, "
+            "profitability, and financial health indicators."
+        ),
+        "strategy_comparison": (
+            "Compare different strategies or approaches, listing pros/cons, "
+            "feasibility, resource requirements, and recommendations."
+        ),
+    }
+
+    FORMAT_INSTRUCTIONS = {
+        "markdown": "Format the output as clean Markdown with headers, bullet points, and emphasis.",
+        "table": (
+            "Format the output using strict Markdown tables with headers and separators (|). "
+            "Ensure every table has a clear header row followed by a separator row (e.g., | Header |). "
+            "Include a summary section in prose and detailed analytical data in tables."
+        ),
+        "json": (
+            "Return the output as a valid JSON object. Do not include markdown code fences. "
+            "Use keys: 'title', 'summary', 'sections' (array of {heading, content}), "
+            "'key_findings' (array of strings), 'recommendations' (array of strings)."
+        ),
+    }
+
     def __init__(self, llm_router: LLMRouter) -> None:
         self.llm = llm_router
 
@@ -29,6 +60,7 @@ class ReportGenerator:
         report_type: str = "general",
         output_format: str = "markdown",
         model_name: str = "auto",
+        provider: str = "openai",
         api_keys: dict[str, str | None] | None = None,
     ) -> dict[str, Any]:
         """
@@ -47,19 +79,27 @@ class ReportGenerator:
             One of: ``markdown``, ``table``, ``json``.
         model_name : str
             LLM to use.
+        provider : str
+            AI provider ("openai", "bedrock", etc.).
 
         Returns
         -------
         dict
             ``{"report", "format", "metadata"}``
         """
-        resolved_model = self.llm.resolve_model(model_name, topic, api_keys)
+        # Only resolve model if provider is openai
+        if provider == "openai":
+            resolved_model = self.llm.resolve_model(model_name, topic, api_keys)
+        else:
+            resolved_model = model_name
 
         system_prompt = self._build_system_prompt(report_type, output_format)
         user_prompt = (
             f"Write a comprehensive {report_type.replace('_', ' ')} about the topic: '{topic}'\n\n"
             f"You must use ONLY the following source material to write the report. Do not add outside knowledge. Do not write an introduction about what you will do.\n\n"
             f"--- SOURCE MATERIAL ---\n{context}\n----------------------\n\n"
+            f"REQUIRED FORMAT: {output_format.upper()}\n"
+            f"{self.FORMAT_INSTRUCTIONS.get(output_format, self.FORMAT_INSTRUCTIONS['markdown'])}\n\n"
             f"FINAL REPORT:\n"
         )
 
@@ -74,6 +114,7 @@ class ReportGenerator:
             temperature=0.4,
             max_tokens=4096,
             api_keys=api_keys,
+            provider=provider,
         )
 
         # Post-process based on output format
@@ -87,6 +128,7 @@ class ReportGenerator:
             "report_type": report_type,
             "output_format": output_format,
             "model_used": resolved_model,
+            "provider_used": provider,
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "context_length": len(context),
         }
@@ -100,43 +142,14 @@ class ReportGenerator:
         }
 
     # ── Private helpers ──────────────────────────────────
-    @staticmethod
-    def _build_system_prompt(report_type: str, output_format: str) -> str:
+    @classmethod
+    def _build_system_prompt(cls, report_type: str, output_format: str) -> str:
         base = "You are an analytical AI. Extract facts from the source material and output the final report directly. Skip pleasantries and meta-commentary."
-
-        type_instructions = {
-            "general": "Write a thorough analysis covering key findings, insights, and conclusions.",
-            "market_analysis": (
-                "Focus on market trends, competitive landscape, opportunities, "
-                "and threats. Include data points and projections where available."
-            ),
-            "financial_summary": (
-                "Focus on financial metrics, revenue analysis, cost breakdown, "
-                "profitability, and financial health indicators."
-            ),
-            "strategy_comparison": (
-                "Compare different strategies or approaches, listing pros/cons, "
-                "feasibility, resource requirements, and recommendations."
-            ),
-        }
-
-        format_instructions = {
-            "markdown": "Format the output as clean Markdown with headers, bullet points, and emphasis.",
-            "table": (
-                "Format the output as Markdown tables where appropriate. "
-                "Include a summary section in prose and detailed data in tables."
-            ),
-            "json": (
-                "Return the output as a valid JSON object with keys: "
-                '"title", "summary", "sections" (array of {heading, content}), '
-                '"key_findings" (array of strings), "recommendations" (array of strings).'
-            ),
-        }
 
         return (
             f"{base}\n\n"
-            f"{type_instructions.get(report_type, type_instructions['general'])}\n\n"
-            f"{format_instructions.get(output_format, format_instructions['markdown'])}"
+            f"{cls.TYPE_INSTRUCTIONS.get(report_type, cls.TYPE_INSTRUCTIONS['general'])}\n\n"
+            f"{cls.FORMAT_INSTRUCTIONS.get(output_format, cls.FORMAT_INSTRUCTIONS['markdown'])}"
         )
 
     @staticmethod

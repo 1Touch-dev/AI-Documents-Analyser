@@ -3,6 +3,7 @@ Workflow Classifier – uses LLM to map natural language intent to a specific wo
 """
 
 import logging
+import json
 from typing import Optional
 from backend.llm_router import LLMRouter
 
@@ -33,7 +34,6 @@ class WorkflowClassifier:
         )
 
         try:
-            import json
             result = await llm.generate(
                 model_name="gpt-4o-mini",
                 messages=[

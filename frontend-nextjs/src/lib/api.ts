@@ -497,6 +497,7 @@ export function generateReport(
     report_type?: string;
     output_format?: "markdown" | "table" | "json";
     model?: string;
+    provider?: string;
     top_k?: number;
     openai_api_key?: string | null;
     anthropic_api_key?: string | null;

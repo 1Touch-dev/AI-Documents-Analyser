@@ -47,10 +47,13 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       fetchOptions.duplex = "half";
     }
 
+    console.log(`[PROXY] Forwarding ${request.method} to ${targetUrl}`);
     backendResponse = await fetch(targetUrl, {
       ...fetchOptions,
     });
+    console.log(`[PROXY] Backend response: ${backendResponse.status}`);
   } catch (error) {
+    console.error(`[PROXY] Error fetching ${targetUrl}:`, error);
     return NextResponse.json(
       {
         detail:

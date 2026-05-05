@@ -247,7 +247,7 @@ export default function WorkflowsPage() {
                 <span className="text-xs font-bold uppercase tracking-widest text-indigo-400">Executive Summary</span>
               </div>
               <p className="text-xl font-medium leading-relaxed text-slate-100 lg:text-2xl">
-                {analysisResult.result.business_insight?.summary || "No summary available."}
+                {analysisResult.result?.business_insight?.summary || "No summary available."}
               </p>
             </div>
 
@@ -259,7 +259,7 @@ export default function WorkflowsPage() {
                   <span className="text-xs font-bold uppercase tracking-widest">Key Findings</span>
                 </div>
                 <ul className="space-y-4">
-                  {analysisResult.result.business_insight?.key_findings.map((f, i) => (
+                  {analysisResult.result?.business_insight?.key_findings?.map((f, i) => (
                     <li key={i} className="flex gap-3 text-sm text-slate-300">
                       <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-cyan-500/10 text-[10px] font-bold text-cyan-400">
                         {i + 1}
@@ -267,6 +267,9 @@ export default function WorkflowsPage() {
                       {f}
                     </li>
                   ))}
+                  {(!analysisResult.result?.business_insight?.key_findings || analysisResult.result.business_insight.key_findings.length === 0) && (
+                    <li className="text-sm text-slate-500 italic">No specific findings identified.</li>
+                  )}
                 </ul>
               </div>
 
@@ -277,12 +280,15 @@ export default function WorkflowsPage() {
                   <span className="text-xs font-bold uppercase tracking-widest">Critical Risks</span>
                 </div>
                 <ul className="space-y-4">
-                  {analysisResult.result.business_insight?.risks.map((r, i) => (
+                  {analysisResult.result?.business_insight?.risks?.map((r, i) => (
                     <li key={i} className="flex gap-3 text-sm text-red-200/80">
                       <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" />
                       {r}
                     </li>
                   ))}
+                  {(!analysisResult.result?.business_insight?.risks || analysisResult.result.business_insight.risks.length === 0) && (
+                    <li className="text-sm text-slate-500 italic">No critical risks flagged.</li>
+                  )}
                 </ul>
               </div>
 
@@ -293,12 +299,15 @@ export default function WorkflowsPage() {
                   <span className="text-xs font-bold uppercase tracking-widest">Next Actions</span>
                 </div>
                 <ul className="space-y-4">
-                  {analysisResult.result.business_insight?.recommendations.map((r, i) => (
+                  {analysisResult.result?.business_insight?.recommendations?.map((r, i) => (
                     <li key={i} className="flex gap-3 text-sm text-indigo-200/80">
                       <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-indigo-500" />
                       {r}
                     </li>
                   ))}
+                  {(!analysisResult.result?.business_insight?.recommendations || analysisResult.result.business_insight.recommendations.length === 0) && (
+                    <li className="text-sm text-slate-500 italic">No immediate actions recommended.</li>
+                  )}
                 </ul>
               </div>
             </div>
@@ -315,7 +324,7 @@ export default function WorkflowsPage() {
                 </summary>
                 <div className="border-t border-white/5 p-6">
                   <pre className="max-h-96 overflow-y-auto text-[10px] text-slate-400 font-mono">
-                    {JSON.stringify(analysisResult.result.result, null, 2)}
+                    {JSON.stringify(analysisResult.result?.result, null, 2)}
                   </pre>
                 </div>
               </details>

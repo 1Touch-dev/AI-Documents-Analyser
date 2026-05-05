@@ -141,6 +141,14 @@ export default function ChatPage() {
     if (token) {
       getModels(token).then(res => {
         setAvailableModels(res.all_models[provider] || []);
+        // Reset model to auto if the current model is not valid for this provider
+        // (unless it's 'auto' or 'custom' which are handled specially)
+        if (model !== 'auto' && model !== 'custom') {
+          const validModels = res.all_models[provider] || [];
+          if (!validModels.some(m => m.model_id === model)) {
+            setModel('auto');
+          }
+        }
       }).catch(() => {});
     }
   }, [provider, token]);

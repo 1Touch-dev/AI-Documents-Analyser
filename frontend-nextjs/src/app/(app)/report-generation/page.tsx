@@ -29,8 +29,10 @@ export default function ReportGenerationPage() {
   const [query, setQuery] = useState("");
   const [reportType, setReportType] = useState("general");
   const [outputFormat, setOutputFormat] = useState<"markdown" | "table" | "json">("markdown");
+  const [provider, setProvider] = useState("openai");
   const [model, setModel] = useState("auto");
-  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [customModelId, setCustomModelId] = useState("");
+  const [availableModels, setAvailableModels] = useState<import("@/lib/api").ModelItem[]>([]);
   
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState<ReportResponse | null>(null);
@@ -38,9 +40,17 @@ export default function ReportGenerationPage() {
 
   useEffect(() => {
     if (token) {
-      getModels(token).then(res => setAvailableModels(res.models)).catch(console.error);
+      getModels(token).then(res => {
+        setAvailableModels(res.all_models[provider] || []);
+        if (model !== 'auto' && model !== 'custom') {
+          const validModels = res.all_models[provider] || [];
+          if (!validModels.some(m => m.model_id === model)) {
+            setModel('auto');
+          }
+        }
+      }).catch(console.error);
     }
-  }, [token]);
+  }, [provider, token]);
 
   const handleGenerate = async () => {
     if (!topic.trim() || !query.trim()) return;
@@ -54,7 +64,8 @@ export default function ReportGenerationPage() {
         query,
         report_type: reportType,
         output_format: outputFormat,
-        model: model !== "auto" ? model : undefined
+        provider: provider,
+        model: model === "custom" ? customModelId : (model !== "auto" ? model : undefined)
       }, token ?? undefined);
       setResult(res);
     } catch (e) {
@@ -66,11 +77,36 @@ export default function ReportGenerationPage() {
 
   const downloadReport = () => {
     if (!result) return;
-    const blob = new Blob([result.report], { type: "text/plain" });
+    
+    let content = result.report;
+    let mimeType = "text/plain";
+    let extension = "txt";
+
+    if (outputFormat === "json") {
+      mimeType = "application/json";
+      extension = "json";
+      // Try to format JSON nicely if it's parseable
+      try {
+        const parsed = JSON.parse(content);
+        content = JSON.stringify(parsed, null, 2);
+      } catch (e) {
+        // If not parseable as pure JSON, it might be wrapped in markdown
+      }
+    } else if (outputFormat === "markdown") {
+      mimeType = "text/markdown";
+      extension = "md";
+    } else if (outputFormat === "table") {
+      mimeType = "text/csv";
+      extension = "csv";
+      // For table, if it returned markdown, we might need to convert it, but let's just save as is or txt
+      // If it returned CSV format, csv extension is correct.
+    }
+
+    const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `Report_${topic.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.txt`;
+    a.download = `Report_${topic.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.${extension}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -186,10 +222,12 @@ export default function ReportGenerationPage() {
                 </button>
               </div>
 
-              <div className="rounded-[2rem] border border-white/10 bg-white/5 p-8 backdrop-blur-xl">
+              <div className="rounded-[2rem] border border-white/10 bg-white/5 p-8 backdrop-blur-xl overflow-x-auto">
                 <div className="prose prose-invert max-w-none prose-sm prose-headings:text-white prose-p:text-slate-300 prose-strong:text-indigo-400 prose-ul:text-slate-400">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {result.report}
+                    {outputFormat === "json" && !result.report.startsWith("```") 
+                      ? `\`\`\`json\n${result.report}\n\`\`\`` 
+                      : result.report}
                   </ReactMarkdown>
                 </div>
               </div>
@@ -214,18 +252,46 @@ export default function ReportGenerationPage() {
 
             <div className="space-y-4">
               <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500">AI Engine</label>
+                <select 
+                  value={provider}
+                  onChange={(e) => setProvider(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-slate-950/50 p-3 text-xs text-white focus:outline-none focus:border-indigo-500/50"
+                >
+                  <option value="openai">OpenAI (GPT-4)</option>
+                  <option value="anthropic">Anthropic (Claude)</option>
+                  <option value="bedrock">AWS Bedrock</option>
+                  <option value="custom">Custom Engine</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Model Choice</label>
                 <select 
                   value={model}
                   onChange={(e) => setModel(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-slate-950/50 p-3 text-xs text-white focus:outline-none"
+                  className="w-full rounded-xl border border-white/10 bg-slate-950/50 p-3 text-xs text-white focus:outline-none focus:border-indigo-500/50"
                 >
                   <option value="auto">Auto-Select (Optimized)</option>
                   {availableModels.map(m => (
-                    <option key={m} value={m}>{m}</option>
+                    <option key={m.model_id} value={m.model_id}>{m.label}</option>
                   ))}
+                  {provider === "custom" && <option value="custom">Custom Model ID</option>}
                 </select>
               </div>
+
+              {model === "custom" && (
+                <div className="space-y-2 animate-in slide-in-from-top-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-indigo-400">Custom Model ID</label>
+                  <input 
+                    type="text"
+                    value={customModelId}
+                    onChange={(e) => setCustomModelId(e.target.value)}
+                    placeholder="e.g. meta-llama/Llama-2-70b"
+                    className="w-full rounded-xl border border-indigo-500/30 bg-indigo-500/5 px-3 py-2 text-sm text-indigo-200 placeholder-indigo-500/50 focus:border-indigo-500 focus:outline-none"
+                  />
+                </div>
+              )}
 
               <div className="rounded-2xl bg-indigo-500/5 border border-indigo-500/10 p-4">
                 <p className="text-[10px] text-indigo-300 leading-relaxed">
