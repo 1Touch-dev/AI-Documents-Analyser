@@ -68,12 +68,11 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   const contentType =
     backendResponse.headers.get("content-type") ?? "application/json; charset=utf-8";
 
-  const isBinary = contentType.includes("octet-stream") || 
-                   contentType.includes("spreadsheetml") || 
-                   contentType.includes("presentationml") ||
-                   contentType.includes("pdf") ||
-                   contentType.includes("zip") ||
-                   contentType.includes("image");
+  const isText = contentType.includes("json") || 
+                 contentType.includes("text") || 
+                 contentType.includes("html") || 
+                 contentType.includes("xml");
+  const isBinary = !isText;
 
   let responseBody: any;
   if (isBinary) {
