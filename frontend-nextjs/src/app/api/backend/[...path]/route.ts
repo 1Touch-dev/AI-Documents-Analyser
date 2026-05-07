@@ -65,11 +65,25 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     );
   }
 
-  const responseText = await backendResponse.text();
   const contentType =
     backendResponse.headers.get("content-type") ?? "application/json; charset=utf-8";
 
-  const response = new NextResponse(responseText, {
+  const isBinary = contentType.includes("octet-stream") || 
+                   contentType.includes("spreadsheetml") || 
+                   contentType.includes("presentationml") ||
+                   contentType.includes("pdf") ||
+                   contentType.includes("zip") ||
+                   contentType.includes("image");
+
+  let responseBody: any;
+  if (isBinary) {
+    const arrayBuffer = await backendResponse.arrayBuffer();
+    responseBody = new Uint8Array(arrayBuffer);
+  } else {
+    responseBody = await backendResponse.text();
+  }
+
+  const response = new NextResponse(responseBody, {
     status: backendResponse.status,
     headers: {
       "content-type": contentType,
@@ -78,6 +92,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
 
   if (backendResponse.ok && isAuthTokenResponse(path)) {
     try {
+      const responseText = typeof responseBody === "string" ? responseBody : new TextDecoder().decode(responseBody);
       const payload = JSON.parse(responseText) as { access_token?: string };
       if (payload.access_token) {
         response.cookies.set({

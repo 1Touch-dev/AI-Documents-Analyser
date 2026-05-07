@@ -7,7 +7,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
 import uuid
 
-class ApprovalAction(BaseModel_if_needed=False):
+class ApprovalAction:
     """
     Structured model tracking approval actions.
     """

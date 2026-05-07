@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import {
   getAnalyticsOverview,
   listDocuments,
@@ -40,6 +41,7 @@ const PIE_COLORS = ["#6366f1", "#06b6d4", "#10b981", "#f59e0b", "#ef4444", "#8b5
 
 export default function DashboardPage() {
   const { token } = useAuth();
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [reports, setReports] = useState<SavedReportMeta[]>([]);
@@ -177,11 +179,20 @@ export default function DashboardPage() {
           <div className="rounded-[2.5rem] border border-white/10 bg-white/5 p-8 backdrop-blur-xl">
             <div className="mb-6 flex items-center justify-between">
               <h3 className="text-lg font-bold text-white">Recent Activity</h3>
-              <button className="text-sm font-bold text-indigo-400 hover:text-indigo-300">View All</button>
+              <button 
+                onClick={() => router.push("/documents")}
+                className="text-sm font-bold text-indigo-400 hover:text-indigo-300"
+              >
+                View All
+              </button>
             </div>
             <div className="space-y-4">
               {recentActivity.map((item, i) => (
-                <div key={i} className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 p-4 transition hover:bg-white/10">
+                <div 
+                  key={i} 
+                  onClick={() => router.push(item.type === 'report' ? '/reports' : '/documents')}
+                  className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 p-4 transition hover:bg-white/10 cursor-pointer"
+                >
                   <div className="flex items-center gap-4">
                     <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${item.type === 'report' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-indigo-500/10 text-indigo-400'}`}>
                       {item.type === 'report' ? <BookMarked className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
@@ -246,7 +257,10 @@ export default function DashboardPage() {
             <p className="mt-2 text-sm leading-relaxed text-indigo-100/80">
               Your documents have been analyzed. We found 3 new cost-saving opportunities in your F&B category.
             </p>
-            <button className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-indigo-600 transition hover:bg-indigo-50">
+            <button 
+              onClick={() => router.push("/workflows")}
+              className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-indigo-600 transition hover:bg-indigo-50"
+            >
               Review Insights
               <ArrowUpRight className="h-4 w-4" />
             </button>

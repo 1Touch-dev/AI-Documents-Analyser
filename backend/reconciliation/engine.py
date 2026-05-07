@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 import uuid
 from backend.fpa_core.models import RevenueEntity, ExpenseEntity, DebtEntity, ObligationEntity
 
-class ReconciliationStatus(BaseModel_if_needed=False):
+class ReconciliationStatus:
     """
     Data structures representing transaction verification state.
     """
