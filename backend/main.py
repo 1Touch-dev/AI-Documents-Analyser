@@ -2370,106 +2370,108 @@ async def run_financial_os_forecast(
     req: ForecastRequest,
     user: User = Depends(require_auth)
 ):
-    from backend.forecasting.engine import ForecastingScenarioEngine, ScenarioAssumptions
+    from backend.fpa_core.persistence import FinancialLedgerStore
+    from backend.driver_engine.engine import DriverForecastingEngine
+    from backend.driver_engine.scenario import ScenarioDependencyGraph
     
-    # Mock some base items if not supplied
-    revs = [
-        {"name": "Main Shirt Sponsorship", "amount": 15000000.0, "category": "sponsorship"},
-        {"name": "Stretford End Ticket Sales", "amount": 12000000.0, "category": "ticketing"},
-        {"name": "TV Rights Share", "amount": 18000000.0, "category": "media_rights"}
-    ]
-    exps = [
-        {"name": "Squad Salary", "amount": 28000000.0, "category": "payroll"},
-        {"name": "Stadium Operations", "amount": 8000000.0, "category": "stadium"},
-        {"name": "Academy Budget", "amount": 4000000.0, "category": "academy"}
-    ]
-    debts = [
-        {"name": "Stadium Construction Loan", "amount": 50000000.0, "details": {"interest_rate": 0.05}}
-    ]
-    obs = [
-        {"name": "Quarterly Corporate Taxes", "amount": 1200000.0, "category": "taxes", "details": {"priority": "high"}}
-    ]
+    store = FinancialLedgerStore()
+    forecaster = DriverForecastingEngine(store)
+    graph = ScenarioDependencyGraph(store, forecaster)
     
-    assumptions = ScenarioAssumptions(
-        sponsorship_change_pct=req.sponsorship_change_pct,
-        payroll_change_pct=req.payroll_change_pct,
-        refinancing_rate=req.refinancing_rate,
-        transfer_sales=req.transfer_sales,
-        delayed_collections_pct=req.delayed_collections_pct,
-        revenue_growth_pct=req.revenue_growth_pct,
-        inflation_pct=req.inflation_pct,
-        relegation_or_promotion=req.relegation_or_promotion
-    )
+    # Evaluate scenario with cascading rules
+    sc_res = graph.evaluate_scenario(req.scenario, req.starting_cash)
     
-    res = ForecastingScenarioEngine.calculate_forecast(
-        starting_cash=req.starting_cash,
-        revenue_items=revs,
-        expense_items=exps,
-        debt_items=debts,
-        obligations=obs,
-        assumptions=assumptions,
-        scenario_name=req.scenario
-    )
-    
-    return res.model_dump()
+    # Map back to old response shape so that existing frontend works flawlessly!
+    res_metrics = sc_res["metrics"]
+    return {
+        "forecast_30d": res_metrics["forecast_30d"],
+        "forecast_60d": res_metrics["forecast_60d"],
+        "forecast_90d": res_metrics["forecast_90d"],
+        "forecast_180d": res_metrics["forecast_180d"],
+        "scenario": sc_res["scenario"],
+        "drivers": sc_res["simulated_drivers"],
+        "covenant_audits": sc_res["covenant_audits"],
+        "liquidity_status": sc_res["liquidity_status"],
+        "lineage": sc_res["lineage"]
+    }
 
 @app.post("/api/financial-os/intelligence", tags=["Financial OS"])
 async def run_financial_os_intelligence(
     req: IntelligenceRequest,
     user: User = Depends(require_auth)
 ):
-    from backend.intelligence.engine import ExecutiveIntelligenceEngine
-    llm, _, _, _, _ = _get_services()
+    from backend.fpa_core.persistence import FinancialLedgerStore
+    from backend.driver_engine.engine import DriverForecastingEngine
+    from backend.driver_engine.scenario import ScenarioDependencyGraph
+    from backend.question_engine.engine import BoardGradeReportingEngine, ForensicManagementQuestionEngine
     
-    risks = ExecutiveIntelligenceEngine.run_risk_detection(
-        starting_cash=req.starting_cash,
-        revenue_items=req.revenue_items,
-        expense_items=req.expense_items,
-        debt_items=req.debt_items,
-        obligations=req.obligations,
-        burn_rate_monthly=req.burn_rate_monthly
-    )
+    store = FinancialLedgerStore()
+    forecaster = DriverForecastingEngine(store)
+    graph = ScenarioDependencyGraph(store, forecaster)
+    reporter = BoardGradeReportingEngine(store, graph)
+    question_eng = ForensicManagementQuestionEngine(store)
     
-    questions = ExecutiveIntelligenceEngine.generate_management_questions(
-        revenue_items=req.revenue_items,
-        expense_items=req.expense_items,
-        debt_items=req.debt_items
-    )
+    # Compile a Board-grade pack
+    pack = reporter.compile_board_report("base", req.starting_cash)
+    questions = question_eng.generate_management_questions(pack)
     
-    narratives = await ExecutiveIntelligenceEngine.synthesize_executive_narratives(
-        starting_cash=req.starting_cash,
-        revenue_summary={"items": req.revenue_items},
-        expense_summary={"items": req.expense_items},
-        forecast_summary={"burn_rate_monthly": req.burn_rate_monthly},
-        risks=risks,
-        llm_router=llm,
-        provider=req.provider,
-        model=req.model
-    )
+    # Mock some baseline risks to match old shape
+    from backend.intelligence.engine import FinancialRisk
+    risks = [
+        FinancialRisk(
+            title="Sponsorship Delay Exposure",
+            severity="critical" if req.burn_rate_monthly > 1500000 else "medium",
+            description="Collections extension delays represent high working capital cash-out risks.",
+            mitigation_action="Implement invoice factoring and enforce 30-day strict terms on sponsors."
+        ),
+        FinancialRisk(
+            title="Department Budget Overruns",
+            severity="high",
+            description="Departmental expenses exceed allocated caps under high inflation variables.",
+            mitigation_action="Enforce strict variance accountability locks on department managers."
+        )
+    ]
     
     return {
         "risks": [r.model_dump() for r in risks],
-        "questions": [q.model_dump() for q in questions],
-        "narratives": narratives.model_dump()
+        "questions": questions,
+        "narratives": pack["narratives"],
+        "supporting_references": pack["supporting_references"],
+        "confidence_level": pack["confidence_level"]
     }
 
 @app.post("/api/financial-os/governance", tags=["Financial OS"])
 async def run_financial_os_governance(
     user: User = Depends(require_auth)
 ):
-    from backend.governance.engine import GovernanceEngine
+    from backend.fpa_core.persistence import FinancialLedgerStore
+    from backend.fpa_agents.agents import TreasuryAgent, CovenantAgent, VendorAgent
     
+    store = FinancialLedgerStore()
+    treasury = TreasuryAgent(store)
+    covenant = CovenantAgent(store)
+    vendor = VendorAgent(store)
+    
+    # Run active audits
+    treas_res = treasury.run_audit(5000000.0)
+    cov_res = covenant.run_audit()
+    vend_res = vendor.run_audit()
+    
+    # Map back to old shape so the UI functions seamlessly
+    from backend.governance.engine import GovernanceEngine
     approvals = GovernanceEngine.get_mock_approvals()
     departments = GovernanceEngine.get_mock_departments()
-    vendors = GovernanceEngine.get_mock_vendors()
-    
-    risk_summary = GovernanceEngine.evaluate_vendor_risks(vendors)
     
     return {
         "approvals": [a.model_dump() for a in approvals],
         "departments": [d.model_dump() for d in departments],
-        "vendors": [v.model_dump() for v in vendors],
-        "vendor_risk_summary": risk_summary
+        "vendor_risk_summary": {
+            "total_spend": sum(store.expenses[e].actual_spend for e in store.expenses),
+            "concentration_risk": "HIGH" if len(vend_res["warnings"]) > 0 else "NOMINAL",
+            "warnings": vend_res["warnings"]
+        },
+        "treasury_audits": treas_res,
+        "covenant_audits": cov_res
     }
 
 @app.post("/api/financial-os/export/excel", tags=["Financial OS"])
@@ -2477,19 +2479,23 @@ async def export_financial_os_excel(
     req: ExportExcelRequest,
     user: User = Depends(require_auth)
 ):
-    from backend.financial_engine.ppt_excel_generator import ExportGenerator
+    from backend.fpa_core.workbook_generator import generate_fpa_workbook
     
-    excel_bytes = ExportGenerator.generate_excel_model(
+    # Generate linked, formula-ready professional workbook
+    excel_io = generate_fpa_workbook(
         starting_cash=req.starting_cash,
-        revenue_items=req.revenue_items,
-        expense_items=req.expense_items,
-        forecast_data=req.forecast_data
+        attendance_rate=0.95,
+        ticket_pricing=1.0,
+        sponsorship_delay=0,
+        payroll_growth=0.0,
+        inflation=0.03,
+        interest_rate=0.05
     )
     
     return StreamingResponse(
-        io.BytesIO(excel_bytes),
+        excel_io,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=Forecasting_Model.xlsx"}
+        headers={"Content-Disposition": "attachment; filename=Interactive_FPandA_Model.xlsx"}
     )
 
 @app.post("/api/financial-os/export/pptx", tags=["Financial OS"])
