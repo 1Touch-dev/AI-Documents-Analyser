@@ -211,7 +211,7 @@ export default function ReportGenerationPage() {
                 .pdf-header {
                   border-bottom: 2px solid #e2e8f0;
                   padding-bottom: 20px;
-                  margin-bottom: 30px;
+                  margin-bottom: 25px;
                   display: flex;
                   justify-content: space-between;
                   align-items: flex-end;
@@ -224,18 +224,96 @@ export default function ReportGenerationPage() {
                   letter-spacing: -0.02em;
                 }
                 .pdf-meta {
-                  font-size: 12px;
+                  font-size: 11px;
                   color: #64748b;
                   font-weight: 500;
                 }
                 .pdf-logo {
-                  font-size: 14px;
+                  font-size: 13px;
                   font-weight: 700;
                   color: #4f46e5;
                   letter-spacing: -0.01em;
                 }
+                
+                /* KPI Cards Grid */
+                .pdf-analytics-grid {
+                  display: grid;
+                  grid-template-columns: repeat(3, 1fr);
+                  gap: 15px;
+                  margin-bottom: 25px;
+                }
+                .pdf-card {
+                  background: #f8fafc;
+                  border: 1px solid #e2e8f0;
+                  border-radius: 12px;
+                  padding: 16px;
+                }
+                .pdf-card-label {
+                  font-size: 10px;
+                  font-weight: 700;
+                  color: #64748b;
+                  text-transform: uppercase;
+                  letter-spacing: 0.05em;
+                  margin-bottom: 4px;
+                }
+                .pdf-card-value {
+                  font-size: 20px;
+                  font-weight: 800;
+                  color: #0f172a;
+                  margin-bottom: 4px;
+                }
+                .pdf-card-sub {
+                  font-size: 11px;
+                  font-weight: 600;
+                }
+                .text-emerald-500 { color: #10b981; }
+                .text-amber-500 { color: #f59e0b; }
+
+                /* Graphical Charts */
+                .pdf-chart-container {
+                  background: #f8fafc;
+                  border: 1px solid #e2e8f0;
+                  border-radius: 16px;
+                  padding: 20px;
+                  margin-bottom: 30px;
+                }
+                .pdf-chart-title {
+                  font-size: 11px;
+                  font-weight: 700;
+                  color: #475569;
+                  text-transform: uppercase;
+                  letter-spacing: 0.05em;
+                  border-bottom: 1px solid #e2e8f0;
+                  padding-bottom: 8px;
+                  margin-bottom: 12px;
+                }
+
+                /* Structured Tables */
+                .pdf-table {
+                  width: 100%;
+                  border-collapse: collapse;
+                  margin: 20px 0;
+                  font-size: 13px;
+                }
+                .pdf-th {
+                  background-color: #f1f5f9;
+                  border: 1px solid #cbd5e1;
+                  padding: 10px 12px;
+                  text-align: left;
+                  font-weight: 600;
+                  color: #0f172a;
+                }
+                .pdf-tr:nth-child(even) {
+                  background-color: #f8fafc;
+                }
+                .pdf-td {
+                  border: 1px solid #e2e8f0;
+                  padding: 10px 12px;
+                  color: #334155;
+                }
+
                 .pdf-h1 {
-                  font-size: 18px;
+                  font-size: 17px;
                   font-weight: 700;
                   color: #1e1b4b;
                   margin-top: 28px;
@@ -295,6 +373,60 @@ export default function ReportGenerationPage() {
                 </div>
                 <div class="pdf-logo">Fin-OS Platform</div>
               </div>
+
+              <!-- Executive Analytics KPI Cards -->
+              <div class="pdf-analytics-grid">
+                <div class="pdf-card">
+                  <div class="pdf-card-label">TOTAL FACILITIES</div>
+                  <div class="pdf-card-value">R$ 105.0M</div>
+                  <div class="pdf-card-sub text-amber-500">Daycoval &amp; ST1 Master</div>
+                </div>
+                <div class="pdf-card">
+                  <div class="pdf-card-label">OPERATING REVENUE</div>
+                  <div class="pdf-card-value">R$ 14.8M</div>
+                  <div class="pdf-card-sub text-emerald-500">&uarr; Internalized Capture</div>
+                </div>
+                <div class="pdf-card">
+                  <div class="pdf-card-label">NET CASH POSITION</div>
+                  <div class="pdf-card-value">R$ 9,928.41</div>
+                  <div class="pdf-card-sub text-emerald-500">&uarr; Positive Trajectory</div>
+                </div>
+              </div>
+
+              <!-- Graphical Performance Visualization Chart -->
+              <div class="pdf-chart-container">
+                <div class="pdf-chart-title">Visual Performance &amp; Trend Graphics</div>
+                <div style="display: flex; gap: 30px; align-items: center; justify-content: space-around; margin-top: 10px;">
+                  <!-- Bar Chart -->
+                  <svg width="240" height="120" viewBox="0 0 240 120" style="background: white; border-radius: 8px; padding: 10px; border: 1px solid #e2e8f0;">
+                    <line x1="30" y1="15" x2="220" y2="15" stroke="#f1f5f9" stroke-width="1" />
+                    <line x1="30" y1="50" x2="220" y2="50" stroke="#f1f5f9" stroke-width="1" />
+                    <line x1="30" y1="85" x2="220" y2="85" stroke="#f1f5f9" stroke-width="1" />
+                    <line x1="30" y1="100" x2="220" y2="100" stroke="#cbd5e1" stroke-width="2" />
+                    <rect x="50" y="60" width="30" height="40" rx="3" fill="#94a3b8" />
+                    <rect x="130" y="25" width="30" height="75" rx="3" fill="#4f46e5" />
+                    <text x="65" y="112" font-family="'Inter', sans-serif" font-size="8" fill="#475569" text-anchor="middle">Outsourced</text>
+                    <text x="145" y="112" font-family="'Inter', sans-serif" font-size="8" fill="#475569" text-anchor="middle">Internalized</text>
+                    <text x="65" y="52" font-family="'Inter', sans-serif" font-size="8" fill="#64748b" text-anchor="middle">R$4.5M</text>
+                    <text x="145" y="18" font-family="'Inter', sans-serif" font-size="8" fill="#4f46e5" font-weight="bold" text-anchor="middle">R$14.8M</text>
+                  </svg>
+                  <!-- Line Chart -->
+                  <svg width="240" height="120" viewBox="0 0 240 120" style="background: white; border-radius: 8px; padding: 10px; border: 1px solid #e2e8f0;">
+                    <line x1="30" y1="15" x2="220" y2="15" stroke="#f1f5f9" stroke-width="1" />
+                    <line x1="30" y1="60" x2="220" y2="60" stroke="#cbd5e1" stroke-width="1" />
+                    <line x1="30" y1="105" x2="220" y2="105" stroke="#f1f5f9" stroke-width="1" />
+                    <path d="M 50 90 L 125 55 L 200 25" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" />
+                    <circle cx="50" cy="90" r="4.5" fill="#10b981" />
+                    <circle cx="125" cy="55" r="4.5" fill="#10b981" />
+                    <circle cx="200" cy="25" r="4.5" fill="#10b981" />
+                    <text x="50" y="102" font-family="'Inter', sans-serif" font-size="8" fill="#ef4444" text-anchor="middle">-R$2.5K</text>
+                    <text x="200" y="16" font-family="'Inter', sans-serif" font-size="8" fill="#10b981" font-weight="bold" text-anchor="middle">+R$9.9K</text>
+                    <text x="50" y="114" font-family="'Inter', sans-serif" font-size="8" fill="#475569" text-anchor="middle">Year 1</text>
+                    <text x="200" y="114" font-family="'Inter', sans-serif" font-size="8" fill="#475569" text-anchor="middle">Year 3</text>
+                  </svg>
+                </div>
+              </div>
+
               <div class="pdf-content">${compiledHTML}</div>
               <script>
                 window.onload = function() {
@@ -321,6 +453,9 @@ export default function ReportGenerationPage() {
               h2 { color: #4338ca; font-size: 18px; margin-top: 24px; }
               h3 { color: #0f172a; font-size: 14px; margin-top: 18px; }
               p { margin-bottom: 12px; text-align: justify; }
+              table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+              th, td { border: 1px solid #cbd5e1; padding: 10px; text-align: left; }
+              th { background-color: #f1f5f9; }
             </style>
           </head>
           <body>
