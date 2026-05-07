@@ -117,6 +117,13 @@ export default function ChatPage() {
   useEffect(() => {
     refreshHistory();
     fetchAdvancedData();
+    if (token && typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const sessionIdParam = params.get("session_id");
+      if (sessionIdParam) {
+        loadChat(sessionIdParam);
+      }
+    }
   }, [token]);
 
   useEffect(() => {
