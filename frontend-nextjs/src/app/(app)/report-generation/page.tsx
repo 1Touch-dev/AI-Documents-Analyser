@@ -83,7 +83,8 @@ export default function ReportGenerationPage() {
     let extension = "txt";
 
     const parseMarkdownToHTML = (markdown: string): string => {
-      let html = markdown;
+      // Normalize line endings to avoid \r matching issues
+      let html = markdown.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
 
       // Escape HTML tags to prevent XSS
       html = html
@@ -91,10 +92,10 @@ export default function ReportGenerationPage() {
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
 
-      // Replace headers
-      html = html.replace(/^# (.*?)$/gm, '<h1 class="pdf-h1">$1</h1>');
-      html = html.replace(/^## (.*?)$/gm, '<h2 class="pdf-h2">$1</h2>');
-      html = html.replace(/^### (.*?)$/gm, '<h3 class="pdf-h3">$1</h3>');
+      // Replace headers (robust regex matching space variations)
+      html = html.replace(/^\s*#\s+(.*?)\s*$/gm, '<h1 class="pdf-h1">$1</h1>');
+      html = html.replace(/^\s*##\s+(.*?)\s*$/gm, '<h2 class="pdf-h2">$1</h2>');
+      html = html.replace(/^\s*###\s+(.*?)\s*$/gm, '<h3 class="pdf-h3">$1</h3>');
 
       // Bold text
       html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
@@ -105,8 +106,7 @@ export default function ReportGenerationPage() {
       html = html.replace(/_(.*?)_/g, '<em>$1</em>');
 
       // Bullet lists
-      html = html.replace(/^\s*-\s+(.*?)$/gm, '<li class="pdf-li">$1</li>');
-      html = html.replace(/^\s*\*\s+(.*?)$/gm, '<li class="pdf-li">$1</li>');
+      html = html.replace(/^\s*[-*]\s+(.*?)$/gm, '<li class="pdf-li">$1</li>');
 
       // Numbered lists
       html = html.replace(/^\s*\d+\.\s+(.*?)$/gm, '<li class="pdf-ol-li">$1</li>');
@@ -114,12 +114,62 @@ export default function ReportGenerationPage() {
       // Blockquotes
       html = html.replace(/^\s*>\s+(.*?)$/gm, '<blockquote class="pdf-blockquote">$1</blockquote>');
 
-      // Paragraphs
+      // Parse Markdown Tables
       const lines = html.split('\n');
-      const processedLines = lines.map(line => {
+      let insideTable = false;
+      let tableRows: string[][] = [];
+      let finalLines: string[] = [];
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line.startsWith('|')) {
+          insideTable = true;
+          if (line.includes('---') || line.includes('===') || line.includes(':---')) {
+            continue;
+          }
+          const cells = line.split('|').map(c => c.trim()).filter((c, idx, arr) => idx > 0 && idx < arr.length - 1);
+          tableRows.push(cells);
+        } else {
+          if (insideTable) {
+            if (tableRows.length > 0) {
+              let tableHTML = '<table class="pdf-table">';
+              tableRows.forEach((row, rIdx) => {
+                if (rIdx === 0) {
+                  tableHTML += '<thead><tr>' + row.map(c => `<th class="pdf-th">${c}</th>`).join('') + '</tr></thead><tbody>';
+                } else {
+                  tableHTML += '<tr class="pdf-tr">' + row.map(c => `<td class="pdf-td">${c}</td>`).join('') + '</tr>';
+                }
+              });
+              tableHTML += '</tbody></table>';
+              finalLines.push(tableHTML);
+              tableRows = [];
+            }
+            insideTable = false;
+          }
+          finalLines.push(lines[i]);
+        }
+      }
+      if (insideTable && tableRows.length > 0) {
+        let tableHTML = '<table class="pdf-table">';
+        tableRows.forEach((row, rIdx) => {
+          if (rIdx === 0) {
+            tableHTML += '<thead><tr>' + row.map(c => `<th class="pdf-th">${c}</th>`).join('') + '</tr></thead><tbody>';
+          } else {
+            tableHTML += '<tr class="pdf-tr">' + row.map(c => `<td class="pdf-td">${c}</td>`).join('') + '</tr>';
+          }
+        });
+        tableHTML += '</tbody></table>';
+        finalLines.push(tableHTML);
+      }
+
+      html = finalLines.join('\n');
+
+      // Paragraphs
+      const pLines = html.split('\n');
+      const processedLines = pLines.map(line => {
         const trimmed = line.trim();
         if (!trimmed) return '';
-        if (trimmed.startsWith('<h') || trimmed.startsWith('<u') || trimmed.startsWith('<o') || trimmed.startsWith('<l') || trimmed.startsWith('<b') || trimmed.startsWith('</')) {
+        if (trimmed.startsWith('<h') || trimmed.startsWith('<u') || trimmed.startsWith('<o') || trimmed.startsWith('<l') || trimmed.startsWith('<b') || trimmed.startsWith('<t') || trimmed.startsWith('</') || trimmed.startsWith('<r') || trimmed.startsWith('<d')) {
           return line;
         }
         return `<p class="pdf-p">${line}</p>`;
@@ -132,16 +182,43 @@ export default function ReportGenerationPage() {
     if (outputFormat === "json") {
       mimeType = "application/json";
       extension = "json";
-      try {
-        const parsed = JSON.parse(content);
-        content = JSON.stringify(parsed, null, 2);
-      } catch (e) {}
+      content = JSON.stringify({
+        topic: topic,
+        generated_on: new Date().toLocaleDateString(),
+        report_type: reportType,
+        insights: content.split('\n').filter(l => l.trim().startsWith('-') || l.trim().startsWith('*')).map(l => l.replace(/^[-*]\s+/, '').trim()),
+        raw_markdown: content
+      }, null, 2);
     } else if (outputFormat === "markdown") {
       mimeType = "text/markdown";
       extension = "md";
     } else if (outputFormat === "table") {
       mimeType = "text/csv";
       extension = "csv";
+      const lines = content.replace(/\r\n/g, "\n").split('\n');
+      let csvContent = "";
+      lines.forEach(line => {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('|')) {
+          if (trimmed.includes('---')) return;
+          const cells = trimmed.split('|').map(c => c.trim()).filter((c, idx, arr) => idx > 0 && idx < arr.length - 1);
+          csvContent += cells.map(c => `"${c.replace(/"/g, '""')}"`).join(',') + '\n';
+        } else if (trimmed.startsWith('-') || trimmed.startsWith('*')) {
+          const text = trimmed.replace(/^[-*]\s+/, '');
+          if (text.includes(':')) {
+            const parts = text.split(':');
+            const key = parts[0].trim();
+            const val = parts.slice(1).join(':').trim();
+            csvContent += `"${key.replace(/"/g, '""')}","${val.replace(/"/g, '""')}"\n`;
+          } else {
+            csvContent += `"Item","${text.replace(/"/g, '""')}"\n`;
+          }
+        }
+      });
+      if (!csvContent) {
+        csvContent = `"Report Topic","${topic.replace(/"/g, '""')}"\n"Date","${new Date().toLocaleDateString()}"\n\n"Analysis Content"\n"${content.replace(/"/g, '""')}"`;
+      }
+      content = csvContent;
     } else if (outputFormat === "excel") {
       try {
         const res = await fetch("/api/backend/financial-os/export/excel", {
