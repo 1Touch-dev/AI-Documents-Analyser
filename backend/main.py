@@ -2273,3 +2273,245 @@ async def set_user_role(
     target.role = role
     db.commit()
     return {"username": username, "role": role, "message": "Role updated."}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  FINANCIAL OPERATING SYSTEM (FIN-OS) ENDPOINTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+import io
+from fastapi.responses import StreamingResponse
+
+class ExtractFinancialsRequest(BaseModel):
+    document_id: Optional[str] = None
+    provider: str = "openai"
+    model: str = "gpt-4o"
+
+class ForecastRequest(BaseModel):
+    starting_cash: float = 5000000.0
+    sponsorship_change_pct: float = 0.0
+    payroll_change_pct: float = 0.0
+    refinancing_rate: float = 0.05
+    transfer_sales: float = 0.0
+    delayed_collections_pct: float = 0.0
+    revenue_growth_pct: float = 0.05
+    inflation_pct: float = 0.03
+    relegation_or_promotion: str = "none"
+    scenario: str = "base"
+
+class IntelligenceRequest(BaseModel):
+    starting_cash: float = 5000000.0
+    revenue_items: list = []
+    expense_items: list = []
+    debt_items: list = []
+    obligations: list = []
+    burn_rate_monthly: float = 500000.0
+    provider: str = "openai"
+    model: str = "gpt-4o"
+
+class ExportExcelRequest(BaseModel):
+    starting_cash: float = 5000000.0
+    revenue_items: list = []
+    expense_items: list = []
+    forecast_data: dict = {}
+
+class ExportPptxRequest(BaseModel):
+    title_text: str = "Q1 Financial Strategy"
+    board_summary: str = ""
+    risks: list = []
+
+@app.post("/api/financial-os/extract", tags=["Financial OS"])
+async def extract_financial_os_data(
+    req: ExtractFinancialsRequest,
+    user: User = Depends(require_auth),
+    db: Session = Depends(get_db)
+):
+    from backend.financial_engine.extractor import FinancialExtractionEngine
+    from db.models import Document
+    import uuid
+
+    llm, rag, _, _, _ = _get_services()
+    
+    # Locate document to extract from
+    doc_text = "No document content found."
+    filename = "SampleModel.xlsx"
+    
+    if req.document_id:
+        try:
+            doc_uuid = uuid.UUID(req.document_id)
+            doc = db.query(Document).filter(Document.id == doc_uuid).first()
+            if doc:
+                filename = doc.title
+                # Read raw text content if available via vector store / RAG
+                try:
+                    res = await rag.query(f"List all numeric items and financials in {filename}", limit=20)
+                    doc_text = "\n".join([chunk.get("text", "") for chunk in res.get("chunks", [])])
+                except Exception as e:
+                    doc_text = f"Fallback text for document {filename}"
+        except Exception:
+            pass
+            
+    # Run the extraction engine
+    extracted_data = await FinancialExtractionEngine.extract_structured_financials(
+        text=doc_text,
+        filename=filename,
+        llm_router=llm,
+        provider=req.provider,
+        model=req.model
+    )
+    
+    return {
+        "status": "success",
+        "extracted_data": extracted_data.model_dump()
+    }
+
+@app.post("/api/financial-os/forecast", tags=["Financial OS"])
+async def run_financial_os_forecast(
+    req: ForecastRequest,
+    user: User = Depends(require_auth)
+):
+    from backend.forecasting.engine import ForecastingScenarioEngine, ScenarioAssumptions
+    
+    # Mock some base items if not supplied
+    revs = [
+        {"name": "Main Shirt Sponsorship", "amount": 15000000.0, "category": "sponsorship"},
+        {"name": "Stretford End Ticket Sales", "amount": 12000000.0, "category": "ticketing"},
+        {"name": "TV Rights Share", "amount": 18000000.0, "category": "media_rights"}
+    ]
+    exps = [
+        {"name": "Squad Salary", "amount": 28000000.0, "category": "payroll"},
+        {"name": "Stadium Operations", "amount": 8000000.0, "category": "stadium"},
+        {"name": "Academy Budget", "amount": 4000000.0, "category": "academy"}
+    ]
+    debts = [
+        {"name": "Stadium Construction Loan", "amount": 50000000.0, "details": {"interest_rate": 0.05}}
+    ]
+    obs = [
+        {"name": "Quarterly Corporate Taxes", "amount": 1200000.0, "category": "taxes", "details": {"priority": "high"}}
+    ]
+    
+    assumptions = ScenarioAssumptions(
+        sponsorship_change_pct=req.sponsorship_change_pct,
+        payroll_change_pct=req.payroll_change_pct,
+        refinancing_rate=req.refinancing_rate,
+        transfer_sales=req.transfer_sales,
+        delayed_collections_pct=req.delayed_collections_pct,
+        revenue_growth_pct=req.revenue_growth_pct,
+        inflation_pct=req.inflation_pct,
+        relegation_or_promotion=req.relegation_or_promotion
+    )
+    
+    res = ForecastingScenarioEngine.calculate_forecast(
+        starting_cash=req.starting_cash,
+        revenue_items=revs,
+        expense_items=exps,
+        debt_items=debts,
+        obligations=obs,
+        assumptions=assumptions,
+        scenario_name=req.scenario
+    )
+    
+    return res.model_dump()
+
+@app.post("/api/financial-os/intelligence", tags=["Financial OS"])
+async def run_financial_os_intelligence(
+    req: IntelligenceRequest,
+    user: User = Depends(require_auth)
+):
+    from backend.intelligence.engine import ExecutiveIntelligenceEngine
+    llm, _, _, _, _ = _get_services()
+    
+    risks = ExecutiveIntelligenceEngine.run_risk_detection(
+        starting_cash=req.starting_cash,
+        revenue_items=req.revenue_items,
+        expense_items=req.expense_items,
+        debt_items=req.debt_items,
+        obligations=req.obligations,
+        burn_rate_monthly=req.burn_rate_monthly
+    )
+    
+    questions = ExecutiveIntelligenceEngine.generate_management_questions(
+        revenue_items=req.revenue_items,
+        expense_items=req.expense_items,
+        debt_items=req.debt_items
+    )
+    
+    narratives = await ExecutiveIntelligenceEngine.synthesize_executive_narratives(
+        starting_cash=req.starting_cash,
+        revenue_summary={"items": req.revenue_items},
+        expense_summary={"items": req.expense_items},
+        forecast_summary={"burn_rate_monthly": req.burn_rate_monthly},
+        risks=risks,
+        llm_router=llm,
+        provider=req.provider,
+        model=req.model
+    )
+    
+    return {
+        "risks": [r.model_dump() for r in risks],
+        "questions": [q.model_dump() for q in questions],
+        "narratives": narratives.model_dump()
+    }
+
+@app.post("/api/financial-os/governance", tags=["Financial OS"])
+async def run_financial_os_governance(
+    user: User = Depends(require_auth)
+):
+    from backend.governance.engine import GovernanceEngine
+    
+    approvals = GovernanceEngine.get_mock_approvals()
+    departments = GovernanceEngine.get_mock_departments()
+    vendors = GovernanceEngine.get_mock_vendors()
+    
+    risk_summary = GovernanceEngine.evaluate_vendor_risks(vendors)
+    
+    return {
+        "approvals": [a.model_dump() for a in approvals],
+        "departments": [d.model_dump() for d in departments],
+        "vendors": [v.model_dump() for v in vendors],
+        "vendor_risk_summary": risk_summary
+    }
+
+@app.post("/api/financial-os/export/excel", tags=["Financial OS"])
+async def export_financial_os_excel(
+    req: ExportExcelRequest,
+    user: User = Depends(require_auth)
+):
+    from backend.financial_engine.ppt_excel_generator import ExportGenerator
+    
+    excel_bytes = ExportGenerator.generate_excel_model(
+        starting_cash=req.starting_cash,
+        revenue_items=req.revenue_items,
+        expense_items=req.expense_items,
+        forecast_data=req.forecast_data
+    )
+    
+    return StreamingResponse(
+        io.BytesIO(excel_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=Forecasting_Model.xlsx"}
+    )
+
+@app.post("/api/financial-os/export/pptx", tags=["Financial OS"])
+async def export_financial_os_pptx(
+    req: ExportPptxRequest,
+    user: User = Depends(require_auth)
+):
+    from backend.financial_engine.ppt_excel_generator import ExportGenerator
+    from backend.intelligence.engine import FinancialRisk
+    
+    risks_parsed = [FinancialRisk(**r) for r in req.risks]
+    
+    pptx_bytes = ExportGenerator.generate_pptx_deck(
+        title_text=req.title_text,
+        board_summary=req.board_summary,
+        risks=risks_parsed,
+        forecast_data={}
+    )
+    
+    return StreamingResponse(
+        io.BytesIO(pptx_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        headers={"Content-Disposition": "attachment; filename=CFO_Board_Report.pptx"}
+    )
+

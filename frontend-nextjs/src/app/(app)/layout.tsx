@@ -26,6 +26,7 @@ import { useAuth } from "@/contexts/auth-context";
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/chat", label: "AI Assistant", icon: MessageCircle },
+  { href: "/financial-os", label: "Financial OS", icon: FileSpreadsheet },
   { href: "/workflows", label: "Business Analysis", icon: Workflow },
   { href: "/documents", label: "Documents", icon: Files },
   { href: "/reports", label: "Report Vault", icon: BookMarked },
