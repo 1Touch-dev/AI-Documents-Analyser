@@ -1,19 +1,20 @@
-# 🧠 AI Business Intelligence Platform
+# 🧠 AI Financial Operating System (Fin-OS)
 
-A production-grade, SaaS-ready platform for automated document analysis and business intelligence. Transform raw documents (PDF, Excel, Word) into actionable executive insights with a single click.
+A professional, enterprise-grade SaaS financial modeling, treasury, and FP&A operating system. Transform raw documents (PDFs, Excel models, CSV spreadsheets) into dynamic, live-recalculating forecasts, CFO risk dashboards, governance approval registries, and executive PowerPoint narrative decks with a single click.
 
 ---
 
 ## 🚀 The Product Experience
 
-This platform is designed for **Business Users**, not just engineers. It follows a simple, high-impact workflow:
+Fin-OS turns static document analysis into a workflow-driven, modeling-driven, and scenario-driven strategic asset:
 
-1.  **📂 Intelligent Ingestion**: Upload documents; AI automatically categorizes them (F&B, Ticketing, Retail, etc.).
-2.  **💬 AI Assistant**: Chat with your document knowledge base in plain English with translation and currency conversion.
-3.  **⚡ One-Click Analysis**: Run complex business intelligence workflows (Financial, Strategy, Operations) across your entire data set.
-4.  **📊 Executive Insights**: View structured summaries, key findings, risks, and actionable recommendations.
-5.  **📑 Report Vault**: Access, manage, and export your history of saved reports in JSON/CSV formats.
-6.  **🔌 MCP Orchestration**: Seamlessly integrate AI tools and workflows via the Model Context Protocol (MCP).
+1.  **📊 Financial Data Layer**: Extracts structured line items (Sponsorship, Payroll, Debt Principal, Covenants, Taxes) into a normalized financial schema using Pandas, openpyxl, and LLM structured extraction.
+2.  **🎛️ Scenario Forecasting Engine**: Supports interactive financial modeling. Adjust sliders (Sponsorship Variance, Payroll Variance, Refinancing Rate, Asset Liquidations, Collections) to see 30, 60, 90, 180 days cash flow, burn rate, liquidity runway, and EBITDA updates *live*.
+3.  **🚨 CFO Risk & Compliance Dashboard**: Automatically audits balance sheets for covenant compliance, unpaid tax exposures, operational deficits, and runway depletion risks.
+4.  **💬 Forensic Management Q&A**: Auto-generates critical forensic questions and suggested investigation paths for management.
+5.  **📝 Executive Narrative Synthesis**: Real-time generation of custom briefs for different stakeholders, including Board summaries, Investor reports, Lender summaries, and internal Management directives.
+6.  **🛡️ Governance & Accountabilities**: Manages budget approvals, department accountability (variance explanation logs), and vendor pricing auto-renew risk profiles.
+7.  **💾 High-Fidelity Exports**: One-click download of live-recalculated Excel forecasting models (`.xlsx`) and board-ready PowerPoint decks (`.pptx`).
 
 ---
 
