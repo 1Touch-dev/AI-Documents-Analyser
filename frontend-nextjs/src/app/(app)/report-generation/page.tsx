@@ -82,6 +82,53 @@ export default function ReportGenerationPage() {
     let mimeType = "text/plain";
     let extension = "txt";
 
+    const parseMarkdownToHTML = (markdown: string): string => {
+      let html = markdown;
+
+      // Escape HTML tags to prevent XSS
+      html = html
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+
+      // Replace headers
+      html = html.replace(/^# (.*?)$/gm, '<h1 class="pdf-h1">$1</h1>');
+      html = html.replace(/^## (.*?)$/gm, '<h2 class="pdf-h2">$1</h2>');
+      html = html.replace(/^### (.*?)$/gm, '<h3 class="pdf-h3">$1</h3>');
+
+      // Bold text
+      html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      html = html.replace(/__(.*?)__/g, '<strong>$1</strong>');
+
+      // Italic text
+      html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+      html = html.replace(/_(.*?)_/g, '<em>$1</em>');
+
+      // Bullet lists
+      html = html.replace(/^\s*-\s+(.*?)$/gm, '<li class="pdf-li">$1</li>');
+      html = html.replace(/^\s*\*\s+(.*?)$/gm, '<li class="pdf-li">$1</li>');
+
+      // Numbered lists
+      html = html.replace(/^\s*\d+\.\s+(.*?)$/gm, '<li class="pdf-ol-li">$1</li>');
+
+      // Blockquotes
+      html = html.replace(/^\s*>\s+(.*?)$/gm, '<blockquote class="pdf-blockquote">$1</blockquote>');
+
+      // Paragraphs
+      const lines = html.split('\n');
+      const processedLines = lines.map(line => {
+        const trimmed = line.trim();
+        if (!trimmed) return '';
+        if (trimmed.startsWith('<h') || trimmed.startsWith('<u') || trimmed.startsWith('<o') || trimmed.startsWith('<l') || trimmed.startsWith('<b') || trimmed.startsWith('</')) {
+          return line;
+        }
+        return `<p class="pdf-p">${line}</p>`;
+      });
+      html = processedLines.join('\n');
+
+      return html;
+    };
+
     if (outputFormat === "json") {
       mimeType = "application/json";
       extension = "json";
@@ -140,28 +187,121 @@ export default function ReportGenerationPage() {
         console.error(e);
       }
     } else if (outputFormat === "pdf") {
+      const compiledHTML = parseMarkdownToHTML(content);
       const printWindow = window.open("", "_blank");
       if (printWindow) {
         printWindow.document.write(`
           <html>
             <head>
               <title>${topic}</title>
+              <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
               <style>
-                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 40px; color: #1e293b; line-height: 1.6; }
-                h1 { color: #4f46e5; font-size: 28px; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; }
-                h2 { color: #0f172a; font-size: 20px; margin-top: 24px; }
-                p { margin-bottom: 16px; text-align: justify; }
-                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                th, td { border: 1px solid #cbd5e1; padding: 10px; text-align: left; }
-                th { background-color: #f1f5f9; }
+                @page {
+                  size: A4;
+                  margin: 20mm;
+                }
+                body {
+                  font-family: 'Inter', sans-serif;
+                  color: #1e293b;
+                  line-height: 1.6;
+                  font-size: 14px;
+                  background-color: #ffffff;
+                  padding: 20px;
+                }
+                .pdf-header {
+                  border-bottom: 2px solid #e2e8f0;
+                  padding-bottom: 20px;
+                  margin-bottom: 30px;
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: flex-end;
+                }
+                .pdf-title-group h1 {
+                  font-size: 24px;
+                  font-weight: 800;
+                  color: #0f172a;
+                  margin: 0 0 4px 0;
+                  letter-spacing: -0.02em;
+                }
+                .pdf-meta {
+                  font-size: 12px;
+                  color: #64748b;
+                  font-weight: 500;
+                }
+                .pdf-logo {
+                  font-size: 14px;
+                  font-weight: 700;
+                  color: #4f46e5;
+                  letter-spacing: -0.01em;
+                }
+                .pdf-h1 {
+                  font-size: 18px;
+                  font-weight: 700;
+                  color: #1e1b4b;
+                  margin-top: 28px;
+                  margin-bottom: 12px;
+                  border-bottom: 1px solid #e2e8f0;
+                  padding-bottom: 6px;
+                  page-break-after: avoid;
+                }
+                .pdf-h2 {
+                  font-size: 14px;
+                  font-weight: 700;
+                  color: #4338ca;
+                  margin-top: 22px;
+                  margin-bottom: 8px;
+                  page-break-after: avoid;
+                }
+                .pdf-h3 {
+                  font-size: 12px;
+                  font-weight: 600;
+                  color: #0f172a;
+                  margin-top: 16px;
+                  margin-bottom: 6px;
+                  page-break-after: avoid;
+                }
+                .pdf-p {
+                  margin-top: 0;
+                  margin-bottom: 12px;
+                  text-align: justify;
+                  color: #334155;
+                }
+                .pdf-li, .pdf-ol-li {
+                  margin-bottom: 4px;
+                  color: #334155;
+                  margin-left: 20px;
+                  list-style-position: outside;
+                }
+                strong {
+                  color: #0f172a;
+                  font-weight: 600;
+                }
+                .pdf-blockquote {
+                  border-left: 4px solid #4f46e5;
+                  background-color: #f8fafc;
+                  padding: 12px 16px;
+                  margin: 16px 0;
+                  border-radius: 0 8px 8px 0;
+                  font-style: italic;
+                  color: #475569;
+                }
               </style>
             </head>
             <body>
-              <h1>${topic}</h1>
-              <p><strong>Generated on:</strong> ${new Date().toLocaleDateString()}</p>
-              <div>${content.replace(/\\n/g, "<br>")}</div>
+              <div class="pdf-header">
+                <div class="pdf-title-group">
+                  <h1>${topic}</h1>
+                  <div class="pdf-meta">Generated on ${new Date().toLocaleDateString()} &middot; AI-CFO Financial Operating System</div>
+                </div>
+                <div class="pdf-logo">Fin-OS Platform</div>
+              </div>
+              <div class="pdf-content">${compiledHTML}</div>
               <script>
-                window.onload = function() { window.print(); }
+                window.onload = function() {
+                  setTimeout(function() {
+                    window.print();
+                  }, 500);
+                }
               </script>
             </body>
           </html>
@@ -170,8 +310,36 @@ export default function ReportGenerationPage() {
       }
       return;
     } else if (outputFormat === "docx") {
-      mimeType = "application/msword";
-      extension = "doc";
+      const compiledHTML = parseMarkdownToHTML(content);
+      const wordDocument = `
+        <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+          <head>
+            <title>${topic}</title>
+            <style>
+              body { font-family: Arial, sans-serif; padding: 40px; color: #1e293b; line-height: 1.6; }
+              h1 { color: #1e1b4b; font-size: 24px; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; }
+              h2 { color: #4338ca; font-size: 18px; margin-top: 24px; }
+              h3 { color: #0f172a; font-size: 14px; margin-top: 18px; }
+              p { margin-bottom: 12px; text-align: justify; }
+            </style>
+          </head>
+          <body>
+            <h1>${topic}</h1>
+            <p><strong>Generated on:</strong> ${new Date().toLocaleDateString()}</p>
+            <div>${compiledHTML}</div>
+          </body>
+        </html>
+      `;
+      const blob = new Blob([wordDocument], { type: "application/msword" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Report_${topic.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.doc`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      return;
     }
 
     const blob = new Blob([content], { type: mimeType });
