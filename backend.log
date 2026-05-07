@@ -1,1 +1,280 @@
 nohup: ignoring input
+INFO:     Started server process [1169231]
+INFO:     Waiting for application startup.
+INFO:backend.main:Starting AI Knowledge Platform …
+2026-05-07 09:12:33,169 INFO sqlalchemy.engine.Engine select pg_catalog.version()
+INFO:sqlalchemy.engine.Engine:select pg_catalog.version()
+2026-05-07 09:12:33,170 INFO sqlalchemy.engine.Engine [raw sql] {}
+INFO:sqlalchemy.engine.Engine:[raw sql] {}
+2026-05-07 09:12:33,171 INFO sqlalchemy.engine.Engine select current_schema()
+INFO:sqlalchemy.engine.Engine:select current_schema()
+2026-05-07 09:12:33,172 INFO sqlalchemy.engine.Engine [raw sql] {}
+INFO:sqlalchemy.engine.Engine:[raw sql] {}
+2026-05-07 09:12:33,172 INFO sqlalchemy.engine.Engine show standard_conforming_strings
+INFO:sqlalchemy.engine.Engine:show standard_conforming_strings
+2026-05-07 09:12:33,173 INFO sqlalchemy.engine.Engine [raw sql] {}
+INFO:sqlalchemy.engine.Engine:[raw sql] {}
+2026-05-07 09:12:33,174 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+INFO:sqlalchemy.engine.Engine:BEGIN (implicit)
+2026-05-07 09:12:33,180 INFO sqlalchemy.engine.Engine SELECT pg_catalog.pg_class.relname 
+FROM pg_catalog.pg_class JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace 
+WHERE pg_catalog.pg_class.relname = %(table_name)s AND pg_catalog.pg_class.relkind = ANY (ARRAY[%(param_1)s, %(param_2)s, %(param_3)s, %(param_4)s, %(param_5)s]) AND pg_catalog.pg_table_is_visible(pg_catalog.pg_class.oid) AND pg_catalog.pg_namespace.nspname != %(nspname_1)s
+INFO:sqlalchemy.engine.Engine:SELECT pg_catalog.pg_class.relname 
+FROM pg_catalog.pg_class JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace 
+WHERE pg_catalog.pg_class.relname = %(table_name)s AND pg_catalog.pg_class.relkind = ANY (ARRAY[%(param_1)s, %(param_2)s, %(param_3)s, %(param_4)s, %(param_5)s]) AND pg_catalog.pg_table_is_visible(pg_catalog.pg_class.oid) AND pg_catalog.pg_namespace.nspname != %(nspname_1)s
+2026-05-07 09:12:33,180 INFO sqlalchemy.engine.Engine [generated in 0.00042s] {'table_name': 'documents', 'param_1': 'r', 'param_2': 'p', 'param_3': 'f', 'param_4': 'v', 'param_5': 'm', 'nspname_1': 'pg_catalog'}
+INFO:sqlalchemy.engine.Engine:[generated in 0.00042s] {'table_name': 'documents', 'param_1': 'r', 'param_2': 'p', 'param_3': 'f', 'param_4': 'v', 'param_5': 'm', 'nspname_1': 'pg_catalog'}
+2026-05-07 09:12:33,183 INFO sqlalchemy.engine.Engine SELECT pg_catalog.pg_class.relname 
+FROM pg_catalog.pg_class JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace 
+WHERE pg_catalog.pg_class.relname = %(table_name)s AND pg_catalog.pg_class.relkind = ANY (ARRAY[%(param_1)s, %(param_2)s, %(param_3)s, %(param_4)s, %(param_5)s]) AND pg_catalog.pg_table_is_visible(pg_catalog.pg_class.oid) AND pg_catalog.pg_namespace.nspname != %(nspname_1)s
+INFO:sqlalchemy.engine.Engine:SELECT pg_catalog.pg_class.relname 
+FROM pg_catalog.pg_class JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace 
+WHERE pg_catalog.pg_class.relname = %(table_name)s AND pg_catalog.pg_class.relkind = ANY (ARRAY[%(param_1)s, %(param_2)s, %(param_3)s, %(param_4)s, %(param_5)s]) AND pg_catalog.pg_table_is_visible(pg_catalog.pg_class.oid) AND pg_catalog.pg_namespace.nspname != %(nspname_1)s
+2026-05-07 09:12:33,183 INFO sqlalchemy.engine.Engine [cached since 0.003014s ago] {'table_name': 'prompt_templates', 'param_1': 'r', 'param_2': 'p', 'param_3': 'f', 'param_4': 'v', 'param_5': 'm', 'nspname_1': 'pg_catalog'}
+INFO:sqlalchemy.engine.Engine:[cached since 0.003014s ago] {'table_name': 'prompt_templates', 'param_1': 'r', 'param_2': 'p', 'param_3': 'f', 'param_4': 'v', 'param_5': 'm', 'nspname_1': 'pg_catalog'}
+2026-05-07 09:12:33,184 INFO sqlalchemy.engine.Engine SELECT pg_catalog.pg_class.relname 
+FROM pg_catalog.pg_class JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace 
+WHERE pg_catalog.pg_class.relname = %(table_name)s AND pg_catalog.pg_class.relkind = ANY (ARRAY[%(param_1)s, %(param_2)s, %(param_3)s, %(param_4)s, %(param_5)s]) AND pg_catalog.pg_table_is_visible(pg_catalog.pg_class.oid) AND pg_catalog.pg_namespace.nspname != %(nspname_1)s
+INFO:sqlalchemy.engine.Engine:SELECT pg_catalog.pg_class.relname 
+FROM pg_catalog.pg_class JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace 
+WHERE pg_catalog.pg_class.relname = %(table_name)s AND pg_catalog.pg_class.relkind = ANY (ARRAY[%(param_1)s, %(param_2)s, %(param_3)s, %(param_4)s, %(param_5)s]) AND pg_catalog.pg_table_is_visible(pg_catalog.pg_class.oid) AND pg_catalog.pg_namespace.nspname != %(nspname_1)s
+2026-05-07 09:12:33,184 INFO sqlalchemy.engine.Engine [cached since 0.004284s ago] {'table_name': 'conversations', 'param_1': 'r', 'param_2': 'p', 'param_3': 'f', 'param_4': 'v', 'param_5': 'm', 'nspname_1': 'pg_catalog'}
+INFO:sqlalchemy.engine.Engine:[cached since 0.004284s ago] {'table_name': 'conversations', 'param_1': 'r', 'param_2': 'p', 'param_3': 'f', 'param_4': 'v', 'param_5': 'm', 'nspname_1': 'pg_catalog'}
+2026-05-07 09:12:33,185 INFO sqlalchemy.engine.Engine SELECT pg_catalog.pg_class.relname 
+FROM pg_catalog.pg_class JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace 
+WHERE pg_catalog.pg_class.relname = %(table_name)s AND pg_catalog.pg_class.relkind = ANY (ARRAY[%(param_1)s, %(param_2)s, %(param_3)s, %(param_4)s, %(param_5)s]) AND pg_catalog.pg_table_is_visible(pg_catalog.pg_class.oid) AND pg_catalog.pg_namespace.nspname != %(nspname_1)s
+INFO:sqlalchemy.engine.Engine:SELECT pg_catalog.pg_class.relname 
+FROM pg_catalog.pg_class JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace 
+WHERE pg_catalog.pg_class.relname = %(table_name)s AND pg_catalog.pg_class.relkind = ANY (ARRAY[%(param_1)s, %(param_2)s, %(param_3)s, %(param_4)s, %(param_5)s]) AND pg_catalog.pg_table_is_visible(pg_catalog.pg_class.oid) AND pg_catalog.pg_namespace.nspname != %(nspname_1)s
+2026-05-07 09:12:33,185 INFO sqlalchemy.engine.Engine [cached since 0.00545s ago] {'table_name': 'users', 'param_1': 'r', 'param_2': 'p', 'param_3': 'f', 'param_4': 'v', 'param_5': 'm', 'nspname_1': 'pg_catalog'}
+INFO:sqlalchemy.engine.Engine:[cached since 0.00545s ago] {'table_name': 'users', 'param_1': 'r', 'param_2': 'p', 'param_3': 'f', 'param_4': 'v', 'param_5': 'm', 'nspname_1': 'pg_catalog'}
+2026-05-07 09:12:33,186 INFO sqlalchemy.engine.Engine SELECT pg_catalog.pg_class.relname 
+FROM pg_catalog.pg_class JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace 
+WHERE pg_catalog.pg_class.relname = %(table_name)s AND pg_catalog.pg_class.relkind = ANY (ARRAY[%(param_1)s, %(param_2)s, %(param_3)s, %(param_4)s, %(param_5)s]) AND pg_catalog.pg_table_is_visible(pg_catalog.pg_class.oid) AND pg_catalog.pg_namespace.nspname != %(nspname_1)s
+INFO:sqlalchemy.engine.Engine:SELECT pg_catalog.pg_class.relname 
+FROM pg_catalog.pg_class JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace 
+WHERE pg_catalog.pg_class.relname = %(table_name)s AND pg_catalog.pg_class.relkind = ANY (ARRAY[%(param_1)s, %(param_2)s, %(param_3)s, %(param_4)s, %(param_5)s]) AND pg_catalog.pg_table_is_visible(pg_catalog.pg_class.oid) AND pg_catalog.pg_namespace.nspname != %(nspname_1)s
+2026-05-07 09:12:33,186 INFO sqlalchemy.engine.Engine [cached since 0.006628s ago] {'table_name': 'llm_usage', 'param_1': 'r', 'param_2': 'p', 'param_3': 'f', 'param_4': 'v', 'param_5': 'm', 'nspname_1': 'pg_catalog'}
+INFO:sqlalchemy.engine.Engine:[cached since 0.006628s ago] {'table_name': 'llm_usage', 'param_1': 'r', 'param_2': 'p', 'param_3': 'f', 'param_4': 'v', 'param_5': 'm', 'nspname_1': 'pg_catalog'}
+2026-05-07 09:12:33,187 INFO sqlalchemy.engine.Engine SELECT pg_catalog.pg_class.relname 
+FROM pg_catalog.pg_class JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace 
+WHERE pg_catalog.pg_class.relname = %(table_name)s AND pg_catalog.pg_class.relkind = ANY (ARRAY[%(param_1)s, %(param_2)s, %(param_3)s, %(param_4)s, %(param_5)s]) AND pg_catalog.pg_table_is_visible(pg_catalog.pg_class.oid) AND pg_catalog.pg_namespace.nspname != %(nspname_1)s
+INFO:sqlalchemy.engine.Engine:SELECT pg_catalog.pg_class.relname 
+FROM pg_catalog.pg_class JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace 
+WHERE pg_catalog.pg_class.relname = %(table_name)s AND pg_catalog.pg_class.relkind = ANY (ARRAY[%(param_1)s, %(param_2)s, %(param_3)s, %(param_4)s, %(param_5)s]) AND pg_catalog.pg_table_is_visible(pg_catalog.pg_class.oid) AND pg_catalog.pg_namespace.nspname != %(nspname_1)s
+2026-05-07 09:12:33,188 INFO sqlalchemy.engine.Engine [cached since 0.007771s ago] {'table_name': 'saved_reports', 'param_1': 'r', 'param_2': 'p', 'param_3': 'f', 'param_4': 'v', 'param_5': 'm', 'nspname_1': 'pg_catalog'}
+INFO:sqlalchemy.engine.Engine:[cached since 0.007771s ago] {'table_name': 'saved_reports', 'param_1': 'r', 'param_2': 'p', 'param_3': 'f', 'param_4': 'v', 'param_5': 'm', 'nspname_1': 'pg_catalog'}
+2026-05-07 09:12:33,188 INFO sqlalchemy.engine.Engine SELECT pg_catalog.pg_class.relname 
+FROM pg_catalog.pg_class JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace 
+WHERE pg_catalog.pg_class.relname = %(table_name)s AND pg_catalog.pg_class.relkind = ANY (ARRAY[%(param_1)s, %(param_2)s, %(param_3)s, %(param_4)s, %(param_5)s]) AND pg_catalog.pg_table_is_visible(pg_catalog.pg_class.oid) AND pg_catalog.pg_namespace.nspname != %(nspname_1)s
+INFO:sqlalchemy.engine.Engine:SELECT pg_catalog.pg_class.relname 
+FROM pg_catalog.pg_class JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace 
+WHERE pg_catalog.pg_class.relname = %(table_name)s AND pg_catalog.pg_class.relkind = ANY (ARRAY[%(param_1)s, %(param_2)s, %(param_3)s, %(param_4)s, %(param_5)s]) AND pg_catalog.pg_table_is_visible(pg_catalog.pg_class.oid) AND pg_catalog.pg_namespace.nspname != %(nspname_1)s
+2026-05-07 09:12:33,189 INFO sqlalchemy.engine.Engine [cached since 0.008845s ago] {'table_name': 'audit_logs', 'param_1': 'r', 'param_2': 'p', 'param_3': 'f', 'param_4': 'v', 'param_5': 'm', 'nspname_1': 'pg_catalog'}
+INFO:sqlalchemy.engine.Engine:[cached since 0.008845s ago] {'table_name': 'audit_logs', 'param_1': 'r', 'param_2': 'p', 'param_3': 'f', 'param_4': 'v', 'param_5': 'm', 'nspname_1': 'pg_catalog'}
+2026-05-07 09:12:33,192 INFO sqlalchemy.engine.Engine SELECT pg_catalog.pg_type.typname 
+FROM pg_catalog.pg_type JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_type.typnamespace 
+WHERE pg_catalog.pg_type.typname = %(typname_1)s AND pg_catalog.pg_type_is_visible(pg_catalog.pg_type.oid) AND pg_catalog.pg_namespace.nspname != %(nspname_1)s
+INFO:sqlalchemy.engine.Engine:SELECT pg_catalog.pg_type.typname 
+FROM pg_catalog.pg_type JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_type.typnamespace 
+WHERE pg_catalog.pg_type.typname = %(typname_1)s AND pg_catalog.pg_type_is_visible(pg_catalog.pg_type.oid) AND pg_catalog.pg_namespace.nspname != %(nspname_1)s
+2026-05-07 09:12:33,192 INFO sqlalchemy.engine.Engine [generated in 0.00034s] {'typname_1': 'doc_status', 'nspname_1': 'pg_catalog'}
+INFO:sqlalchemy.engine.Engine:[generated in 0.00034s] {'typname_1': 'doc_status', 'nspname_1': 'pg_catalog'}
+2026-05-07 09:12:33,193 INFO sqlalchemy.engine.Engine COMMIT
+INFO:sqlalchemy.engine.Engine:COMMIT
+INFO:backend.main:Database tables ensured.
+2026-05-07 09:12:33,202 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+INFO:sqlalchemy.engine.Engine:BEGIN (implicit)
+2026-05-07 09:12:33,205 INFO sqlalchemy.engine.Engine SELECT prompt_templates.id AS prompt_templates_id, prompt_templates.name AS prompt_templates_name, prompt_templates.category AS prompt_templates_category, prompt_templates.template AS prompt_templates_template, prompt_templates.description AS prompt_templates_description, prompt_templates.created_at AS prompt_templates_created_at 
+FROM prompt_templates 
+WHERE prompt_templates.name = %(name_1)s 
+ LIMIT %(param_1)s
+INFO:sqlalchemy.engine.Engine:SELECT prompt_templates.id AS prompt_templates_id, prompt_templates.name AS prompt_templates_name, prompt_templates.category AS prompt_templates_category, prompt_templates.template AS prompt_templates_template, prompt_templates.description AS prompt_templates_description, prompt_templates.created_at AS prompt_templates_created_at 
+FROM prompt_templates 
+WHERE prompt_templates.name = %(name_1)s 
+ LIMIT %(param_1)s
+2026-05-07 09:12:33,205 INFO sqlalchemy.engine.Engine [generated in 0.00048s] {'name_1': 'Default RAG', 'param_1': 1}
+INFO:sqlalchemy.engine.Engine:[generated in 0.00048s] {'name_1': 'Default RAG', 'param_1': 1}
+2026-05-07 09:12:33,208 INFO sqlalchemy.engine.Engine SELECT prompt_templates.id AS prompt_templates_id, prompt_templates.name AS prompt_templates_name, prompt_templates.category AS prompt_templates_category, prompt_templates.template AS prompt_templates_template, prompt_templates.description AS prompt_templates_description, prompt_templates.created_at AS prompt_templates_created_at 
+FROM prompt_templates 
+WHERE prompt_templates.name = %(name_1)s 
+ LIMIT %(param_1)s
+INFO:sqlalchemy.engine.Engine:SELECT prompt_templates.id AS prompt_templates_id, prompt_templates.name AS prompt_templates_name, prompt_templates.category AS prompt_templates_category, prompt_templates.template AS prompt_templates_template, prompt_templates.description AS prompt_templates_description, prompt_templates.created_at AS prompt_templates_created_at 
+FROM prompt_templates 
+WHERE prompt_templates.name = %(name_1)s 
+ LIMIT %(param_1)s
+2026-05-07 09:12:33,208 INFO sqlalchemy.engine.Engine [cached since 0.003426s ago] {'name_1': 'Executive Summary', 'param_1': 1}
+INFO:sqlalchemy.engine.Engine:[cached since 0.003426s ago] {'name_1': 'Executive Summary', 'param_1': 1}
+2026-05-07 09:12:33,210 INFO sqlalchemy.engine.Engine SELECT prompt_templates.id AS prompt_templates_id, prompt_templates.name AS prompt_templates_name, prompt_templates.category AS prompt_templates_category, prompt_templates.template AS prompt_templates_template, prompt_templates.description AS prompt_templates_description, prompt_templates.created_at AS prompt_templates_created_at 
+FROM prompt_templates 
+WHERE prompt_templates.name = %(name_1)s 
+ LIMIT %(param_1)s
+INFO:sqlalchemy.engine.Engine:SELECT prompt_templates.id AS prompt_templates_id, prompt_templates.name AS prompt_templates_name, prompt_templates.category AS prompt_templates_category, prompt_templates.template AS prompt_templates_template, prompt_templates.description AS prompt_templates_description, prompt_templates.created_at AS prompt_templates_created_at 
+FROM prompt_templates 
+WHERE prompt_templates.name = %(name_1)s 
+ LIMIT %(param_1)s
+2026-05-07 09:12:33,210 INFO sqlalchemy.engine.Engine [cached since 0.005186s ago] {'name_1': 'Comparative Analysis', 'param_1': 1}
+INFO:sqlalchemy.engine.Engine:[cached since 0.005186s ago] {'name_1': 'Comparative Analysis', 'param_1': 1}
+2026-05-07 09:12:33,211 INFO sqlalchemy.engine.Engine SELECT prompt_templates.id AS prompt_templates_id, prompt_templates.name AS prompt_templates_name, prompt_templates.category AS prompt_templates_category, prompt_templates.template AS prompt_templates_template, prompt_templates.description AS prompt_templates_description, prompt_templates.created_at AS prompt_templates_created_at 
+FROM prompt_templates 
+WHERE prompt_templates.name = %(name_1)s 
+ LIMIT %(param_1)s
+INFO:sqlalchemy.engine.Engine:SELECT prompt_templates.id AS prompt_templates_id, prompt_templates.name AS prompt_templates_name, prompt_templates.category AS prompt_templates_category, prompt_templates.template AS prompt_templates_template, prompt_templates.description AS prompt_templates_description, prompt_templates.created_at AS prompt_templates_created_at 
+FROM prompt_templates 
+WHERE prompt_templates.name = %(name_1)s 
+ LIMIT %(param_1)s
+2026-05-07 09:12:33,211 INFO sqlalchemy.engine.Engine [cached since 0.006517s ago] {'name_1': 'Data Extraction', 'param_1': 1}
+INFO:sqlalchemy.engine.Engine:[cached since 0.006517s ago] {'name_1': 'Data Extraction', 'param_1': 1}
+2026-05-07 09:12:33,212 INFO sqlalchemy.engine.Engine COMMIT
+INFO:sqlalchemy.engine.Engine:COMMIT
+INFO:backend.prompt_manager:Default prompt templates seeded.
+INFO:backend.embeddings:Loading embedding model: BAAI/bge-base-en-v1.5
+INFO:sentence_transformers.SentenceTransformer:Use pytorch device_name: cpu
+INFO:sentence_transformers.SentenceTransformer:Load pretrained SentenceTransformer: BAAI/bge-base-en-v1.5
+INFO:backend.embeddings:Embedding dimension: 768
+[0;93m2026-05-07 09:12:35.792688262 [W:onnxruntime:Default, device_discovery.cc:211 DiscoverDevicesForPlatform] GPU device discovery failed: device_discovery.cc:91 ReadFileContents Failed to open file: "/sys/class/drm/card0/device/vendor"[m
+ERROR:chromadb.telemetry.product.posthog:Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+ERROR:chromadb.telemetry.product.posthog:Failed to send telemetry event ClientCreateCollectionEvent: capture() takes 1 positional argument but 3 were given
+INFO:backend.vector_store:ChromaDB collection 'documents' ready (898 items)
+INFO:backend.main:Services pre-warmed: embedding model loaded and ready.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+catalog.version()
+2026-05-07 09:12:36,585 INFO sqlalchemy.engine.Engine [raw sql] {}
+INFO:sqlalchemy.engine.Engine:[raw sql] {}
+2026-05-07 09:12:36,586 INFO sqlalchemy.engine.Engine select current_schema()
+INFO:sqlalchemy.engine.Engine:select current_schema()
+2026-05-07 09:12:36,586 INFO sqlalchemy.engine.Engine [raw sql] {}
+INFO:sqlalchemy.engine.Engine:[raw sql] {}
+2026-05-07 09:12:36,587 INFO sqlalchemy.engine.Engine show standard_conforming_strings
+INFO:sqlalchemy.engine.Engine:show standard_conforming_strings
+2026-05-07 09:12:36,587 INFO sqlalchemy.engine.Engine [raw sql] {}
+INFO:sqlalchemy.engine.Engine:[raw sql] {}
+2026-05-07 09:12:36,588 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+INFO:sqlalchemy.engine.Engine:BEGIN (implicit)
+2026-05-07 09:12:36,594 INFO sqlalchemy.engine.Engine SELECT pg_catalog.pg_class.relname 
+FROM pg_catalog.pg_class JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace 
+WHERE pg_catalog.pg_class.relname = %(table_name)s AND pg_catalog.pg_class.relkind = ANY (ARRAY[%(param_1)s, %(param_2)s, %(param_3)s, %(param_4)s, %(param_5)s]) AND pg_catalog.pg_table_is_visible(pg_catalog.pg_class.oid) AND pg_catalog.pg_namespace.nspname != %(nspname_1)s
+INFO:sqlalchemy.engine.Engine:SELECT pg_catalog.pg_class.relname 
+FROM pg_catalog.pg_class JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace 
+WHERE pg_catalog.pg_class.relname = %(table_name)s AND pg_catalog.pg_class.relkind = ANY (ARRAY[%(param_1)s, %(param_2)s, %(param_3)s, %(param_4)s, %(param_5)s]) AND pg_catalog.pg_table_is_visible(pg_catalog.pg_class.oid) AND pg_catalog.pg_namespace.nspname != %(nspname_1)s
+2026-05-07 09:12:36,594 INFO sqlalchemy.engine.Engine [generated in 0.00032s] {'table_name': 'documents', 'param_1': 'r', 'param_2': 'p', 'param_3': 'f', 'param_4': 'v', 'param_5': 'm', 'nspname_1': 'pg_catalog'}
+INFO:sqlalchemy.engine.Engine:[generated in 0.00032s] {'table_name': 'documents', 'param_1': 'r', 'param_2': 'p', 'param_3': 'f', 'param_4': 'v', 'param_5': 'm', 'nspname_1': 'pg_catalog'}
+2026-05-07 09:12:36,596 INFO sqlalchemy.engine.Engine SELECT pg_catalog.pg_class.relname 
+FROM pg_catalog.pg_class JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace 
+WHERE pg_catalog.pg_class.relname = %(table_name)s AND pg_catalog.pg_class.relkind = ANY (ARRAY[%(param_1)s, %(param_2)s, %(param_3)s, %(param_4)s, %(param_5)s]) AND pg_catalog.pg_table_is_visible(pg_catalog.pg_class.oid) AND pg_catalog.pg_namespace.nspname != %(nspname_1)s
+INFO:sqlalchemy.engine.Engine:SELECT pg_catalog.pg_class.relname 
+FROM pg_catalog.pg_class JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace 
+WHERE pg_catalog.pg_class.relname = %(table_name)s AND pg_catalog.pg_class.relkind = ANY (ARRAY[%(param_1)s, %(param_2)s, %(param_3)s, %(param_4)s, %(param_5)s]) AND pg_catalog.pg_table_is_visible(pg_catalog.pg_class.oid) AND pg_catalog.pg_namespace.nspname != %(nspname_1)s
+2026-05-07 09:12:36,597 INFO sqlalchemy.engine.Engine [cached since 0.002792s ago] {'table_name': 'prompt_templates', 'param_1': 'r', 'param_2': 'p', 'param_3': 'f', 'param_4': 'v', 'param_5': 'm', 'nspname_1': 'pg_catalog'}
+INFO:sqlalchemy.engine.Engine:[cached since 0.002792s ago] {'table_name': 'prompt_templates', 'param_1': 'r', 'param_2': 'p', 'param_3': 'f', 'param_4': 'v', 'param_5': 'm', 'nspname_1': 'pg_catalog'}
+2026-05-07 09:12:36,597 INFO sqlalchemy.engine.Engine SELECT pg_catalog.pg_class.relname 
+FROM pg_catalog.pg_class JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace 
+WHERE pg_catalog.pg_class.relname = %(table_name)s AND pg_catalog.pg_class.relkind = ANY (ARRAY[%(param_1)s, %(param_2)s, %(param_3)s, %(param_4)s, %(param_5)s]) AND pg_catalog.pg_table_is_visible(pg_catalog.pg_class.oid) AND pg_catalog.pg_namespace.nspname != %(nspname_1)s
+INFO:sqlalchemy.engine.Engine:SELECT pg_catalog.pg_class.relname 
+FROM pg_catalog.pg_class JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace 
+WHERE pg_catalog.pg_class.relname = %(table_name)s AND pg_catalog.pg_class.relkind = ANY (ARRAY[%(param_1)s, %(param_2)s, %(param_3)s, %(param_4)s, %(param_5)s]) AND pg_catalog.pg_table_is_visible(pg_catalog.pg_class.oid) AND pg_catalog.pg_namespace.nspname != %(nspname_1)s
+2026-05-07 09:12:36,598 INFO sqlalchemy.engine.Engine [cached since 0.003894s ago] {'table_name': 'conversations', 'param_1': 'r', 'param_2': 'p', 'param_3': 'f', 'param_4': 'v', 'param_5': 'm', 'nspname_1': 'pg_catalog'}
+INFO:sqlalchemy.engine.Engine:[cached since 0.003894s ago] {'table_name': 'conversations', 'param_1': 'r', 'param_2': 'p', 'param_3': 'f', 'param_4': 'v', 'param_5': 'm', 'nspname_1': 'pg_catalog'}
+2026-05-07 09:12:36,598 INFO sqlalchemy.engine.Engine SELECT pg_catalog.pg_class.relname 
+FROM pg_catalog.pg_class JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace 
+WHERE pg_catalog.pg_class.relname = %(table_name)s AND pg_catalog.pg_class.relkind = ANY (ARRAY[%(param_1)s, %(param_2)s, %(param_3)s, %(param_4)s, %(param_5)s]) AND pg_catalog.pg_table_is_visible(pg_catalog.pg_class.oid) AND pg_catalog.pg_namespace.nspname != %(nspname_1)s
+INFO:sqlalchemy.engine.Engine:SELECT pg_catalog.pg_class.relname 
+FROM pg_catalog.pg_class JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace 
+WHERE pg_catalog.pg_class.relname = %(table_name)s AND pg_catalog.pg_class.relkind = ANY (ARRAY[%(param_1)s, %(param_2)s, %(param_3)s, %(param_4)s, %(param_5)s]) AND pg_catalog.pg_table_is_visible(pg_catalog.pg_class.oid) AND pg_catalog.pg_namespace.nspname != %(nspname_1)s
+2026-05-07 09:12:36,599 INFO sqlalchemy.engine.Engine [cached since 0.004811s ago] {'table_name': 'users', 'param_1': 'r', 'param_2': 'p', 'param_3': 'f', 'param_4': 'v', 'param_5': 'm', 'nspname_1': 'pg_catalog'}
+INFO:sqlalchemy.engine.Engine:[cached since 0.004811s ago] {'table_name': 'users', 'param_1': 'r', 'param_2': 'p', 'param_3': 'f', 'param_4': 'v', 'param_5': 'm', 'nspname_1': 'pg_catalog'}
+2026-05-07 09:12:36,599 INFO sqlalchemy.engine.Engine SELECT pg_catalog.pg_class.relname 
+FROM pg_catalog.pg_class JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace 
+WHERE pg_catalog.pg_class.relname = %(table_name)s AND pg_catalog.pg_class.relkind = ANY (ARRAY[%(param_1)s, %(param_2)s, %(param_3)s, %(param_4)s, %(param_5)s]) AND pg_catalog.pg_table_is_visible(pg_catalog.pg_class.oid) AND pg_catalog.pg_namespace.nspname != %(nspname_1)s
+INFO:sqlalchemy.engine.Engine:SELECT pg_catalog.pg_class.relname 
+FROM pg_catalog.pg_class JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace 
+WHERE pg_catalog.pg_class.relname = %(table_name)s AND pg_catalog.pg_class.relkind = ANY (ARRAY[%(param_1)s, %(param_2)s, %(param_3)s, %(param_4)s, %(param_5)s]) AND pg_catalog.pg_table_is_visible(pg_catalog.pg_class.oid) AND pg_catalog.pg_namespace.nspname != %(nspname_1)s
+2026-05-07 09:12:36,599 INFO sqlalchemy.engine.Engine [cached since 0.005648s ago] {'table_name': 'llm_usage', 'param_1': 'r', 'param_2': 'p', 'param_3': 'f', 'param_4': 'v', 'param_5': 'm', 'nspname_1': 'pg_catalog'}
+INFO:sqlalchemy.engine.Engine:[cached since 0.005648s ago] {'table_name': 'llm_usage', 'param_1': 'r', 'param_2': 'p', 'param_3': 'f', 'param_4': 'v', 'param_5': 'm', 'nspname_1': 'pg_catalog'}
+2026-05-07 09:12:36,600 INFO sqlalchemy.engine.Engine SELECT pg_catalog.pg_class.relname 
+FROM pg_catalog.pg_class JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace 
+WHERE pg_catalog.pg_class.relname = %(table_name)s AND pg_catalog.pg_class.relkind = ANY (ARRAY[%(param_1)s, %(param_2)s, %(param_3)s, %(param_4)s, %(param_5)s]) AND pg_catalog.pg_table_is_visible(pg_catalog.pg_class.oid) AND pg_catalog.pg_namespace.nspname != %(nspname_1)s
+INFO:sqlalchemy.engine.Engine:SELECT pg_catalog.pg_class.relname 
+FROM pg_catalog.pg_class JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace 
+WHERE pg_catalog.pg_class.relname = %(table_name)s AND pg_catalog.pg_class.relkind = ANY (ARRAY[%(param_1)s, %(param_2)s, %(param_3)s, %(param_4)s, %(param_5)s]) AND pg_catalog.pg_table_is_visible(pg_catalog.pg_class.oid) AND pg_catalog.pg_namespace.nspname != %(nspname_1)s
+2026-05-07 09:12:36,600 INFO sqlalchemy.engine.Engine [cached since 0.006476s ago] {'table_name': 'saved_reports', 'param_1': 'r', 'param_2': 'p', 'param_3': 'f', 'param_4': 'v', 'param_5': 'm', 'nspname_1': 'pg_catalog'}
+INFO:sqlalchemy.engine.Engine:[cached since 0.006476s ago] {'table_name': 'saved_reports', 'param_1': 'r', 'param_2': 'p', 'param_3': 'f', 'param_4': 'v', 'param_5': 'm', 'nspname_1': 'pg_catalog'}
+2026-05-07 09:12:36,601 INFO sqlalchemy.engine.Engine SELECT pg_catalog.pg_class.relname 
+FROM pg_catalog.pg_class JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace 
+WHERE pg_catalog.pg_class.relname = %(table_name)s AND pg_catalog.pg_class.relkind = ANY (ARRAY[%(param_1)s, %(param_2)s, %(param_3)s, %(param_4)s, %(param_5)s]) AND pg_catalog.pg_table_is_visible(pg_catalog.pg_class.oid) AND pg_catalog.pg_namespace.nspname != %(nspname_1)s
+INFO:sqlalchemy.engine.Engine:SELECT pg_catalog.pg_class.relname 
+FROM pg_catalog.pg_class JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace 
+WHERE pg_catalog.pg_class.relname = %(table_name)s AND pg_catalog.pg_class.relkind = ANY (ARRAY[%(param_1)s, %(param_2)s, %(param_3)s, %(param_4)s, %(param_5)s]) AND pg_catalog.pg_table_is_visible(pg_catalog.pg_class.oid) AND pg_catalog.pg_namespace.nspname != %(nspname_1)s
+2026-05-07 09:12:36,601 INFO sqlalchemy.engine.Engine [cached since 0.007303s ago] {'table_name': 'audit_logs', 'param_1': 'r', 'param_2': 'p', 'param_3': 'f', 'param_4': 'v', 'param_5': 'm', 'nspname_1': 'pg_catalog'}
+INFO:sqlalchemy.engine.Engine:[cached since 0.007303s ago] {'table_name': 'audit_logs', 'param_1': 'r', 'param_2': 'p', 'param_3': 'f', 'param_4': 'v', 'param_5': 'm', 'nspname_1': 'pg_catalog'}
+2026-05-07 09:12:36,604 INFO sqlalchemy.engine.Engine SELECT pg_catalog.pg_type.typname 
+FROM pg_catalog.pg_type JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_type.typnamespace 
+WHERE pg_catalog.pg_type.typname = %(typname_1)s AND pg_catalog.pg_type_is_visible(pg_catalog.pg_type.oid) AND pg_catalog.pg_namespace.nspname != %(nspname_1)s
+INFO:sqlalchemy.engine.Engine:SELECT pg_catalog.pg_type.typname 
+FROM pg_catalog.pg_type JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_type.typnamespace 
+WHERE pg_catalog.pg_type.typname = %(typname_1)s AND pg_catalog.pg_type_is_visible(pg_catalog.pg_type.oid) AND pg_catalog.pg_namespace.nspname != %(nspname_1)s
+2026-05-07 09:12:36,604 INFO sqlalchemy.engine.Engine [generated in 0.00025s] {'typname_1': 'doc_status', 'nspname_1': 'pg_catalog'}
+INFO:sqlalchemy.engine.Engine:[generated in 0.00025s] {'typname_1': 'doc_status', 'nspname_1': 'pg_catalog'}
+2026-05-07 09:12:36,605 INFO sqlalchemy.engine.Engine COMMIT
+INFO:sqlalchemy.engine.Engine:COMMIT
+INFO:backend.main:Database tables ensured.
+2026-05-07 09:12:36,613 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+INFO:sqlalchemy.engine.Engine:BEGIN (implicit)
+2026-05-07 09:12:36,616 INFO sqlalchemy.engine.Engine SELECT prompt_templates.id AS prompt_templates_id, prompt_templates.name AS prompt_templates_name, prompt_templates.category AS prompt_templates_category, prompt_templates.template AS prompt_templates_template, prompt_templates.description AS prompt_templates_description, prompt_templates.created_at AS prompt_templates_created_at 
+FROM prompt_templates 
+WHERE prompt_templates.name = %(name_1)s 
+ LIMIT %(param_1)s
+INFO:sqlalchemy.engine.Engine:SELECT prompt_templates.id AS prompt_templates_id, prompt_templates.name AS prompt_templates_name, prompt_templates.category AS prompt_templates_category, prompt_templates.template AS prompt_templates_template, prompt_templates.description AS prompt_templates_description, prompt_templates.created_at AS prompt_templates_created_at 
+FROM prompt_templates 
+WHERE prompt_templates.name = %(name_1)s 
+ LIMIT %(param_1)s
+2026-05-07 09:12:36,616 INFO sqlalchemy.engine.Engine [generated in 0.00034s] {'name_1': 'Default RAG', 'param_1': 1}
+INFO:sqlalchemy.engine.Engine:[generated in 0.00034s] {'name_1': 'Default RAG', 'param_1': 1}
+2026-05-07 09:12:36,619 INFO sqlalchemy.engine.Engine SELECT prompt_templates.id AS prompt_templates_id, prompt_templates.name AS prompt_templates_name, prompt_templates.category AS prompt_templates_category, prompt_templates.template AS prompt_templates_template, prompt_templates.description AS prompt_templates_description, prompt_templates.created_at AS prompt_templates_created_at 
+FROM prompt_templates 
+WHERE prompt_templates.name = %(name_1)s 
+ LIMIT %(param_1)s
+INFO:sqlalchemy.engine.Engine:SELECT prompt_templates.id AS prompt_templates_id, prompt_templates.name AS prompt_templates_name, prompt_templates.category AS prompt_templates_category, prompt_templates.template AS prompt_templates_template, prompt_templates.description AS prompt_templates_description, prompt_templates.created_at AS prompt_templates_created_at 
+FROM prompt_templates 
+WHERE prompt_templates.name = %(name_1)s 
+ LIMIT %(param_1)s
+2026-05-07 09:12:36,619 INFO sqlalchemy.engine.Engine [cached since 0.002976s ago] {'name_1': 'Executive Summary', 'param_1': 1}
+INFO:sqlalchemy.engine.Engine:[cached since 0.002976s ago] {'name_1': 'Executive Summary', 'param_1': 1}
+2026-05-07 09:12:36,620 INFO sqlalchemy.engine.Engine SELECT prompt_templates.id AS prompt_templates_id, prompt_templates.name AS prompt_templates_name, prompt_templates.category AS prompt_templates_category, prompt_templates.template AS prompt_templates_template, prompt_templates.description AS prompt_templates_description, prompt_templates.created_at AS prompt_templates_created_at 
+FROM prompt_templates 
+WHERE prompt_templates.name = %(name_1)s 
+ LIMIT %(param_1)s
+INFO:sqlalchemy.engine.Engine:SELECT prompt_templates.id AS prompt_templates_id, prompt_templates.name AS prompt_templates_name, prompt_templates.category AS prompt_templates_category, prompt_templates.template AS prompt_templates_template, prompt_templates.description AS prompt_templates_description, prompt_templates.created_at AS prompt_templates_created_at 
+FROM prompt_templates 
+WHERE prompt_templates.name = %(name_1)s 
+ LIMIT %(param_1)s
+2026-05-07 09:12:36,621 INFO sqlalchemy.engine.Engine [cached since 0.004444s ago] {'name_1': 'Comparative Analysis', 'param_1': 1}
+INFO:sqlalchemy.engine.Engine:[cached since 0.004444s ago] {'name_1': 'Comparative Analysis', 'param_1': 1}
+2026-05-07 09:12:36,622 INFO sqlalchemy.engine.Engine SELECT prompt_templates.id AS prompt_templates_id, prompt_templates.name AS prompt_templates_name, prompt_templates.category AS prompt_templates_category, prompt_templates.template AS prompt_templates_template, prompt_templates.description AS prompt_templates_description, prompt_templates.created_at AS prompt_templates_created_at 
+FROM prompt_templates 
+WHERE prompt_templates.name = %(name_1)s 
+ LIMIT %(param_1)s
+INFO:sqlalchemy.engine.Engine:SELECT prompt_templates.id AS prompt_templates_id, prompt_templates.name AS prompt_templates_name, prompt_templates.category AS prompt_templates_category, prompt_templates.template AS prompt_templates_template, prompt_templates.description AS prompt_templates_description, prompt_templates.created_at AS prompt_templates_created_at 
+FROM prompt_templates 
+WHERE prompt_templates.name = %(name_1)s 
+ LIMIT %(param_1)s
+2026-05-07 09:12:36,622 INFO sqlalchemy.engine.Engine [cached since 0.005725s ago] {'name_1': 'Data Extraction', 'param_1': 1}
+INFO:sqlalchemy.engine.Engine:[cached since 0.005725s ago] {'name_1': 'Data Extraction', 'param_1': 1}
+2026-05-07 09:12:36,622 INFO sqlalchemy.engine.Engine COMMIT
+INFO:sqlalchemy.engine.Engine:COMMIT
+INFO:backend.prompt_manager:Default prompt templates seeded.
+INFO:backend.embeddings:Loading embedding model: BAAI/bge-base-en-v1.5
+INFO:sentence_transformers.SentenceTransformer:Use pytorch device_name: cpu
+INFO:sentence_transformers.SentenceTransformer:Load pretrained SentenceTransformer: BAAI/bge-base-en-v1.5
+INFO:backend.embeddings:Embedding dimension: 768
+[0;93m2026-05-07 09:12:38.016970421 [W:onnxruntime:Default, device_discovery.cc:211 DiscoverDevicesForPlatform] GPU device discovery failed: device_discovery.cc:91 ReadFileContents Failed to open file: "/sys/class/drm/card0/device/vendor"[m
+ERROR:chromadb.telemetry.product.posthog:Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+ERROR:chromadb.telemetry.product.posthog:Failed to send telemetry event ClientCreateCollectionEvent: capture() takes 1 positional argument but 3 were given
+INFO:backend.vector_store:ChromaDB collection 'documents' ready (898 items)
+INFO:backend.main:Services pre-warmed: embedding model loaded and ready.
+INFO:     Application startup complete.
+ERROR:    [Errno 98] error while attempting to bind on address ('0.0.0.0', 8000): address already in use
+INFO:     Waiting for application shutdown.
+INFO:backend.main:Shutdown complete.
+INFO:     Application shutdown complete.

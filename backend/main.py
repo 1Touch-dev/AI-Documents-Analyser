@@ -2521,3 +2521,88 @@ async def export_financial_os_pptx(
         headers={"Content-Disposition": "attachment; filename=CFO_Board_Report.pptx"}
     )
 
+@app.post("/api/financial-os/reconciliation", tags=["Financial OS"])
+async def run_financial_os_reconciliation(
+    user: User = Depends(require_auth)
+):
+    from backend.fpa_core.persistence import FinancialLedgerStore
+    from backend.reconciliation.engine import ReconciliationEngine
+    
+    store = FinancialLedgerStore()
+    engine = ReconciliationEngine(store)
+    return engine.run_reconciliation()
+
+@app.post("/api/financial-os/executive-reports", tags=["Financial OS"])
+async def run_financial_os_executive_reports(
+    req: IntelligenceRequest,
+    user: User = Depends(require_auth)
+):
+    from backend.fpa_core.persistence import FinancialLedgerStore
+    from backend.reconciliation.engine import ReconciliationEngine
+    from backend.executive_reporting.templates import ExecutiveReportCompiler
+    
+    store = FinancialLedgerStore()
+    recon_engine = ReconciliationEngine(store)
+    recon_res = recon_engine.run_reconciliation()
+    
+    compiler = ExecutiveReportCompiler(store, recon_res)
+    
+    # Calculate some simulated metrics
+    starting_cash = req.starting_cash
+    ending_cash = starting_cash + 15000000.0 - 28000000.0
+    burn_rate = 1200000.0
+    runway_days = int((starting_cash / burn_rate) * 30.0)
+    ebitda = 15000000.0 - 28000000.0
+    
+    return {
+        "board_report": compiler.generate_board_report(starting_cash, ending_cash, burn_rate, runway_days, ebitda),
+        "lender_package": compiler.generate_lender_report(0.05),
+        "investor_briefing": compiler.generate_investor_report(),
+        "emergency_liquidity": compiler.generate_emergency_liquidity_report(starting_cash, burn_rate),
+        "treasury_briefing": compiler.generate_treasury_report()
+    }
+
+@app.post("/api/financial-os/automation", tags=["Financial OS"])
+async def run_financial_os_automation(
+    req: ForecastRequest,
+    user: User = Depends(require_auth)
+):
+    from backend.fpa_core.persistence import FinancialLedgerStore
+    from backend.reconciliation.engine import ReconciliationEngine
+    from backend.driver_engine.engine import DriverForecastingEngine
+    from backend.automation.scheduler import ScheduledWorkflowEngine
+    
+    store = FinancialLedgerStore()
+    recon_engine = ReconciliationEngine(store)
+    forecaster = DriverForecastingEngine(store)
+    
+    scheduler = ScheduledWorkflowEngine(store, recon_engine, forecaster)
+    
+    # Execute a monthly continuous recurring check
+    res = scheduler.execute_recurring_workflow(req.scenario, req.starting_cash)
+    return res
+
+@app.post("/api/financial-os/governance-audit", tags=["Financial OS"])
+async def run_financial_os_governance_audit(
+    user: User = Depends(require_auth)
+):
+    from backend.approval_system.governance import ApprovalLifecycleTracker, DepartmentReviewCycle, WorkflowGovernanceLogger
+    
+    tracker = ApprovalLifecycleTracker()
+    reviews = DepartmentReviewCycle()
+    logger = WorkflowGovernanceLogger()
+    
+    # Seed a simulated model override log for auditing
+    logger.log_governance_event(
+        event_type="model_override",
+        actor=user.username,
+        description="Applied a 10% tactical first-team squad payroll reduction.",
+        details={"payroll_growth_index_old": 0.0, "payroll_growth_index_new": -0.10}
+    )
+    
+    return {
+        "approvals": tracker.registry,
+        "department_reviews": reviews.get_department_reviews(),
+        "governance_logs": logger.get_governance_logs()
+    }
+

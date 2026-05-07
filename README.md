@@ -76,4 +76,33 @@ docker compose up --build -d
 - 🔌 **[MCP Overview](backend/mcp/README.md)**: Technical details of the tool execution server.
 
 ---
+
+## 🛡️ Enterprise Governance, Verification & Reconciliation Suite
+
+Fin-OS features an institutional-grade validation and oversight suite designed to satisfy strict CFO, creditor, and auditor standards:
+
+### 1. 📊 Financial Reconciliation & Data Integrity
+*   **Duplicate Audits**: Scans the unified ledger to flag identical transaction amounts, categories, or counterparties.
+*   **Cross-Document Matching**: Automatically verifies expected revenues against contract milestones and maps expenses to authorized budget codes.
+*   **Completeness Scorer**: Calculates a `source_completeness_score` (0.0 to 1.0) and verifies lineage back to specific spreadsheets, cell rows, and document hashes.
+*   **Formula Verification**: Automatically audits aggregate departmental variances against individual ledger variances to prevent formula corruption.
+
+### 2. 📝 Board-Grade Reporting Templates
+*   **Board Reports**: Executive briefings, KPI dashboards, liquidity runways, covenant monitoring, risk matrices, and required strategic actions.
+*   **Lender Packages**: Refinancing rates, collateral summaries, quarterly interest liabilities, and compliant status indicators.
+*   **Investor Briefs**: Multi-period organic growth, attendance stability indices, and cash allocation reviews.
+*   **Emergency Liquidity Directives**: Accelerated cash-preservation guidelines and immediate transfer asset liquidation triggers.
+*   **Treasury Briefings**: Precise accounts payable schedules, tax schedules (HMRC VAT), and pending receivables collection trackers.
+
+### 3. ⚙️ Scheduled Automation & Escalation
+*   **Recurring Workflows**: Scheduled Daily, Weekly, Monthly, and Quarterly checks that automatically audit ledger validation records.
+*   **Escalation triggers**: Automatically alerts the CFO if the liquidity runway drops below 90 days, if any critical liabilities are overdue, or if a covenant breach risk is identified.
+*   **System Notifications**: Dynamic `CFO_ALERT`, `TREASURY_ALERT`, `OPERATIONAL_WARNING`, and `DEPARTMENT_VARIANCE_ALERT` notifications.
+
+### 4. 🔏 Approvals Lifecycle & Departmental Governance
+*   **Approval Lifecycle**: Registers requester profiles, dollar amounts, status, timestamps, and escalation histories.
+*   **Department Reviews**: Monthly accountability reviews where department heads can submit variance explanations.
+*   **Planning Audit Log**: Complete history of model overrides, forecast adjustments, and agent decision streams.
+
+---
 MIT License. Created for high-performance business intelligence.
