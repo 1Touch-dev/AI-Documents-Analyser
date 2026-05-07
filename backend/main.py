@@ -1433,6 +1433,38 @@ async def analytics_financial_dashboard(
         dashboard = _default_financial_dashboard()
         dashboard["notes"] = ["Financial extraction could not complete with the current model backend."]
 
+    # High-integrity fallback using actual Ledger database if totals are 0 or empty
+    try:
+        from backend.fpa_core.persistence import FinancialLedgerStore
+        store = FinancialLedgerStore()
+        
+        if dashboard["totals"]["revenue_total"] == 0:
+            revs = store.get_all_revenues()
+            for r in revs:
+                cat = "tickets" if r.category == "ticketing" else r.category
+                if cat in dashboard["revenue"]:
+                    dashboard["revenue"][cat] = r.amount
+                else:
+                    dashboard["revenue"]["f_and_b"] = dashboard["revenue"].get("f_and_b", 0.0) + r.amount
+
+        if dashboard["totals"]["expense_total"] == 0:
+            exps = store.get_all_expenses()
+            for e in exps:
+                dept = "player_salary" if e.department == "payroll" else e.department
+                if dept in dashboard["expenses"]:
+                    dashboard["expenses"][dept] = e.actual_spend
+                else:
+                    dashboard["expenses"]["misc"] = dashboard["expenses"].get("misc", 0.0) + e.actual_spend
+
+        # Recalculate totals
+        dashboard["totals"] = {
+            "revenue_total": round(sum(dashboard["revenue"].values()), 2),
+            "expense_total": round(sum(dashboard["expenses"].values()), 2),
+            "net_total": round(sum(dashboard["revenue"].values()) - sum(dashboard["expenses"].values()), 2)
+        }
+    except Exception as fallback_err:
+        logger.warning("Fallback ledger populate failed: %s", fallback_err)
+
     dashboard["source_documents"] = source_documents[:20]
     dashboard["model_used"] = resolved_model
     return dashboard

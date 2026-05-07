@@ -4,6 +4,27 @@ import { FormEvent, useEffect, useState } from "react";
 import { createPrompt, deletePrompt, listPrompts, type PromptItem } from "@/lib/api";
 import { useAuth } from "@/contexts/auth-context";
 
+const PROMPT_PRESETS = [
+  {
+    name: "CFO Strategic Financial Audit",
+    category: "Financial",
+    description: "Act as an institutional CFO. Deeply analyze EBITDA margins, cash flow runway, and debt covenants.",
+    template: "Act as an institutional CFO. Your job is to perform a high-integrity financial review.\n\nContext:\n\${context}\n\nAnalyze this question: \${question}"
+  },
+  {
+    name: "Senior F&B Operator Insights",
+    category: "F&B",
+    description: "Act as a senior hospitality consultant. Analyze menu engineering, labor efficiency, and portion control.",
+    template: "Act as a senior F&B operator and hospitality consultant. Analyze food cost % and menu profitability.\n\nContext:\n\${context}\n\nQuestion: \${question}"
+  },
+  {
+    name: "Sponsorship Asset Monetization",
+    category: "Sponsorship",
+    description: "Value Engineering approach modeled after Innovative Partnerships Group (IPG360).",
+    template: "Act as the Lead Strategist at a global sports and entertainment consultancy. Focus on Contractually Obligated Income (COI).\n\nContext:\n\${context}\n\nQuestion: \${question}"
+  }
+];
+
 export default function PromptsPage() {
   const { token } = useAuth();
   const [prompts, setPrompts] = useState<PromptItem[]>([]);
@@ -92,7 +113,7 @@ export default function PromptsPage() {
           <form
             onSubmit={onSubmit}
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-2xl space-y-3 rounded-xl border border-white/15 bg-slate-950 p-5"
+            className="w-full max-w-2xl space-y-4 rounded-xl border border-white/15 bg-slate-950 p-6 shadow-2xl"
           >
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-white">Create New Prompt</h3>
@@ -103,6 +124,27 @@ export default function PromptsPage() {
               >
                 Close
               </button>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Quick Presets (Click to auto-fill)</label>
+              <div className="flex flex-wrap gap-2">
+                {PROMPT_PRESETS.map((preset, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      setName(preset.name);
+                      setCategory(preset.category);
+                      setDescription(preset.description);
+                      setTemplate(preset.template);
+                    }}
+                    className="rounded-lg bg-white/5 border border-white/10 px-3 py-1.5 text-xs text-slate-300 hover:bg-white/10 hover:text-white transition"
+                  >
+                    {preset.name}
+                  </button>
+                ))}
+              </div>
             </div>
             <input
               value={name}

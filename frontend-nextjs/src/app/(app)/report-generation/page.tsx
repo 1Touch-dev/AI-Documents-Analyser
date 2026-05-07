@@ -28,7 +28,7 @@ export default function ReportGenerationPage() {
   const [topic, setTopic] = useState("");
   const [query, setQuery] = useState("");
   const [reportType, setReportType] = useState("general");
-  const [outputFormat, setOutputFormat] = useState<"markdown" | "table" | "json">("markdown");
+  const [outputFormat, setOutputFormat] = useState<"markdown" | "table" | "json" | "pdf" | "docx" | "pptx" | "excel">("markdown");
   const [provider, setProvider] = useState("openai");
   const [model, setModel] = useState("auto");
   const [customModelId, setCustomModelId] = useState("");
@@ -63,7 +63,7 @@ export default function ReportGenerationPage() {
         topic,
         query,
         report_type: reportType,
-        output_format: outputFormat,
+        output_format: outputFormat === "pdf" || outputFormat === "docx" || outputFormat === "pptx" || outputFormat === "excel" ? "markdown" : outputFormat,
         provider: provider,
         model: model === "custom" ? customModelId : (model !== "auto" ? model : undefined)
       }, token ?? undefined);
@@ -75,7 +75,7 @@ export default function ReportGenerationPage() {
     }
   };
 
-  const downloadReport = () => {
+  const downloadReport = async () => {
     if (!result) return;
     
     let content = result.report;
@@ -85,21 +85,93 @@ export default function ReportGenerationPage() {
     if (outputFormat === "json") {
       mimeType = "application/json";
       extension = "json";
-      // Try to format JSON nicely if it's parseable
       try {
         const parsed = JSON.parse(content);
         content = JSON.stringify(parsed, null, 2);
-      } catch (e) {
-        // If not parseable as pure JSON, it might be wrapped in markdown
-      }
+      } catch (e) {}
     } else if (outputFormat === "markdown") {
       mimeType = "text/markdown";
       extension = "md";
     } else if (outputFormat === "table") {
       mimeType = "text/csv";
       extension = "csv";
-      // For table, if it returned markdown, we might need to convert it, but let's just save as is or txt
-      // If it returned CSV format, csv extension is correct.
+    } else if (outputFormat === "excel") {
+      try {
+        const res = await fetch("/api/backend/financial-os/export/excel", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ starting_cash: 5000000.0, revenue_items: [], expense_items: [], forecast_data: {} })
+        });
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `Report_${topic.replace(/\s+/g, '_')}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        return;
+      } catch (e) {
+        console.error(e);
+      }
+    } else if (outputFormat === "pptx") {
+      try {
+        const res = await fetch("/api/backend/financial-os/export/pptx", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ title_text: topic, board_summary: content, risks: [] })
+        });
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `Report_${topic.replace(/\s+/g, '_')}.pptx`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        return;
+      } catch (e) {
+        console.error(e);
+      }
+    } else if (outputFormat === "pdf") {
+      const printWindow = window.open("", "_blank");
+      if (printWindow) {
+        printWindow.document.write(`
+          <html>
+            <head>
+              <title>${topic}</title>
+              <style>
+                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 40px; color: #1e293b; line-height: 1.6; }
+                h1 { color: #4f46e5; font-size: 28px; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; }
+                h2 { color: #0f172a; font-size: 20px; margin-top: 24px; }
+                p { margin-bottom: 16px; text-align: justify; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                th, td { border: 1px solid #cbd5e1; padding: 10px; text-align: left; }
+                th { background-color: #f1f5f9; }
+              </style>
+            </head>
+            <body>
+              <h1>${topic}</h1>
+              <p><strong>Generated on:</strong> ${new Date().toLocaleDateString()}</p>
+              <div>${content.replace(/\\n/g, "<br>")}</div>
+              <script>
+                window.onload = function() { window.print(); }
+              </script>
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+      }
+      return;
+    } else if (outputFormat === "docx") {
+      mimeType = "application/msword";
+      extension = "doc";
     }
 
     const blob = new Blob([content], { type: mimeType });
@@ -147,13 +219,13 @@ export default function ReportGenerationPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-2 col-span-1">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Report Type</label>
                   <select 
                     value={reportType}
                     onChange={(e) => setReportType(e.target.value)}
-                    className="w-full rounded-xl border border-white/10 bg-slate-950/50 p-3 text-sm text-white focus:outline-none"
+                    className="w-full rounded-2xl border border-white/10 bg-slate-950/50 p-4 text-sm text-white focus:outline-none focus:border-indigo-500/50"
                   >
                     <option value="general">General Audit</option>
                     <option value="financial">Financial Analysis</option>
@@ -161,30 +233,31 @@ export default function ReportGenerationPage() {
                     <option value="strategic">Strategic SWOT</option>
                   </select>
                 </div>
-                <div className="space-y-2">
+                
+                <div className="space-y-2 col-span-1 md:col-span-2">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Output Format</label>
-                  <div className="flex gap-1 rounded-xl bg-slate-950/50 p-1 border border-white/5">
-                    <button 
-                      onClick={() => setOutputFormat("markdown")}
-                      className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2 text-xs transition ${outputFormat === 'markdown' ? 'bg-indigo-500 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
-                    >
-                      <FileText className="h-3 w-3" />
-                      MD
-                    </button>
-                    <button 
-                      onClick={() => setOutputFormat("table")}
-                      className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2 text-xs transition ${outputFormat === 'table' ? 'bg-indigo-500 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
-                    >
-                      <TableIcon className="h-3 w-3" />
-                      Table
-                    </button>
-                    <button 
-                      onClick={() => setOutputFormat("json")}
-                      className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2 text-xs transition ${outputFormat === 'json' ? 'bg-indigo-500 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
-                    >
-                      <Code className="h-3 w-3" />
-                      JSON
-                    </button>
+                  <div className="grid grid-cols-4 sm:grid-cols-7 gap-1 rounded-2xl bg-slate-950/50 p-1 border border-white/5">
+                    {[
+                      { id: "markdown", label: "MD", icon: FileText },
+                      { id: "table", label: "CSV", icon: TableIcon },
+                      { id: "json", label: "JSON", icon: Code },
+                      { id: "pdf", label: "PDF", icon: FileText },
+                      { id: "docx", label: "Word", icon: FileText },
+                      { id: "pptx", label: "PPT", icon: FileSpreadsheet },
+                      { id: "excel", label: "Excel", icon: FileSpreadsheet }
+                    ].map(f => {
+                      const Icon = f.icon;
+                      return (
+                        <button 
+                          key={f.id}
+                          onClick={() => setOutputFormat(f.id as any)}
+                          className={`flex flex-col items-center justify-center gap-1 rounded-xl py-2 text-[10px] font-bold transition ${outputFormat === f.id ? 'bg-indigo-500 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
+                        >
+                          <Icon className="h-4 w-4" />
+                          {f.label}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
