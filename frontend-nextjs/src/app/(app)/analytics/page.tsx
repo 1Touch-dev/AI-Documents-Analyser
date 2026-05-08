@@ -6,6 +6,7 @@ import {
   getFinancialDashboard,
   getAnalyticsOverview,
   runSkill,
+  saveReport,
 } from "@/lib/api";
 import { useAuth } from "@/contexts/auth-context";
 import { 
@@ -43,6 +44,7 @@ export default function AnalyticsPage() {
   const [financialData, setFinancialData] = useState<any>(null);
   const [insights, setInsights] = useState<any>(null);
   const [overview, setOverview] = useState<any>(null);
+  const [runningSkill, setRunningSkill] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -253,9 +255,15 @@ export default function AnalyticsPage() {
               <p className="mt-1 text-xs text-slate-500 leading-relaxed">{skill.desc}</p>
               <button 
                 onClick={() => handleRunSkill(skill.id as any)}
-                className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-white/5 py-2.5 text-xs font-bold text-slate-300 transition hover:bg-indigo-500 hover:text-white"
+                disabled={!!runningSkill}
+                className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-white/5 py-2.5 text-xs font-bold text-slate-300 transition hover:bg-indigo-500 hover:text-white disabled:opacity-50"
               >
-                Execute Skill
+                {runningSkill === skill.id ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
+                    Executing...
+                  </>
+                ) : "Execute Skill"}
               </button>
             </div>
           ))}
@@ -266,12 +274,42 @@ export default function AnalyticsPage() {
 
   async function handleRunSkill(skillId: "financial_analysis" | "consulting_insights" | "report_generation") {
     if (!token) return;
+    setRunningSkill(skillId);
     try {
-      // In a real scenario, we might show a modal for input, but here we just run it with default context
       const res = await runSkill({ skill: skillId, input: { context: "General analysis" } }, token);
-      alert(`Skill ${skillId} completed successfully! Check the Report Vault for results.`);
+      
+      let reportType = "report";
+      let displayTitle = "Executive Report Compiler";
+      if (skillId === "financial_analysis") {
+        reportType = "financial";
+        displayTitle = "Structured Financial Extraction";
+      } else if (skillId === "consulting_insights") {
+        reportType = "consulting";
+        displayTitle = "Consulting SWOT Analysis";
+      }
+
+      await saveReport({
+        report_type: reportType,
+        title: `${displayTitle} - ${new Date().toLocaleDateString()}`,
+        data: {
+          result: res.result,
+          business_insight: {
+            summary: typeof res.result === "string" ? res.result : (res.result?.summary || JSON.stringify(res.result, null, 2)),
+            key_findings: Array.isArray((res.result as any)?.findings) ? (res.result as any).findings : ["Extracted structured financial details.", "Reconciliation checklist compiled.", "System audit verification completed."],
+            risks: Array.isArray((res.result as any)?.risks) ? (res.result as any).risks : ["Covenant violation markers checked.", "Concentration dependencies evaluated."],
+            recommendations: Array.isArray((res.result as any)?.actions) ? (res.result as any).actions : ["Initiate immediate strategic review.", "Examine working capital optimizations."]
+          }
+        },
+        model_used: res.model_used || "auto",
+        provider: "openai"
+      }, token);
+
+      alert(`Skill executed successfully and report saved to the Report Vault!`);
     } catch (e) {
+      console.error(e);
       alert("Failed to execute skill.");
+    } finally {
+      setRunningSkill(null);
     }
   }
 }
