@@ -69,18 +69,11 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     backendResponse.headers.get("content-type") ?? "application/json; charset=utf-8";
 
   const isText = contentType.includes("json") || 
-                 contentType.includes("text") || 
+                 contentType.startsWith("text/") || 
                  contentType.includes("html") || 
-                 contentType.includes("xml");
+                 contentType.includes("/xml") ||
+                 contentType.includes("+xml");
   const isBinary = !isText;
-
-  let responseBody: any;
-  if (isBinary) {
-    const arrayBuffer = await backendResponse.arrayBuffer();
-    responseBody = arrayBuffer;
-  } else {
-    responseBody = await backendResponse.text();
-  }
 
   const responseHeaders = new Headers();
   responseHeaders.set("content-type", contentType);
@@ -88,6 +81,15 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   if (contentDisposition) {
     responseHeaders.set("content-disposition", contentDisposition);
   }
+
+  if (isBinary) {
+    return new NextResponse(backendResponse.body, {
+      status: backendResponse.status,
+      headers: responseHeaders,
+    });
+  }
+
+  const responseBody = await backendResponse.text();
 
   const response = new NextResponse(responseBody, {
     status: backendResponse.status,
