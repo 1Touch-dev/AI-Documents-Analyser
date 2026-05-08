@@ -83,7 +83,9 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   }
 
   if (isBinary) {
-    return new NextResponse(backendResponse.body, {
+    const arrayBuffer = await backendResponse.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    return new NextResponse(buffer, {
       status: backendResponse.status,
       headers: responseHeaders,
     });
