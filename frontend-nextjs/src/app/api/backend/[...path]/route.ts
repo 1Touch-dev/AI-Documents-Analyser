@@ -77,16 +77,21 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   let responseBody: any;
   if (isBinary) {
     const arrayBuffer = await backendResponse.arrayBuffer();
-    responseBody = new Uint8Array(arrayBuffer);
+    responseBody = arrayBuffer;
   } else {
     responseBody = await backendResponse.text();
   }
 
+  const responseHeaders = new Headers();
+  responseHeaders.set("content-type", contentType);
+  const contentDisposition = backendResponse.headers.get("content-disposition");
+  if (contentDisposition) {
+    responseHeaders.set("content-disposition", contentDisposition);
+  }
+
   const response = new NextResponse(responseBody, {
     status: backendResponse.status,
-    headers: {
-      "content-type": contentType,
-    },
+    headers: responseHeaders,
   });
 
   if (backendResponse.ok && isAuthTokenResponse(path)) {
